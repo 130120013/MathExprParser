@@ -25,5 +25,6 @@ NUMB	([0-9]+)|([0-9]*\.[0-9]+)
 [\n]			{ return '\n'; }
 [ \t]+			{ /* empty */ }
 "quit"			{ yyterminate(); }
+"hello world"   {}
 .				/* nothing, eat up */
 
