@@ -1,5 +1,7 @@
 #include <iostream> 
 #include <queue>
+#include <stack>
+#include "SortStation.cpp"
 
 
 //template <class Iterator> 
@@ -10,10 +12,10 @@ void lex(const char* expr, const int length, double* number)
 	auto it = expr;
 	short hasPunct = 0;
 	*number = 0;
-	std::queue<IToken> operationQueue;
-	std::queue<IToken> outputQueue;
+	std::stack<IToken<double>> operationQueue;
+	std::queue<IToken<double>> outputQueue;
 
-	while (*endPtr != NULL) //если NULL, значит, что strtod достиг конца строки
+	while (*endPtr != NULL || begPtr != expr + length) //если NULL, значит, что достиг конца строки
 	{
 		try
 		{
@@ -27,9 +29,11 @@ void lex(const char* expr, const int length, double* number)
 				}
 			 */
 
+			//не описан случай вхождения токена функции
+
 			if (*begPtr >= '0' || *begPtr <= '9') //если число class Number
 			{
-				outputQueue.push(std::strtod(begPtr, &endPtr));
+				outputQueue.push(Number<double>(std::strtod(begPtr, &endPtr)));
 
 				if (begPtr == endPtr)
 					throw std::invalid_argument("ERROR!");
@@ -42,18 +46,105 @@ void lex(const char* expr, const int length, double* number)
 					begPtr += 1;
 					continue;
 				}
+
 				if (*begPtr == '+') //надо различать бинарный и унарный +
 				{
+					if (OperatorPlus<double>().getPriority() < operationQueue.top().getPriority())
+						outputQueue.push(operationQueue.top());
+					else
+						operationQueue.push(OperatorPlus<double>());
+
+					begPtr += 1;
 					//если следующий токен - число, то унарный
 					//необходимо ввести счетчик операторов? 
 				}
+				if (*begPtr == '-')
+				{
+					if (OperatorMinus<double>().getPriority() < operationQueue.top().getPriority())
+						outputQueue.push(operationQueue.top());
+					else
+						operationQueue.push(OperatorMinus<double>());
+
+					begPtr += 1;
+				}
+				if (*begPtr == '*')
+				{
+					if (OperatorMul<double>().getPriority() < operationQueue.top().getPriority())
+						outputQueue.push(operationQueue.top());
+					else
+						operationQueue.push(OperatorMul<double>());
+
+					begPtr += 1;
+				}
+				if (*begPtr == '/')
+				{
+					if (OperatorDiv<double>().getPriority() < operationQueue.top().getPriority())
+						outputQueue.push(operationQueue.top());
+					else
+						operationQueue.push(OperatorDiv<double>());
+
+					begPtr += 1;
+				}
+				if (*begPtr == ',')
+				{
+					bool isOpeningBracket = false;
+					while (!isOpeningBracket) 
+					{
+						if (operationQueue.top() != '(') //надо спроектировать метод получения символа
+						{
+							outputQueue.push(operationQueue.pop());
+						}
+						else
+						{
+							isOpeningBracket = true;
+						}
+					}
+					if(!isOpeningBracket)
+						throw std::invalid_argument("ERROR!");
+					begPtr += 1;
+				}
+				if (*begPtr == '(')
+				{
+					operationQueue.push(Delimiter<double>());
+					begPtr += 1;
+				}
+				if (*begPtr == ')')
+				{
+					bool isOpeningBracket = false;
+					while (!isOpeningBracket)
+					{
+						if (operationQueue.top() != '(') 
+						{
+							outputQueue.push(operationQueue.pop());
+						}
+						else
+						{
+							isOpeningBracket = true;
+						}
+					}
+					if (!isOpeningBracket)
+						throw std::invalid_argument("ERROR!");
+					else
+						operationQueue.pop();
+					if (operationQueue.top() == "sin") //если функция
+						outputQueue.push(Operator<double>());
+					begPtr += 1;
+				}
+
 			}
 		}
 		catch (std::exception e)
 		{
 			throw std::invalid_argument("ERROR!");
 		}
-	} 
+	}
+	while (operationQueue.size() != 0)
+	{
+		if (operationQueue.pop() == '(' || operationQueue.pop() == ')') //если скобка
+			throw std::invalid_argument("ERROR!");
+		else
+			outputQueue.push(operationQueue.pop());
+	}
 }
 
 int main()

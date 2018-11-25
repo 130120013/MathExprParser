@@ -3,16 +3,17 @@
 template <class T>
 class IToken
 {
-public:
-	virtual T action() = 0;
+//public:
+//	virtual T action() = 0;
 };
 
 template <class T = double>
-class Number : public IToken
+class Number : public IToken<T>
 {
 public:
 	Number(T val) : value(val) {};
-	T action()
+	Number(Number<T> num) : value(num()) {};
+	T operator()()
 	{
 		return value;
 	}
@@ -22,26 +23,67 @@ private:
 };
 
 template <class T>
-class Operator : public IToken //+-*/
+class Operator : public IToken<T>
 {
 public:
-	T action()
+	T operator()(const Number<T> a, const Number<T> b)
 	{
-
+		return //a() - b();
+			;
+	}
+	short getPriority()
+	{
+		return priority;
 	}
 private:
+	short priority; 
+};
 
-
+template <class T = double>
+class OperatorPlus : public Operator<T> //+-*/
+{
+public:
+	Number<T> operator()(const Number<T> a, const Number<T> b)
+	{
+		return a() + b();
+	}
+};
+template <class T>
+class OperatorMinus : public Operator<T>
+{
+public:
+	T operator()(const Number<T> a, const Number<T> b)
+	{
+		return a() - b();
+	}
+};
+template <class T>
+class OperatorMul : public Operator<T>
+{
+public:
+	Number<T> operator()(const Number<T> a, const Number<T> b)
+	{
+		return a() * b();
+	}
+};
+template <class T>
+class OperatorDiv : public Operator<T>
+{
+public:
+	Number<T> operator()(const Number<T> a, const Number<T> b)
+	{
+		return a() / b();
+	}
 };
 
 template <class T>
-class Function : public IToken //sin,cos...
+class Function : public IToken<T> //sin,cos...
 {
 
 };
 
 template <class T>
-class Delimiter : public IToken //,' '()
+class Delimiter : public IToken<T> //,' '()
 {
 
 };
