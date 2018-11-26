@@ -1,2 +1,19 @@
-﻿  Parser.cpp
-  MathParser.vcxproj -> C:\Users\Alina.Protopopova\Pictures\CAMAAS\rep\MathExprParser\MathParser\x64\Debug\MathParser.exe
+﻿  SortStation.cpp
+  Parser.cpp
+c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(157): error C3312: не найдена вызываемая функция "begin" для типа "std::queue<T,std::deque<_Ty,std::allocator<_Ty>>>"
+          with
+          [
+              T=double,
+              _Ty=double
+          ]
+  c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(155): note: при компиляции функции-члена "<Нет данных>" класса <Нет данных>
+  c:\users\jack\documents\mathexprparser\mathparser\mathparser\parser.cpp(98): note: см. ссылку на создание экземпляров класса шаблон при компиляции "OperatorDiv<double>"
+c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(157): error C3312: не найдена вызываемая функция "end" для типа "std::queue<T,std::deque<_Ty,std::allocator<_Ty>>>"
+          with
+          [
+              T=double,
+              _Ty=double
+          ]
+c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(158): error C2065: arg: необъявленный идентификатор
+c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(159): error C2065: arg: необъявленный идентификатор
+  Создание кода...

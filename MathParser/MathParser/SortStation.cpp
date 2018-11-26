@@ -24,6 +24,7 @@ public:
 	*/
 	virtual void push_argument(T value) = 0;
 	virtual bool is_ready() const = 0; //all parameters are specified
+
 //	virtual T action() = 0;
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 };
@@ -44,6 +45,7 @@ public:
 	{
 		return true;
 	}
+
 	void push_argument(T)
 	{
 		//do nothing for literals - they do not accept parameters. But the implementation (even empty) must be provided for polymorphic methods.
@@ -113,18 +115,32 @@ template <class T>
 class OperatorMinus : public Operator<T>
 {
 public:
-	T operator()(const Number<T> a, const Number<T> b)
+	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
 	{
-		return a() - b();
+		auto result = T(); //zero-initialization
+		for (auto arg& : this->parameter_queue())
+			result += arg;
+		return arg;
+	}
+	virtual bool is_ready() const
+	{
+		return this->parameter_queue().size() == 2;
 	}
 };
 template <class T>
 class OperatorMul : public Operator<T>
 {
 public:
-	Number<T> operator()(const Number<T> a, const Number<T> b)
+	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
 	{
-		return a() * b();
+		auto result = T(); //zero-initialization
+		for (auto arg& : this->parameter_queue())
+			result += arg;
+		return arg;
+	}
+	virtual bool is_ready() const
+	{
+		return this->parameter_queue().size() == 2;
 	}
 	virtual short getPriority()
 	{
@@ -135,9 +151,20 @@ template <class T>
 class OperatorDiv : public Operator<T>
 {
 public:
-	Number<T> operator()(const Number<T> a, const Number<T> b)
+	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
 	{
-		return a() / b();
+		auto result = T(); //zero-initialization
+		for (auto& arg : this->parameter_queue())
+			result += arg;
+		return arg;
+	}
+	virtual bool is_ready() const
+	{
+		return this->parameter_queue().size() == 2;
+	}
+	virtual short getPriority()
+	{
+		return 1;
 	}
 };
 
