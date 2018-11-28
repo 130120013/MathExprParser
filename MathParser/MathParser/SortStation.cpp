@@ -94,13 +94,16 @@ protected:
 template <class T = double>
 class OperatorPlus : public Operator<T> //+-*/
 {
+	T ops[2], *top = ops;
+	
 public:
+	virtual void push_argument(T value)
+	{
+		*top++ = value;
+	}
 	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
 	{
-		auto result = T(); //zero-initialization
-		for (auto arg&:this->parameter_queue())
-			result += arg;
-		return arg;
+		return ops[0] + ops[1];
 	}
 	virtual bool is_ready() const
 	{
