@@ -1,19 +1,14 @@
-﻿  SortStation.cpp
-  Parser.cpp
-c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(157): error C3312: не найдена вызываемая функция "begin" для типа "std::queue<T,std::deque<_Ty,std::allocator<_Ty>>>"
+﻿  Parser.cpp
+c:\users\alina.protopopova\pictures\camaas\rep\mathexprparser\mathparser\mathparser\sortstation.cpp(83): warning C4267: 'return': conversion from 'size_t' to 'unsigned int', possible loss of data
+  c:\users\alina.protopopova\pictures\camaas\rep\mathexprparser\mathparser\mathparser\sortstation.cpp(82): note: while compiling class template member function 'unsigned int Operator<T>::get_params_count(void) const'
           with
           [
-              T=double,
-              _Ty=double
+              T=double
           ]
-  c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(155): note: при компиляции функции-члена "<Нет данных>" класса <Нет данных>
-  c:\users\jack\documents\mathexprparser\mathparser\mathparser\parser.cpp(98): note: см. ссылку на создание экземпляров класса шаблон при компиляции "OperatorDiv<double>"
-c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(157): error C3312: не найдена вызываемая функция "end" для типа "std::queue<T,std::deque<_Ty,std::allocator<_Ty>>>"
+  c:\users\alina.protopopova\pictures\camaas\rep\mathexprparser\mathparser\mathparser\sortstation.cpp(98): note: see reference to class template instantiation 'Operator<T>' being compiled
           with
           [
-              T=double,
-              _Ty=double
+              T=double
           ]
-c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(158): error C2065: arg: необъявленный идентификатор
-c:\users\jack\documents\mathexprparser\mathparser\mathparser\sortstation.cpp(159): error C2065: arg: необъявленный идентификатор
-  Создание кода...
+  c:\users\alina.protopopova\pictures\camaas\rep\mathexprparser\mathparser\mathparser\parser.cpp(77): note: see reference to class template instantiation 'OperatorPlus<double>' being compiled
+  MathParser.vcxproj -> C:\Users\Alina.Protopopova\Pictures\CAMAAS\rep\MathExprParser\MathParser\x64\Debug\MathParser.exe

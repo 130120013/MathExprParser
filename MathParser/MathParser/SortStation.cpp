@@ -24,8 +24,6 @@ public:
 	*/
 	virtual void push_argument(T value) = 0;
 	virtual bool is_ready() const = 0; //all parameters are specified
-
-//	virtual T action() = 0;
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 };
 
@@ -49,9 +47,10 @@ public:
 	{
 		//do nothing for literals - they do not accept parameters. But the implementation (even empty) must be provided for polymorphic methods.
 		//or throw an exception
-#ifndef __CUDACC__
-		throw bad_expession_parameters("An argument is specified for a literal");
-#endif
+		return;
+//#ifndef __CUDACC__
+//		throw bad_expession_parameters("An argument is specified for a literal");
+//#endif
 	}
 protected:
 private:
@@ -94,7 +93,7 @@ protected:
 	}
 };
 
-template <class T = double>
+template <class T>
 class OperatorPlus : public Operator<T> //+-*/
 {
 	T ops[2], *top = ops;
@@ -198,83 +197,76 @@ public:
 		return 2;
 	}
 };
-
-template <class T = double>
-class OperatorUnaryPlus : public Operator<T> //+-*/
-{
-	T op;
-
-public:
-	virtual void push_argument(T value)
-	{
-		op = value;
-	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
-	{
-		return ops[0] + ops[1];
-	}
-	virtual bool is_ready() const
-	{
-		return this->parameter_queue().size() == 1;
-	}
-	virtual unsigned get_params_count() const
-	{
-		return 1;
-	}
-	/*T operator()(const Number<T> a, const Number<T> b)
-	{
-		return a() + b();
-	}*/
-};
-
-template <class T = double>
-class OperatorUnaryMinux : public Operator<T> //+-*/
-{
-	T op;
-
-public:
-	virtual void push_argument(T value)
-	{
-		op = -1 * value;
-	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
-	{
-		return ops[0] + ops[1];
-	}
-	virtual bool is_ready() const
-	{
-		return this->parameter_queue().size() == 1;
-	}
-	virtual unsigned get_params_count() const
-	{
-		return 1;
-	}
-	/*T operator()(const Number<T> a, const Number<T> b)
-	{
-		return a() + b();
-	}*/
-};
+//
+//template <class T = double>
+//class OperatorUnaryPlus : public Operator<T> //+-*/
+//{
+//	T op;
+//
+//public:
+//	virtual void push_argument(T value)
+//	{
+//		op = value;
+//	}
+//	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+//	{
+//		return op;
+//	}
+//	virtual bool is_ready() const
+//	{
+//		return true;//this->parameter_queue().size() == 1;
+//	}
+//	virtual unsigned get_params_count() const
+//	{
+//		return 1;
+//	}
+//	/*T operator()(const Number<T> a, const Number<T> b)
+//	{
+//		return a() + b();
+//	}*/
+//};
+//
+//template <class T = double>
+//class OperatorUnaryMinus : public Operator<T> //+-*/
+//{
+//	T op;
+//
+//public:
+//	virtual void push_argument(T value)
+//	{
+//		op = -1 * value;
+//	}
+//	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+//	{
+//		return (op < 0) ? op : -1 * op;
+//	}
+//	virtual bool is_ready() const
+//	{
+//		return true;//this->parameter_queue().size() == 1;
+//	}
+//	virtual unsigned get_params_count() const
+//	{
+//		return 1;
+//	}
+//	/*T operator()(const Number<T> a, const Number<T> b)
+//	{
+//		return a() + b();
+//	}*/
+//};
 
 template <class T>
 class Function : public IToken<T> //sin,cos...
 {
 	std::queue<T> m_parameters;
 public:
-	//virtual T operator()()  = 0;/*Implementation of IToken<T>::operator()()*/
 
-	/*If this form is defined, then it will hide the "virtual T operator()()" overload, unless that form is also explicitly declared even as pure virtual*/
-	//T operator()(const Number<T> a, const Number<T> b)
-	//{
-	//	return //a() - b();
-	//		;
-	//}
 	virtual void push_argument(T value)
 	{
 		m_parameters.push(value);
 	}
 	virtual unsigned get_params_count() const
 	{
-		//return m_parameters.size();
+		return m_parameters.size();
 	}
 protected:
 	std::queue<T>& parameter_queue()
@@ -309,7 +301,6 @@ public:
 		return 1;
 	}
 };
-
 template <class T>
 class CosFunction : public Function<T>
 {
@@ -332,7 +323,6 @@ public:
 		return 1;
 	}
 };
-
 template <class T>
 class TgFunction : public Function<T>
 {
@@ -360,23 +350,36 @@ public:
 	}
 };
 
-template <class T = bool >
-class Bracket : public IToken<T> //,' '()
+template <class T>
+class Bracket : public Operator<T> //,' '()
 {
-	T openingBracket;
+	//T openingBracket;
 public:
-	Bracket(const T isOpeningBracket) : openingBracket(isOpeningBracket) {};
+	//Bracket(const T isOpeningBracket) : openingBracket(isOpeningBracket) {};
+	Bracket() = default;
+
+	virtual T operator()() 
+	{
+		return true;
+	}
+
+	virtual bool is_ready() const
+	{
+		return true;
+	}
 
 	virtual void push_argument(T value)
 	{
-		openingBracket = value; //true is for opening bracket, false is for closing.
+		return; //openingBracket = value; //true is for opening bracket, false is for closing.
 	}
 };
 
-template <class T = char> //char?
+template <class T>
 class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 {
-	T op;
+	T op = 0;
+	char* name;
+	size_t name_length = 0;
 public:
 	Variable(T value) : op(value) {};
 	Variable(const Variable<T>& val) = default;
@@ -385,12 +388,16 @@ public:
 	{
 		op = value;
 	}
-	virtual T operator()()//? what should this method do?
+	virtual T operator()()
 	{
 		return op;
 	}
 	virtual bool is_ready() const
 	{
 		return true;
+	}
+	char* get_name()
+	{
+		return name;
 	}
 };
