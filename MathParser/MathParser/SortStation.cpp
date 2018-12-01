@@ -60,7 +60,7 @@ private:
 template <class T>
 class Operator : public IToken<T>
 {
-	std::queue<T> m_parameters;
+	//std::queue<T> m_parameters;
 public:
 	//virtual T operator()()  = 0;/*Implementation of IToken<T>::operator()()*/
 
@@ -70,27 +70,27 @@ public:
 	//	return //a() - b();
 	//		;
 	//}
-	virtual void push_argument(T value)
+	/*virtual void push_argument(T value)
 	{
 		m_parameters.push(value);
-	}
+	}*/
 	virtual short getPriority()
 	{
 		return 0; //default priority, less code but more error prone
 	}
-	virtual std::size_t get_params_count() const
+	/*virtual std::size_t get_params_count() const
 	{
 		return m_parameters.size();
-	}
+	}*/
 protected:
-	std::queue<T>& parameter_queue()
+	/*std::queue<T>& parameter_queue()
 	{
 		return m_parameters;
 	}
 	const std::queue<T>& parameter_queue() const
 	{
 		return m_parameters;
-	}
+	}*/
 };
 
 template <class T>
