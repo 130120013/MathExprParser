@@ -3,12 +3,13 @@
 #include <stack>
 #include "SortStation.cpp"
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 
 template <class T>
 std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) //пока что только для чисел и операторов
 {
-	if(*input_string >= '0' || *input_string <= '9')
+	if(*input_string >= '0' && *input_string <= '9')
 		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 	if (*input_string == '+')
 		return std::make_shared<OperatorPlus<T>>();
@@ -18,38 +19,46 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) 
 		return std::make_shared<OperatorMul<T>>();
 	if (*input_string == '/')
 		return std::make_shared<OperatorDiv<T>>();
+	if (*input_string == 's')
+	{
+		if (std::strstr(input_string, "sin") != NULL)
+		{
+			return std::make_shared<SinFunction<T>>();
+		}
+	}
+	if (*input_string == 'c')
+	{
+		if (std::strstr(input_string, "cos") != NULL)
+		{
+			return std::make_shared<CosFunction<T>>();
+		}
+	}
+	if (*input_string == 't')
+	{
+		if (std::strstr(input_string, "tg") != NULL)
+		{
+			return std::make_shared<TgFunction<T>>();
+		}
+	}
 
 	return NULL;
 }
 
 //template <class Iterator> 
-std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int length, double* number)
+std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int length)
 {
 	char* endPtr = (char*)(expr + length - 1);
 	char* begPtr = (char*)(expr + 0);
 	auto it = expr;
 	short hasPunct = 0;
-	*number = 0;
 	std::stack<std::shared_ptr<IToken<double>>> operationQueue;
 	std::queue<std::shared_ptr<IToken<double>>> outputQueue;
 
-	while (*begPtr != NULL || begPtr != expr + length) //если NULL, значит, что достиг конца строки
+	while (*begPtr != NULL || begPtr != expr + length) 
 	{
 		try
 		{
-			/*	if (*it == '.')
-				{
-					hasPunct += 1;
-					if (hasPunct == 2)
-					{
-						throw std::invalid_argument("dublicated dot");
-					}
-				}
-			 */
-			//не описан случай вхождения токена функции
-
-
-			if (*begPtr >= '0' && *begPtr <= '9') //если число class Number
+			if (*begPtr >= '0' && *begPtr <= '9')
 			{
 				outputQueue.push(parse_token<double>(begPtr, &endPtr));
 
@@ -64,67 +73,90 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 					begPtr += 1;
 					continue;
 				}
+				if (*begPtr = 's') //sin
+				{
+					auto funcSin = parse_token<double>(begPtr, &endPtr);
+					if(funcSin != NULL)
+						outputQueue.push(funcSin);
+					else 
+						throw std::invalid_argument("ERROR!");
+					begPtr += 3;
+				}
+				if (*begPtr = 'c') //cos
+				{
+					auto funcCos = parse_token<double>(begPtr, &endPtr);
+					if (funcCos != NULL)
+						outputQueue.push(funcCos);
+					else
+						throw std::invalid_argument("ERROR!");
+					begPtr += 3;
+				}
+				if (*begPtr = 't') //tg
+				{
+					auto funcTg = parse_token<double>(begPtr, &endPtr);
+					if (funcTg != NULL)
+						outputQueue.push(funcTg);
+					else
+						throw std::invalid_argument("ERROR!");
+					begPtr += 2;
+				}
 
 				if (*begPtr == '+')
 				{
 					char tok = *(begPtr + 1);
-					if (tok >= '0' && tok <= '9') //унарный плюс
+					if (tok >= '0' && tok <= '9') //unary +
 					{
 						outputQueue.push(parse_token<double>(begPtr, &endPtr));
 						begPtr = endPtr;
 					}
-					else //бинарный плюс
+					else //binary +
 					{
-						if (operationQueue.size() != 0 && OperatorPlus<double>().getPriority() < dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
+						if (operationQueue.size() != 0 && OperatorPlus<double>().getPriority() <= dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
 						{
 							outputQueue.push(operationQueue.top());
 							operationQueue.pop();
 						}
-						else
-							operationQueue.push(parse_token<double>(begPtr, &endPtr));
+						operationQueue.push(parse_token<double>(begPtr, &endPtr));
 						begPtr += 1;
 					}
 				}
 				if (*begPtr == '-')
 				{
 					char tok = *(begPtr + 1);
-					if (tok >= '0' && tok <= '9') //унарный минус
+					if (tok >= '0' && tok <= '9') //unary -
 					{
 						outputQueue.push(parse_token<double>(begPtr, &endPtr));
 						begPtr = endPtr;
 					}
-					else //бинарный минус
+					else //binary -
 					{
-						if (operationQueue.size() != 0 && OperatorMinus<double>().getPriority() < dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
+						if (operationQueue.size() != 0 && OperatorMinus<double>().getPriority() <= dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
 						{
 							outputQueue.push(operationQueue.top());
 							operationQueue.pop();
 						}
-						else
-							operationQueue.push(parse_token<double>(begPtr, &endPtr));
+						operationQueue.push(parse_token<double>(begPtr, &endPtr));
 						begPtr += 1;
 					}
 				}
 				if (*begPtr == '*')
 				{
-					if (operationQueue.size() != 0 && OperatorMul<double>().getPriority() < dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
+					if (operationQueue.size() != 0 && OperatorMul<double>().getPriority() <= dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
 					{
 						outputQueue.push(operationQueue.top());
 						operationQueue.pop();
 					}
-					else
-						operationQueue.push(parse_token<double>(begPtr, &endPtr));
+					operationQueue.push(parse_token<double>(begPtr, &endPtr));
 					begPtr += 1;
 				}
 				if (*begPtr == '/')
 				{
-					if (operationQueue.size() != 0 && OperatorDiv<double>().getPriority() < dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
+					if (operationQueue.size() != 0 && OperatorDiv<double>().getPriority() <= dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
 					{
 						outputQueue.push(operationQueue.top());
 						operationQueue.pop();
 					}
-					else
-						operationQueue.push(parse_token<double>(begPtr, &endPtr));
+					operationQueue.push(parse_token<double>(begPtr, &endPtr));
 					begPtr += 1;
 				}
 				if (*begPtr == ',')
@@ -170,11 +202,8 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 						throw std::invalid_argument("ERROR!");
 					else
 						operationQueue.pop();
-					//if (operationQueue.top() == "sin") //если функция
-					//	outputQueue.push(Operator<double>());
 					begPtr += 1;
 				}
-
 			}
 		}
 		catch (std::exception e)
@@ -184,21 +213,21 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 	}
 	while (operationQueue.size() != 0)
 	{
-		//if (operationQueue.pop() == '(' || operationQueue.pop() == ')') //если скобка
-		//	throw std::invalid_argument("ERROR!");
-		//else
+		if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) != NULL) //checking enclosing brackets
+			throw std::invalid_argument("ERROR!");
+		else
+		{
 			outputQueue.push(operationQueue.top());
 			operationQueue.pop();
+		}
 	}
 	return outputQueue;
 }
 
 int main()
 {
-	char* endptr;
-	double number = std::strtod("123.5c 5", &endptr);
-	int length = 9;
-	lex("4 - 8 - 9", length, &number);
+	int length = 12;
+	lex("4.12 + 8 * 9", length);
 
 	return 0;
 } 
