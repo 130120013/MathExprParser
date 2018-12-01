@@ -76,7 +76,10 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 					else //бинарный плюс
 					{
 						if (operationQueue.size() != 0 && OperatorPlus<double>().getPriority() < dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
+						{
 							outputQueue.push(operationQueue.top());
+							operationQueue.pop();
+						}
 						else
 							operationQueue.push(parse_token<double>(begPtr, &endPtr));
 						begPtr += 1;
@@ -93,7 +96,10 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 					else //бинарный минус
 					{
 						if (operationQueue.size() != 0 && OperatorMinus<double>().getPriority() < dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
+						{
 							outputQueue.push(operationQueue.top());
+							operationQueue.pop();
+						}
 						else
 							operationQueue.push(parse_token<double>(begPtr, &endPtr));
 						begPtr += 1;
@@ -102,7 +108,10 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 				if (*begPtr == '*')
 				{
 					if (operationQueue.size() != 0 && OperatorMul<double>().getPriority() < dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
+					{
 						outputQueue.push(operationQueue.top());
+						operationQueue.pop();
+					}
 					else
 						operationQueue.push(parse_token<double>(begPtr, &endPtr));
 					begPtr += 1;
@@ -110,7 +119,10 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 				if (*begPtr == '/')
 				{
 					if (operationQueue.size() != 0 && OperatorDiv<double>().getPriority() < dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
+					{
 						outputQueue.push(operationQueue.top());
+						operationQueue.pop();
+					}
 					else
 						operationQueue.push(parse_token<double>(begPtr, &endPtr));
 					begPtr += 1;
@@ -118,48 +130,50 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 				if (*begPtr == ',')
 				{
 					bool isOpeningBracket = false;
-					while (!isOpeningBracket) 
+					while (!isOpeningBracket || operationQueue.size() != 0) //while an opening bracket is not found or an operation stack is not empty
 					{
-						if (operationQueue.top() != '(') //operationQueue.top() 
+						if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) == NULL) //if the cast to Bracket is not successfull, return NULL => it is not '('  
 						{
-							outputQueue.push(operationQueue.pop());
+							outputQueue.push(operationQueue.top());
+							operationQueue.pop();
 						}
 						else
 						{
 							isOpeningBracket = true;
 						}
 					}
-					if(!isOpeningBracket)
+					if(!isOpeningBracket) //missing '('
 						throw std::invalid_argument("ERROR!");
 					begPtr += 1;
 				}
-				//if (*begPtr == '(')
-				//{
-				//	operationQueue.push(Delimiter<double>());
-				//	begPtr += 1;
-				//}
-				//if (*begPtr == ')')
-				//{
-				//	bool isOpeningBracket = false;
-				//	while (!isOpeningBracket)
-				//	{
-				//		if (operationQueue.top() != '(') 
-				//		{
-				//			outputQueue.push(operationQueue.pop());
-				//		}
-				//		else
-				//		{
-				//			isOpeningBracket = true;
-				//		}
-				//	}
-				//	if (!isOpeningBracket)
-				//		throw std::invalid_argument("ERROR!");
-				//	else
-				//		operationQueue.pop();
-				//	if (operationQueue.top() == "sin") //если функция
-				//		outputQueue.push(Operator<double>());
-				//	begPtr += 1;
-				//}
+				if (*begPtr == '(')
+				{
+					operationQueue.push(std::make_shared<Bracket<double>>());
+					begPtr += 1;
+				}
+				if (*begPtr == ')')
+				{
+					bool isOpeningBracket = false;
+					while (!isOpeningBracket || operationQueue.size() != 0)
+					{
+						if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) == NULL)
+						{
+							outputQueue.push(operationQueue.top());
+							operationQueue.pop();
+						}
+						else
+						{
+							isOpeningBracket = true;
+						}
+					}
+					if (!isOpeningBracket)
+						throw std::invalid_argument("ERROR!");
+					else
+						operationQueue.pop();
+					//if (operationQueue.top() == "sin") //если функция
+					//	outputQueue.push(Operator<double>());
+					begPtr += 1;
+				}
 
 			}
 		}
@@ -183,8 +197,8 @@ int main()
 {
 	char* endptr;
 	double number = std::strtod("123.5c 5", &endptr);
-	int length = 12;
-	lex("123.5 - 56.6", length, &number);
+	int length = 9;
+	lex("4 - 8 - 9", length, &number);
 
 	return 0;
 } 

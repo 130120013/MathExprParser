@@ -78,7 +78,7 @@ public:
 	{
 		return 0; //default priority, less code but more error prone
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return m_parameters.size();
 	}
@@ -111,7 +111,7 @@ public:
 	{
 		return this->parameter_queue().size() == 2;
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return 2;
 	}
@@ -138,7 +138,7 @@ public:
 	{
 		return this->parameter_queue().size() == 2;
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return 2;
 	}
@@ -165,7 +165,7 @@ public:
 	{
 		return 1;
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return 2;
 	}
@@ -192,7 +192,7 @@ public:
 	{
 		return 1;
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return 2;
 	}
@@ -264,7 +264,7 @@ public:
 	{
 		m_parameters.push(value);
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return m_parameters.size();
 	}
@@ -296,7 +296,7 @@ public:
 	{
 		return this->parameter_queue().size() == 1;
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return 1;
 	}
@@ -318,7 +318,7 @@ public:
 	{
 		return this->parameter_queue().size() == 1;
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return 1;
 	}
@@ -344,7 +344,7 @@ public:
 	{
 		return -1;
 	}
-	virtual unsigned get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return 1;
 	}
