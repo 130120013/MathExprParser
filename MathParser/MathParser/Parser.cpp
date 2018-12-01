@@ -8,7 +8,7 @@
 template <class T>
 std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) //пока что только для чисел и операторов
 {
-	if(*input_string >= '0' || *input_string <= '9')
+	if(*input_string >= '0' && *input_string <= '9')
 		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 	if (*input_string == '+')
 		return std::make_shared<OperatorPlus<T>>();
@@ -195,10 +195,10 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 
 int main()
 {
-	char* endptr;
-	double number = std::strtod("123.5c 5", &endptr);
+	//char* endptr;
+	double number;// = std::strtod("123.5c 5", &endptr);
 	int length = 9;
 	lex("4 - 8 - 9", length, &number);
-
+	std::cout << number << "\n";
 	return 0;
 } 
