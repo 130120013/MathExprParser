@@ -1,0 +1,11 @@
+[Dd]ebug/
+[Rr]elease/
+x64/
+.vs/
+*.tlog
+*.idb
+*.ipch
+*.pdb
+*.ilk
+*.db
+*.suo
