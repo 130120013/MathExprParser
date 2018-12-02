@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <vector>
 
 template <class T>
 std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) //пока что только для чисел и операторов
@@ -238,8 +239,66 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 	return outputQueue;
 }
 
+Function<std::shared_ptr<IToken<double>>> lexHeader(const char* expr, const int length)
+{
+	Function<std::shared_ptr<IToken<double>>> funcName;
+	char* name = (char*)("");
+	unsigned short f = std::strstr(expr, "(") - expr;
+	std::strncpy(name, expr, f);
+	char* begPtr = (char*)(expr + f);
+	funcName.set_name(name);
+	
+	bool isOpeningBracket = false;
+
+	while (*begPtr != '\0' || begPtr != expr + length)
+	{
+		if (*begPtr == ' ')
+		{
+			begPtr += 1;
+			continue;
+		}
+
+		if (*begPtr == '(')
+		{
+			if(isOpeningBracket)
+				throw std::invalid_argument("ERROR!"); //dublicated '('
+			isOpeningBracket = true;
+		}
+
+		if (*begPtr == ',') //a-zA_Z0-9
+		{
+
+		}
+
+		if (*begPtr == ')')
+		{
+			if(!isOpeningBracket)
+				throw std::invalid_argument("ERROR!"); //missing ')'
+		}
+
+		if (*begPtr == ',')
+		{
+
+			while (isOpeningBracket || funcName.get_params_count() != 0) //while an opening bracket is not found or an operation stack is not empty
+			{
+				if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) == NULL) //if the cast to Bracket is not successfull, return NULL => it is not '('  
+				{
+					outputQueue.push(operationQueue.top());
+					operationQueue.pop();
+				}
+				else
+				{
+					isOpeningBracket = true;
+				}
+			}
+			begPtr += 1;
+		}
+	}
+	return Function<std::shared_ptr<IToken<double>>>();
+}
 int main()
 {
+	const char* func = "f(x) = 7 * x + 3";
 	int length = 11;
 	lex("-7 + sin(6)", length);
 

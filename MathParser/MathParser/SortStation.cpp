@@ -202,8 +202,16 @@ template <class T>
 class Function : public IToken<T> //sin,cos...
 {
 	std::queue<T> m_parameters;
+	char* function_name;
 public:
-
+	virtual T operator()()
+	{
+		return m_parameters.front();
+	}
+	virtual bool is_ready() const 
+	{
+		return true; //is it needed function?
+	}
 	virtual void push_argument(T value)
 	{
 		m_parameters.push(value);
@@ -211,6 +219,14 @@ public:
 	virtual std::size_t get_params_count() const
 	{
 		return m_parameters.size();
+	}
+	virtual void set_name(const char* value)
+	{
+		function_name = (char*) value;
+	}
+	virtual char* get_function_name() const
+	{
+		return function_name;
 	}
 protected:
 	std::queue<T>& parameter_queue()
