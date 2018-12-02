@@ -109,7 +109,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return this->parameter_queue().size() == 2;
+		return true;//this->parameter_queue().size() == 2;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -136,7 +136,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return this->parameter_queue().size() == 2;
+		return true;//this->parameter_queue().size() == 2;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -159,7 +159,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return this->parameter_queue().size() == 2;
+		return true;//this->parameter_queue().size() == 2;
 	}
 	virtual short getPriority()
 	{
@@ -186,7 +186,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return this->parameter_queue().size() == 2;
+		return true;//this->parameter_queue().size() == 2;
 	}
 	virtual short getPriority()
 	{
@@ -197,62 +197,6 @@ public:
 		return 2;
 	}
 };
-//
-//template <class T = double>
-//class OperatorUnaryPlus : public Operator<T> //+-*/
-//{
-//	T op;
-//
-//public:
-//	virtual void push_argument(T value)
-//	{
-//		op = value;
-//	}
-//	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
-//	{
-//		return op;
-//	}
-//	virtual bool is_ready() const
-//	{
-//		return true;//this->parameter_queue().size() == 1;
-//	}
-//	virtual unsigned get_params_count() const
-//	{
-//		return 1;
-//	}
-//	/*T operator()(const Number<T> a, const Number<T> b)
-//	{
-//		return a() + b();
-//	}*/
-//};
-//
-//template <class T = double>
-//class OperatorUnaryMinus : public Operator<T> //+-*/
-//{
-//	T op;
-//
-//public:
-//	virtual void push_argument(T value)
-//	{
-//		op = -1 * value;
-//	}
-//	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
-//	{
-//		return (op < 0) ? op : -1 * op;
-//	}
-//	virtual bool is_ready() const
-//	{
-//		return true;//this->parameter_queue().size() == 1;
-//	}
-//	virtual unsigned get_params_count() const
-//	{
-//		return 1;
-//	}
-//	/*T operator()(const Number<T> a, const Number<T> b)
-//	{
-//		return a() + b();
-//	}*/
-//};
 
 template <class T>
 class Function : public IToken<T> //sin,cos...
@@ -371,6 +315,10 @@ public:
 	virtual void push_argument(T value)
 	{
 		return; //openingBracket = value; //true is for opening bracket, false is for closing.
+	}
+	virtual short getPriority()
+	{
+		return -1;
 	}
 };
 

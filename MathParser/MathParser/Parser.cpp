@@ -12,12 +12,25 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) 
 	if(*input_string >= '0' && *input_string <= '9')
 		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 	if (*input_string == '+')
+	{
+		char tok = *(input_string + 1);
+		if (tok >= '0' && tok <= '9')
+			return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 		return std::make_shared<OperatorPlus<T>>();
+	}
+
 	if (*input_string == '-')
+	{
+		char tok = *(input_string + 1);
+		if (tok >= '0' && tok <= '9')
+			return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 		return std::make_shared<OperatorMinus<T>>();
+	}
+
 	if (*input_string == '*')
 		return std::make_shared<OperatorMul<T>>();
 	if (*input_string == '/')
+
 		return std::make_shared<OperatorDiv<T>>();
 	if (*input_string == 's')
 	{
@@ -54,7 +67,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 	std::stack<std::shared_ptr<IToken<double>>> operationQueue;
 	std::queue<std::shared_ptr<IToken<double>>> outputQueue;
 
-	while (*begPtr != NULL || begPtr != expr + length) 
+	while (*begPtr != NULL || *begPtr != '\0' || begPtr != expr + length) 
 	{
 		try
 		{
@@ -73,29 +86,29 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 					begPtr += 1;
 					continue;
 				}
-				if (*begPtr = 's') //sin
+				if (*begPtr == 's') //sin
 				{
 					auto funcSin = parse_token<double>(begPtr, &endPtr);
 					if(funcSin != NULL)
-						outputQueue.push(funcSin);
+						operationQueue.push(funcSin);
 					else 
 						throw std::invalid_argument("ERROR!");
 					begPtr += 3;
 				}
-				if (*begPtr = 'c') //cos
+				if (*begPtr == 'c') //cos
 				{
 					auto funcCos = parse_token<double>(begPtr, &endPtr);
 					if (funcCos != NULL)
-						outputQueue.push(funcCos);
+						operationQueue.push(funcCos);
 					else
 						throw std::invalid_argument("ERROR!");
 					begPtr += 3;
 				}
-				if (*begPtr = 't') //tg
+				if (*begPtr == 't') //tg
 				{
 					auto funcTg = parse_token<double>(begPtr, &endPtr);
 					if (funcTg != NULL)
-						outputQueue.push(funcTg);
+						operationQueue.push(funcTg);
 					else
 						throw std::invalid_argument("ERROR!");
 					begPtr += 2;
@@ -186,9 +199,9 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 				if (*begPtr == ')')
 				{
 					bool isOpeningBracket = false;
-					while (!isOpeningBracket || operationQueue.size() != 0)
+					while (operationQueue.size() != 0)
 					{
-						if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) == NULL)
+						if (operationQueue.size() != 0 && dynamic_cast<Bracket<double>*>(operationQueue.top().get()) == NULL)
 						{
 							outputQueue.push(operationQueue.top());
 							operationQueue.pop();
@@ -196,6 +209,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 						else
 						{
 							isOpeningBracket = true;
+							break;
 						}
 					}
 					if (!isOpeningBracket)
@@ -213,7 +227,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 	}
 	while (operationQueue.size() != 0)
 	{
-		if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) != NULL) //checking enclosing brackets
+		if (dynamic_cast<Bracket<double>*>(operationQueue.top().get()) != NULL) //checking enclosing brackets
 			throw std::invalid_argument("ERROR!");
 		else
 		{
@@ -226,8 +240,8 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 
 int main()
 {
-	int length = 12;
-	lex("4.12 + 8 * 9", length);
+	int length = 11;
+	lex("-7 + sin(6)", length);
 
 	return 0;
 } 
