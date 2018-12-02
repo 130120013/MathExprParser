@@ -1,6 +1,7 @@
 //#include <iostream> - what for?
 #include <queue> //to store arguments
 #include <stdexcept> //for exceptions
+#include <memory>
 
 struct invalid_exception:std::exception
 {
@@ -14,15 +15,30 @@ struct bad_expession_parameters:std::exception
 	bad_expession_parameters(const char* decription);
 };
 
+//template <class T>
+//class IToken;
+//
+//template <class T>
+//T compute_token(const IToken<T>& tkn)
+//{
+//	return tkn();
+//}
+//
+//template <class T>
+//T compute_token(const T& tkn)
+//{
+//	return tkn;
+//}
+
 template <class T>
 class IToken
 {
 public:
-	virtual T operator()() = 0; //All derived classes must implement the same method with the same return type
+	virtual T operator()() const = 0; //All derived classes must implement the same method with the same return type
 	/*Push a required (as defined at runtime, perhaps erroneously which must be detected by implementations) number of arguments.
 	Push arguments from first to last. Then call the operator() above.
 	*/
-	virtual void push_argument(T value) = 0;
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value) = 0;
 	virtual bool is_ready() const = 0; //all parameters are specified
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 };
@@ -35,7 +51,7 @@ public:
 	//Number(const Number<T>& num) : value(num()) {}; /*-*/
 	//Better:
 	Number(const Number<T>&) = default;
-	T operator()()
+	T operator()() const
 	{
 		return value;
 	}
@@ -96,20 +112,20 @@ protected:
 template <class T>
 class OperatorPlus : public Operator<T> //+-*/
 {
-	T ops[2], *top = ops;
+	std::shared_ptr<IToken<T>> ops[2], *top = ops;
 	
 public:
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		*top++ = value;
 	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
 		return ops[0] + ops[1];
 	}
 	virtual bool is_ready() const
 	{
-		return true;//this->parameter_queue().size() == 2;
+		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -130,7 +146,7 @@ public:
 	{
 		*top++ = value;
 	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
 		return ops[0] - ops[1];
 	}
@@ -220,10 +236,6 @@ public:
 	{
 		return m_parameters.size();
 	}
-	virtual void set_name(const char* value)
-	{
-		function_name = (char*) value;
-	}
 	virtual char* get_function_name() const
 	{
 		return function_name;
@@ -242,7 +254,7 @@ protected:
 template <class T>
 class SinFunction : public Function<T>
 {
-	T op;
+	std::shared_ptr<IToken<T>> op;
 public:
 	virtual void push_argument(T value)
 	{
@@ -259,6 +271,10 @@ public:
 	virtual std::size_t get_params_count() const
 	{
 		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "sin";
 	}
 };
 template <class T>

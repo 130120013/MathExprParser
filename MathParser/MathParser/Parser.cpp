@@ -239,7 +239,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 	return outputQueue;
 }
 
-Function<std::shared_ptr<IToken<double>>> lexHeader(const char* expr, const int length)
+std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //returns Header
 {
 	Function<std::shared_ptr<IToken<double>>> funcName;
 	char* name = (char*)("");
@@ -281,7 +281,7 @@ Function<std::shared_ptr<IToken<double>>> lexHeader(const char* expr, const int 
 
 			while (isOpeningBracket || funcName.get_params_count() != 0) //while an opening bracket is not found or an operation stack is not empty
 			{
-				if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) == NULL) //if the cast to Bracket is not successfull, return NULL => it is not '('  
+				if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) == nullptr) //if the cast to Bracket is not successfull, return NULL => it is not '('  
 				{
 					outputQueue.push(operationQueue.top());
 					operationQueue.pop();
@@ -294,7 +294,7 @@ Function<std::shared_ptr<IToken<double>>> lexHeader(const char* expr, const int 
 			begPtr += 1;
 		}
 	}
-	return Function<std::shared_ptr<IToken<double>>>();
+	return std::shared_ptr<IToken<double>>();
 }
 int main()
 {
