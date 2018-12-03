@@ -5,7 +5,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
-#include <vector>
+#include <list>
+
 
 template <class T>
 std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) //пока что только для чисел и операторов
@@ -59,8 +60,10 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) 
 }
 
 //template <class Iterator> 
-std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int length)
+std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int length)
 {
+	std::list<std::shared_ptr<IToken<double>>> output;
+	
 	char* endPtr = (char*)(expr + length - 1);
 	char* begPtr = (char*)(expr + 0);
 	auto it = expr;
@@ -74,7 +77,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 		{
 			if (*begPtr >= '0' && *begPtr <= '9')
 			{
-				outputQueue.push(parse_token<double>(begPtr, &endPtr));
+				output.push_back(parse_token<double>(begPtr, &endPtr));
 
 				if (begPtr == endPtr)
 					throw std::invalid_argument("ERROR!");
@@ -120,14 +123,14 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 					char tok = *(begPtr + 1);
 					if (tok >= '0' && tok <= '9') //unary +
 					{
-						outputQueue.push(parse_token<double>(begPtr, &endPtr));
+						output.push_back(parse_token<double>(begPtr, &endPtr));
 						begPtr = endPtr;
 					}
 					else //binary +
 					{
 						if (operationQueue.size() != 0 && OperatorPlus<double>().getPriority() <= dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
 						{
-							outputQueue.push(operationQueue.top());
+							output.push_back(operationQueue.top());
 							operationQueue.pop();
 						}
 						operationQueue.push(parse_token<double>(begPtr, &endPtr));
@@ -139,14 +142,14 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 					char tok = *(begPtr + 1);
 					if (tok >= '0' && tok <= '9') //unary -
 					{
-						outputQueue.push(parse_token<double>(begPtr, &endPtr));
+						output.push_back(parse_token<double>(begPtr, &endPtr));
 						begPtr = endPtr;
 					}
 					else //binary -
 					{
 						if (operationQueue.size() != 0 && OperatorMinus<double>().getPriority() <= dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
 						{
-							outputQueue.push(operationQueue.top());
+							output.push_back(operationQueue.top());
 							operationQueue.pop();
 						}
 						operationQueue.push(parse_token<double>(begPtr, &endPtr));
@@ -157,7 +160,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 				{
 					if (operationQueue.size() != 0 && OperatorMul<double>().getPriority() <= dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
 					{
-						outputQueue.push(operationQueue.top());
+						output.push_back(operationQueue.top());
 						operationQueue.pop();
 					}
 					operationQueue.push(parse_token<double>(begPtr, &endPtr));
@@ -167,7 +170,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 				{
 					if (operationQueue.size() != 0 && OperatorDiv<double>().getPriority() <= dynamic_cast<Operator<double>*>(operationQueue.top().get())->getPriority())
 					{
-						outputQueue.push(operationQueue.top());
+						output.push_back(operationQueue.top());
 						operationQueue.pop();
 					}
 					operationQueue.push(parse_token<double>(begPtr, &endPtr));
@@ -180,7 +183,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 					{
 						if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) == NULL) //if the cast to Bracket is not successfull, return NULL => it is not '('  
 						{
-							outputQueue.push(operationQueue.top());
+							output.push_back(operationQueue.top());
 							operationQueue.pop();
 						}
 						else
@@ -204,7 +207,7 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 					{
 						if (operationQueue.size() != 0 && dynamic_cast<Bracket<double>*>(operationQueue.top().get()) == NULL)
 						{
-							outputQueue.push(operationQueue.top());
+							output.push_back(operationQueue.top());
 							operationQueue.pop();
 						}
 						else
@@ -232,26 +235,41 @@ std::queue<std::shared_ptr<IToken<double>>> lex(const char* expr, const int leng
 			throw std::invalid_argument("ERROR!");
 		else
 		{
-			outputQueue.push(operationQueue.top());
+			output.push_back(operationQueue.top());
 			operationQueue.pop();
 		}
 	}
-	return outputQueue;
+	return output;
 }
 
 std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //returns Header
 {
-	Function<std::shared_ptr<IToken<double>>> funcName;
+	Header<double> funcName;
 	char* name = (char*)("");
-	unsigned short f = std::strstr(expr, "(") - expr;
-	std::strncpy(name, expr, f);
-	char* begPtr = (char*)(expr + f);
-	funcName.set_name(name);
+	unsigned short name_size = std::strstr(expr, "(") - expr;
+	std::strncpy(name, expr, name_size);
+	char* begPtr = (char*)(expr + name_size);
+	//funcName.set_name(name);
 	
 	bool isOpeningBracket = false;
+	bool isClosingBracket = false;
+	unsigned short commaCount = 0;
 
 	while (*begPtr != '\0' || begPtr != expr + length)
 	{
+		if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z'))
+		{
+			char* tok_name = (char*)("");
+			char* endTokPtr = begPtr;
+			while ((*endTokPtr >= 'A' && *endTokPtr <= 'Z') || (*endTokPtr >= 'a' && *endTokPtr <= 'z') || (*endTokPtr >= '0' && *endTokPtr <= '9'))
+			{
+				endTokPtr += 1;
+			}
+			name_size = endTokPtr - begPtr;
+			std::strncpy(tok_name, begPtr, name_size);
+			funcName.push_argument(std::make_shared<Variable<double>>(tok_name, name_size, 0));
+		}
+
 		if (*begPtr == ' ')
 		{
 			begPtr += 1;
@@ -267,29 +285,33 @@ std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //
 
 		if (*begPtr == ',') //a-zA_Z0-9
 		{
-
+			commaCount += 1;
+			begPtr += 1;
 		}
 
 		if (*begPtr == ')')
 		{
 			if(!isOpeningBracket)
 				throw std::invalid_argument("ERROR!"); //missing ')'
+			if(isClosingBracket)
+				throw std::invalid_argument("ERROR!"); //dublicated ')'
+			isClosingBracket = true;
 		}
 
 		if (*begPtr == ',')
 		{
 
-			while (isOpeningBracket || funcName.get_params_count() != 0) //while an opening bracket is not found or an operation stack is not empty
+			while (isClosingBracket || isOpeningBracket || funcName.get_params_count() != 0) //while an opening bracket is not found or an operation stack is not empty
 			{
-				if (dynamic_cast<Bracket<bool>*>(operationQueue.top().get()) == nullptr) //if the cast to Bracket is not successfull, return NULL => it is not '('  
-				{
-					outputQueue.push(operationQueue.top());
-					operationQueue.pop();
-				}
-				else
-				{
-					isOpeningBracket = true;
-				}
+				//if (dynamic_cast<Bracket<double>*>(operationQueue.top().get()) == nullptr) //if the cast to Bracket is not successfull, return NULL => it is not '('  
+				//{
+				//	outputQueue.push(operationQueue.top());
+				//	operationQueue.pop();
+				//}
+				//else
+				//{
+				//	isOpeningBracket = true;
+				//}
 			}
 			begPtr += 1;
 		}
@@ -299,8 +321,8 @@ std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //
 int main()
 {
 	const char* func = "f(x) = 7 * x + 3";
-	int length = 11;
-	lex("-7 + sin(6)", length);
+	int length = 10;
+	lex("7 + sin(6)", length);
 
 	return 0;
 } 

@@ -50,16 +50,33 @@ public:
 	Number(T val) : value(val) {};
 	//Number(const Number<T>& num) : value(num()) {}; /*-*/
 	//Better:
-	Number(const Number<T>&) = default;
-	T operator()() const
+	Number(const Number<T>& num) = default;
+
+	virtual T operator()() const
 	{
 		return value;
 	}
-	bool is_ready() const
+	virtual bool is_ready() const
 	{
 		return true;
 	}
-	void push_argument(T)
+	T operator+(const Number<T>& num) const
+	{
+		return this->value + num();
+	}
+	T operator-(const Number<T>& num) const
+	{
+		return this->value - num();
+	}
+	T operator*(const Number<T>& num) const
+	{
+		return this->value * num();
+	}
+	T operator/(const Number<T>& num) const
+	{
+		return this->value / num();
+	}
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		//do nothing for literals - they do not accept parameters. But the implementation (even empty) must be provided for polymorphic methods.
 		//or throw an exception
@@ -121,7 +138,15 @@ public:
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		return ops[0] + ops[1];
+		if (dynamic_cast<Number<T>*>(ops[0].get()) != nullptr && dynamic_cast<Number<T>*>(ops[1].get()) != nullptr)
+		{
+			const Number<T>* k1 = dynamic_cast<Number<T>*>(ops[0].get());
+			const Number<T>* k2 = dynamic_cast<Number<T>*>(ops[1].get());
+
+			return *k1 / *k2;
+		}
+
+		return 0;
 	}
 	virtual bool is_ready() const
 	{
@@ -139,16 +164,24 @@ public:
 template <class T>
 class OperatorMinus : public Operator<T>
 {
-	T ops[2], *top = ops;
+	std::shared_ptr<IToken<T>> ops[2], *top = ops;
 
 public:
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		*top++ = value;
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		return ops[0] - ops[1];
+		if (dynamic_cast<Number<T>*>(ops[0].get()) != nullptr && dynamic_cast<Number<T>*>(ops[1].get()) != nullptr)
+		{
+			const Number<T>* k1 = dynamic_cast<Number<T>*>(ops[0].get());
+			const Number<T>* k2 = dynamic_cast<Number<T>*>(ops[1].get());
+
+			return *k1 - *k2;
+		}
+
+		return 0;
 	}
 	virtual bool is_ready() const
 	{
@@ -162,16 +195,24 @@ public:
 template <class T>
 class OperatorMul : public Operator<T>
 {
-	T ops[2], *top = ops;
+	std::shared_ptr<IToken<T>> ops[2], *top = ops;
 
 public:
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		*top++ = value;
 	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+	virtual T operator()() const
 	{
-		return ops[0] * ops[1];
+		if (dynamic_cast<Number<T>*>(ops[0].get()) != nullptr && dynamic_cast<Number<T>*>(ops[1].get()) != nullptr)
+		{
+			const Number<T>* k1 = dynamic_cast<Number<T>*>(ops[0].get());
+			const Number<T>* k2 = dynamic_cast<Number<T>*>(ops[1].get());
+
+			return *k1 * *k2;
+		}
+
+		return 0;
 	}
 	virtual bool is_ready() const
 	{
@@ -189,20 +230,28 @@ public:
 template <class T>
 class OperatorDiv : public Operator<T>
 {
-	T ops[2], *top = ops;
+	std::shared_ptr<IToken<T>> ops[2], *top = ops;
 
 public:
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		*top++ = value;
 	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+	virtual T operator()() const
 	{
-		return ops[0] / ops[1];
+		if (dynamic_cast<Number<T>*>(ops[0].get()) != nullptr && dynamic_cast<Number<T>*>(ops[1].get()) != nullptr)
+		{
+			const Number<T>* k1 = dynamic_cast<Number<T>*>(ops[0].get());
+			const Number<T>* k2 = dynamic_cast<Number<T>*>(ops[1].get());
+
+			return *k1 / *k2;
+		}
+
+		return 0;
 	}
 	virtual bool is_ready() const
 	{
-		return true;//this->parameter_queue().size() == 2;
+		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -217,18 +266,18 @@ public:
 template <class T>
 class Function : public IToken<T> //sin,cos...
 {
-	std::queue<T> m_parameters;
+	std::queue<std::shared_ptr<IToken<T>>> m_parameters;
 	char* function_name;
 public:
 	virtual T operator()()
 	{
-		return m_parameters.front();
+		return m_parameters.front().get()->operator()();
 	}
 	virtual bool is_ready() const 
 	{
 		return true; //is it needed function?
 	}
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		m_parameters.push(value);
 	}
@@ -236,7 +285,7 @@ public:
 	{
 		return m_parameters.size();
 	}
-	virtual char* get_function_name() const
+	virtual const char* get_function_name() const
 	{
 		return function_name;
 	}
@@ -245,7 +294,7 @@ protected:
 	{
 		return m_parameters;
 	}
-	const std::queue<T>& parameter_queue() const
+	const std::queue<std::shared_ptr<IToken<T>>>& parameter_queue() const
 	{
 		return m_parameters;
 	}
@@ -256,13 +305,18 @@ class SinFunction : public Function<T>
 {
 	std::shared_ptr<IToken<T>> op;
 public:
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		op = value;
 	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		return std::sin(op);
+		if (dynamic_cast<Number<T>*>(op.get()) != nullptr)
+		{
+			const Number<T>* k1 = dynamic_cast<Number<T>*>(op.get());
+
+			return std::sin(k1->operator()());
+		} 
 	}
 	virtual bool is_ready() const
 	{
@@ -280,15 +334,20 @@ public:
 template <class T>
 class CosFunction : public Function<T>
 {
-	T op;
+	std::shared_ptr<IToken<T>> op;
 public:
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		op = value;
 	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		return std::cos(op);
+		if (dynamic_cast<Number<T>*>(op.get()) != nullptr)
+		{
+			const Number<T>* k1 = dynamic_cast<Number<T>*>(op.get());
+
+			return std::cos(k1->operator()());
+		}
 	}
 	virtual bool is_ready() const
 	{
@@ -298,19 +357,28 @@ public:
 	{
 		return 1;
 	}
+	virtual const char* get_function_name() const
+	{
+		return "cos";
+	}
 };
 template <class T>
 class TgFunction : public Function<T>
 {
-	T op;
+	std::shared_ptr<IToken<T>> op;
 public:
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		op = value;
 	}
-	virtual T operator()()/*Implementation of IToken<T>::operator()()*/
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		return std::tan(op);
+		if (dynamic_cast<Number<T>*>(op.get()) != nullptr)
+		{
+			const Number<T>* k1 = dynamic_cast<Number<T>*>(op.get());
+
+			return std::tan(k1->operator()());
+		}
 	}
 	virtual bool is_ready() const
 	{
@@ -323,6 +391,10 @@ public:
 	virtual std::size_t get_params_count() const
 	{
 		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "tg";
 	}
 };
 
@@ -334,7 +406,7 @@ public:
 	//Bracket(const T isOpeningBracket) : openingBracket(isOpeningBracket) {};
 	Bracket() = default;
 
-	virtual T operator()() 
+	virtual T operator()() const
 	{
 		return true;
 	}
@@ -344,7 +416,7 @@ public:
 		return true;
 	}
 
-	virtual void push_argument(T value)
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		return; //openingBracket = value; //true is for opening bracket, false is for closing.
 	}
@@ -355,29 +427,91 @@ public:
 };
 
 template <class T>
+class Header : public IToken<T> //sin,cos...
+{
+	std::queue<std::shared_ptr<IToken<T>>> m_parameters;
+	std::unique_ptr<char> function_name;
+	std::size_t function_name_length = 0;
+	bool isReady = false;
+public:
+	virtual T operator()() const
+	{
+		return m_parameters.size();
+	}
+	virtual bool is_ready() const
+	{
+		return true; //is it needed function?
+	}
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		m_parameters.push(value);
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return m_parameters.size();
+	}
+	virtual char* get_function_name() const
+	{
+		return function_name.get();
+	}
+	virtual void set_function_name(char* name)
+	{
+		function_name.reset(name);
+	}
+	size_t get_name_length()
+	{
+		return function_name_length;
+	}
+protected:
+	std::queue<T>& parameter_queue()
+	{
+		return m_parameters;
+	}
+	const std::queue<T>& parameter_queue() const
+	{
+		return m_parameters;
+	}
+};
+
+template <class T>
 class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 {
 	T op = 0;
-	char* name;
-	size_t name_length = 0;
+	std::unique_ptr<char> name;
+	std::size_t name_length = 0;
+	bool isReady = false;
 public:
-	Variable(T value) : op(value) {};
-	Variable(const Variable<T>& val) = default;
-
-	virtual void push_argument(T value)
+	Variable(char* varname, std::size_t len, T value = 0) : op(value), name_length(len) 
 	{
-		op = value;
+		this->name.reset(varname);
+		isReady = true;
 	}
-	virtual T operator()()
+	Variable(const Variable<T>& val): op(val()), name_length(val.name_length())
+	{
+		this->name.reset(val.get_name());
+		isReady = true;
+	}
+
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		if (isReady)
+			throw std::invalid_argument("ERROR!");
+		//op = value;
+	}
+	virtual T operator()() const
 	{
 		return op;
 	}
 	virtual bool is_ready() const
 	{
-		return true;
+		return isReady;
 	}
-	char* get_name()
+	char* get_name() const
 	{
-		return name;
+		return name.get();
+	}
+	size_t get_name_length()
+	{
+		return name_length;
 	}
 };
