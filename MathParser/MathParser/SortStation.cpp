@@ -434,6 +434,15 @@ class Header : public IToken<T> //sin,cos...
 	std::size_t function_name_length = 0;
 	bool isReady = false;
 public:
+	Header() = default;
+	Header(char* varname, std::size_t len) : function_name_length(len)
+	{
+		function_name.reset(varname);
+	}
+	Header(Header<T>&& val) : function_name_length(val.get_name_length())
+	{
+		function_name.reset(std::move(varname));
+	}
 	virtual T operator()() const
 	{
 		return m_parameters.size();
@@ -483,12 +492,12 @@ class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 public:
 	Variable(char* varname, std::size_t len, T value = 0) : op(value), name_length(len) 
 	{
-		this->name.reset(varname);
+		name.reset(varname);
 		isReady = true;
 	}
-	Variable(const Variable<T>& val): op(val()), name_length(val.name_length())
+	Variable(Variable<T>&& val) : op(val()), name_length(val.get_name_length())
 	{
-		this->name.reset(val.get_name());
+		name.reset(val.get_name());
 		isReady = true;
 	}
 

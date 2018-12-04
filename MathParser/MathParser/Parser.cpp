@@ -59,6 +59,25 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) 
 	return NULL;
 }
 
+template <class T>
+std::shared_ptr<IToken<T>> parse_text_token(const char* input_string, char** endptr)
+{
+	std::size_t name_size;
+	char* endTokPtr = (char*)input_string;
+	while ((*endTokPtr >= 'A' && *endTokPtr <= 'Z') || (*endTokPtr >= 'a' && *endTokPtr <= 'z') || (*endTokPtr >= '0' && *endTokPtr <= '9'))
+	{
+		endTokPtr += 1;
+	}
+
+	name_size = endTokPtr - input_string;
+	char* tok_name = (char*)malloc(name_size);
+	std::strncpy(tok_name, input_string, name_size);
+	auto token = std::make_shared<Variable<double>>(tok_name, name_size, 0);
+	*(endptr) = endTokPtr;
+	return token;
+	//return nullptr;
+}
+
 //template <class Iterator> 
 std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int length)
 {
@@ -69,7 +88,6 @@ std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int lengt
 	auto it = expr;
 	short hasPunct = 0;
 	std::stack<std::shared_ptr<IToken<double>>> operationQueue;
-	std::queue<std::shared_ptr<IToken<double>>> outputQueue;
 
 	while (*begPtr != NULL || *begPtr != '\0' || begPtr != expr + length) 
 	{
@@ -244,11 +262,13 @@ std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int lengt
 
 std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //returns Header
 {
-	Header<double> funcName;
-	char* name = (char*)("");
-	unsigned short name_size = std::strstr(expr, "(") - expr;
+	std::size_t name_size = std::strstr(expr, "(") - expr;
+	char* name = (char*)malloc(name_size);
 	std::strncpy(name, expr, name_size);
+	auto funcName = std::make_shared<Header<double>>(name, name_size);
+	//std::shared_ptr<Header<double>> funcName;
 	char* begPtr = (char*)(expr + name_size);
+	char* endPtr = begPtr;
 	//funcName.set_name(name);
 	
 	bool isOpeningBracket = false;
@@ -259,15 +279,20 @@ std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //
 	{
 		if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z'))
 		{
-			char* tok_name = (char*)("");
-			char* endTokPtr = begPtr;
+			/*char* endTokPtr = begPtr;
 			while ((*endTokPtr >= 'A' && *endTokPtr <= 'Z') || (*endTokPtr >= 'a' && *endTokPtr <= 'z') || (*endTokPtr >= '0' && *endTokPtr <= '9'))
 			{
 				endTokPtr += 1;
-			}
+			}	
+
 			name_size = endTokPtr - begPtr;
+			char* tok_name = (char*)malloc(name_size);
 			std::strncpy(tok_name, begPtr, name_size);
-			funcName.push_argument(std::make_shared<Variable<double>>(tok_name, name_size, 0));
+			Variable<double> token(tok_name, name_size, 0);*/
+
+			
+			funcName.get()->push_argument(parse_text_token<double>(begPtr, &endPtr));
+			begPtr = endPtr;
 		}
 
 		if (*begPtr == ' ')
@@ -281,6 +306,7 @@ std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //
 			if(isOpeningBracket)
 				throw std::invalid_argument("ERROR!"); //dublicated '('
 			isOpeningBracket = true;
+			begPtr += 1;
 		}
 
 		if (*begPtr == ',') //a-zA_Z0-9
@@ -296,14 +322,15 @@ std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //
 			if(isClosingBracket)
 				throw std::invalid_argument("ERROR!"); //dublicated ')'
 			isClosingBracket = true;
+			begPtr += 1;
 		}
 
-		if (*begPtr == ',')
-		{
+		//if (*begPtr == ',')
+		//{
 
-			while (isClosingBracket || isOpeningBracket || funcName.get_params_count() != 0) //while an opening bracket is not found or an operation stack is not empty
-			{
-				//if (dynamic_cast<Bracket<double>*>(operationQueue.top().get()) == nullptr) //if the cast to Bracket is not successfull, return NULL => it is not '('  
+		//	while (isClosingBracket || isOpeningBracket || funcName.get_params_count() != 0) //while an opening bracket is not found or an operation stack is not empty
+		//	{
+		//		//if (dynamic_cast<Bracket<double>*>(operationQueue.top().get()) == nullptr) //if the cast to Bracket is not successfull, return NULL => it is not '('  
 				//{
 				//	outputQueue.push(operationQueue.top());
 				//	operationQueue.pop();
@@ -312,17 +339,20 @@ std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //
 				//{
 				//	isOpeningBracket = true;
 				//}
-			}
-			begPtr += 1;
-		}
+		//	}
+		//	begPtr += 1;
+		//}
 	}
-	return std::shared_ptr<IToken<double>>();
+	return funcName;
 }
 int main()
 {
-	const char* func = "f(x) = 7 * x + 3";
+	const char* func = "f(x) = 7 * 7 + 3";
 	int length = 10;
-	lex("7 + sin(6)", length);
+	//lex("7 + sin(6)", length);
+	const char* funcHeader = "f(x)";
+	int length1 = 4;
+	lexHeader(funcHeader, length1);
 
 	return 0;
 } 
