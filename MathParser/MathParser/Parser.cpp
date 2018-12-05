@@ -60,7 +60,7 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) 
 }
 
 template <class T>
-std::shared_ptr<IToken<T>> parse_text_token(const char* input_string, char** endptr)
+std::shared_ptr<IToken<T>> parse_text_token(const char* input_string, char** endptr, char* tok_name)
 {
 	std::size_t name_size;
 	char* endTokPtr = (char*)input_string;
@@ -70,7 +70,7 @@ std::shared_ptr<IToken<T>> parse_text_token(const char* input_string, char** end
 	}
 
 	name_size = endTokPtr - input_string;
-	char* tok_name = (char*)malloc(name_size);
+	tok_name = new char[name_size];
 	std::strncpy(tok_name, input_string, name_size);
 	auto token = std::make_shared<Variable<double>>(tok_name, name_size, 0);
 	*(endptr) = endTokPtr;
@@ -260,10 +260,10 @@ std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int lengt
 	return output;
 }
 
-std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //returns Header
+std::shared_ptr<Header<double>> lexHeader(const char* expr, const int length) //returns Header
 {
 	std::size_t name_size = std::strstr(expr, "(") - expr;
-	char* name = (char*)malloc(name_size);
+	char* name = new char[name_size];
 	std::strncpy(name, expr, name_size);
 	auto funcName = std::make_shared<Header<double>>(name, name_size);
 	//std::shared_ptr<Header<double>> funcName;
@@ -304,7 +304,7 @@ std::shared_ptr<IToken<double>> lexHeader(const char* expr, const int length) //
 		if (*begPtr == '(')
 		{
 			if(isOpeningBracket)
-				throw std::invalid_argument("ERROR!"); //dublicated '('
+				throw std::invalid_argument("ERROR!"); //duplicated '('
 			isOpeningBracket = true;
 			begPtr += 1;
 		}
@@ -350,7 +350,7 @@ int main()
 	const char* func = "f(x) = 7 * 7 + 3";
 	int length = 10;
 	//lex("7 + sin(6)", length);
-	const char* funcHeader = "f(x)";
+	const char* funcHeader = "f(x) = ";
 	int length1 = 4;
 	lexHeader(funcHeader, length1);
 

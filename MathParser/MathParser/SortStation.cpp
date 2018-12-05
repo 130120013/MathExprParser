@@ -2,6 +2,7 @@
 #include <queue> //to store arguments
 #include <stdexcept> //for exceptions
 #include <memory>
+#include <map>
 
 struct invalid_exception:std::exception
 {
@@ -427,15 +428,15 @@ public:
 };
 
 template <class T>
-class Header : public IToken<T> //sin,cos...
+class Header
 {
-	std::queue<std::shared_ptr<IToken<T>>> m_parameters;
+	std::map<std::unique_ptr<char>, std::shared_ptr<IToken<T>>> m_parameters;
 	std::unique_ptr<char> function_name;
 	std::size_t function_name_length = 0;
 	bool isReady = false;
 public:
 	Header() = default;
-	Header(char* varname, std::size_t len) : function_name_length(len)
+	Header(char* funcName, std::size_t len) : function_name_length(len)
 	{
 		function_name.reset(varname);
 	}
@@ -451,9 +452,9 @@ public:
 	{
 		return true; //is it needed function?
 	}
-	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	virtual void push_argument(std::unique_ptr<char> key, const std::shared_ptr<IToken<T>>& value)
 	{
-		m_parameters.push(value);
+		m_parameters.emplace(key, value);
 	}
 	virtual std::size_t get_params_count() const
 	{
