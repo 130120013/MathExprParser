@@ -3,6 +3,7 @@
 #include <stdexcept> //for exceptions
 #include <memory>
 #include <map>
+#include <list>
 
 struct invalid_exception:std::exception
 {
@@ -428,62 +429,6 @@ public:
 };
 
 template <class T>
-class Header
-{
-	std::map<std::unique_ptr<char>, std::shared_ptr<IToken<T>>> m_parameters;
-	std::unique_ptr<char> function_name;
-	std::size_t function_name_length = 0;
-	bool isReady = false;
-public:
-	Header() = default;
-	Header(char* funcName, std::size_t len) : function_name_length(len)
-	{
-		function_name.reset(varname);
-	}
-	Header(Header<T>&& val) : function_name_length(val.get_name_length())
-	{
-		function_name.reset(std::move(varname));
-	}
-	virtual T operator()() const
-	{
-		return m_parameters.size();
-	}
-	virtual bool is_ready() const
-	{
-		return true; //is it needed function?
-	}
-	virtual void push_argument(std::unique_ptr<char> key, const std::shared_ptr<IToken<T>>& value)
-	{
-		m_parameters.emplace(key, value);
-	}
-	virtual std::size_t get_params_count() const
-	{
-		return m_parameters.size();
-	}
-	virtual char* get_function_name() const
-	{
-		return function_name.get();
-	}
-	virtual void set_function_name(char* name)
-	{
-		function_name.reset(name);
-	}
-	size_t get_name_length()
-	{
-		return function_name_length;
-	}
-protected:
-	std::queue<T>& parameter_queue()
-	{
-		return m_parameters;
-	}
-	const std::queue<T>& parameter_queue() const
-	{
-		return m_parameters;
-	}
-};
-
-template <class T>
 class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 {
 	T op = 0;
@@ -523,5 +468,115 @@ public:
 	size_t get_name_length()
 	{
 		return name_length;
+	}
+};
+
+template <class T>
+std::shared_ptr<IToken<T>> parse_text_token(const char* input_string, char** endptr, char* tok_name);
+
+template <class T>
+class Header
+{
+	std::map<std::string, T> m_arguments;
+	std::vector<std::string> m_parameters;
+	std::unique_ptr<char[]> function_name;
+	std::size_t function_name_length = 0;
+	bool isReady = false;
+public:
+	Header() = default;
+	Header(const char* expression, std::size_t expression_len, char** endptr)
+	{
+		std::size_t function_name_length = std::strstr(expression, "(") //TODO: implement strstr with a loop which takes expression_len into account
+			- expression;										//and does not assume existence of the terminating null at the end of expression.
+																//Fail if the opening bracket is not found within first expression_len symbols of expression.
+		auto function_name = std::make_unique<char[]>(function_name_length);
+		std::strncpy(function_name.get(), expression, function_name_length);
+		char* begPtr = (char*)(expression + function_name_length);
+		char* endPtr = begPtr;
+		std::list<std::string> params;
+	
+		bool isOpeningBracket = false;
+		bool isClosingBracket = false;
+		unsigned short commaCount = 0;
+
+		while (*begPtr != '=' || begPtr != expression + length)
+		{
+			if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z'))
+			{
+				std::string param_name = dynamic_cast<Variable<T>&>(*parse_text_token<double>(begPtr, &endPtr)).get_name();
+				if (!m_arguments.emplace(param_name, T()).second)
+					throw std::invalid_argument("Parameter is not unique!"); //duplicated '('
+				params.emplace_back(std::move(param_name));
+				begPtr = endPtr;
+			}
+
+			if (*begPtr == ' ')
+			{
+				begPtr += 1;
+				continue;
+			}
+
+			if (*begPtr == '(')
+			{
+				if(isOpeningBracket)
+					throw std::invalid_argument("ERROR!"); //duplicated '('
+				isOpeningBracket = true;
+				begPtr += 1;
+			}
+
+			if (*begPtr == ',') //a-zA_Z0-9
+			{
+				commaCount += 1;
+				begPtr += 1;
+			}
+
+			if (*begPtr == ')')
+			{
+				if(!isOpeningBracket)
+					throw std::invalid_argument("ERROR!"); //missing ')'
+				if(isClosingBracket)
+					throw std::invalid_argument("ERROR!"); //dublicated ')'
+				isClosingBracket = true;
+				begPtr += 1;
+			}
+		}
+		m_parameters.reserve(params.size());
+		for (auto& param:params)
+			m_parameters.emplace_back(std::move(param));
+		*endptr = begPtr;
+	}
+	Header(Header<T>&& val) : function_name_length(val.get_name_length())
+	{
+		function_name.reset(std::move(varname));
+	}
+	virtual bool is_ready() const
+	{
+		return true; //is it needed function?
+	}
+	void push_argument(const char* name, std::size_t parameter_name_size, const T& value)
+	{
+		auto it = m_arguments.find(std::string(name, name + parameter_name_size));
+		if (it == m_arguments.end())
+			throw std::invalid_argument("Parameter not found");
+		it->second = value;
+	}
+	const T& get_argument(const char* parameter_name, std::size_t parameter_name_size) const //call this from Variable::operator()().
+	{
+		auto it = m_arguments.find(std::string(name, name + parameter_name_size));
+		if (it == m_arguments.end())
+			throw std::invalid_argument("Parameter not found");
+		return it->second;
+	}
+	std::size_t get_params_count() const //what does this have to return?
+	{
+		return m_parameters.size();
+	}
+	const char* get_function_name() const
+	{
+		return function_name.get();
+	}
+	size_t get_name_length() const
+	{
+		return function_name_length;
 	}
 };
