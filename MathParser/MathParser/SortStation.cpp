@@ -319,6 +319,7 @@ public:
 
 			return std::sin(k1->operator()());
 		} 
+		throw std::invalid_argument("ERROR!");
 	}
 	virtual bool is_ready() const
 	{
@@ -350,6 +351,7 @@ public:
 
 			return std::cos(k1->operator()());
 		}
+		throw std::invalid_argument("ERROR!");
 	}
 	virtual bool is_ready() const
 	{
@@ -381,6 +383,7 @@ public:
 
 			return std::tan(k1->operator()());
 		}
+		throw std::invalid_argument("ERROR!");
 	}
 	virtual bool is_ready() const
 	{
@@ -484,30 +487,50 @@ class Header
 	bool isReady = false;
 public:
 	Header() = default;
-	Header(const char* expression, std::size_t expression_len, char** endptr)
+	Header(const char* expression, std::size_t expression_len, char** endPtr)
 	{
-		std::size_t function_name_length = std::strstr(expression, "(") //TODO: implement strstr with a loop which takes expression_len into account
-			- expression;										//and does not assume existence of the terminating null at the end of expression.
-																//Fail if the opening bracket is not found within first expression_len symbols of expression.
-		auto function_name = std::make_unique<char[]>(function_name_length);
-		std::strncpy(function_name.get(), expression, function_name_length);
-		char* begPtr = (char*)(expression + function_name_length);
-		char* endPtr = begPtr;
+		char* begPtr = (char*)(expression);
+		//char* endPtr = begPtr;
 		std::list<std::string> params;
 	
 		bool isOpeningBracket = false;
 		bool isClosingBracket = false;
 		unsigned short commaCount = 0;
 
-		while (*begPtr != '=' || begPtr != expression + length)
+		while (*begPtr != '=' && begPtr < expression + expression_len)
 		{
 			if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z'))
 			{
-				std::string param_name = dynamic_cast<Variable<T>&>(*parse_text_token<double>(begPtr, &endPtr)).get_name();
+				if (this->function_name == nullptr)
+				{
+					while (begPtr < expression + expression_len + 1)
+					{
+
+						auto brPtr = std::strstr(expression, "(");
+						if (brPtr == nullptr)
+						{
+							if (begPtr == expression + expression_len)
+								throw std::invalid_argument("ERROR");
+							begPtr += 1;
+						}
+						else
+						{
+							begPtr = (char*)brPtr;
+							auto size = std::size_t(brPtr - expression);
+							this->function_name = std::make_unique<char[]>(size + 1);
+							std::strncpy(this->function_name.get(), expression, size);
+							this->function_name[size] = 0;
+							break;
+						}
+					}
+					continue;
+				}
+				std::string param_name;
+				std::string param = dynamic_cast<Variable<T>&>(*parse_text_token<double>(begPtr, endPtr, (char*)(param_name.c_str()))).get_name();
 				if (!m_arguments.emplace(param_name, T()).second)
 					throw std::invalid_argument("Parameter is not unique!"); //duplicated '('
 				params.emplace_back(std::move(param_name));
-				begPtr = endPtr;
+				begPtr = *endPtr;
 			}
 
 			if (*begPtr == ' ')
@@ -543,7 +566,7 @@ public:
 		m_parameters.reserve(params.size());
 		for (auto& param:params)
 			m_parameters.emplace_back(std::move(param));
-		*endptr = begPtr;
+		*endPtr = begPtr;
 	}
 	Header(Header<T>&& val) : function_name_length(val.get_name_length())
 	{
