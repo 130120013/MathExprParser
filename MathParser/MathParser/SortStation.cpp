@@ -17,21 +17,6 @@ struct bad_expession_parameters:std::exception
 	bad_expession_parameters(const char* decription);
 };
 
-//template <class T>
-//class IToken;
-//
-//template <class T>
-//T compute_token(const IToken<T>& tkn)
-//{
-//	return tkn();
-//}
-//
-//template <class T>
-//T compute_token(const T& tkn)
-//{
-//	return tkn;
-//}
-
 template <class T>
 class IToken
 {
@@ -50,8 +35,6 @@ class Number : public IToken<T>
 {
 public:
 	Number(T val) : value(val) {};
-	//Number(const Number<T>& num) : value(num()) {}; /*-*/
-	//Better:
 	Number(const Number<T>& num) = default;
 
 	virtual T operator()() const
@@ -95,37 +78,11 @@ private:
 template <class T>
 class Operator : public IToken<T>
 {
-	//std::queue<T> m_parameters;
 public:
-	//virtual T operator()()  = 0;/*Implementation of IToken<T>::operator()()*/
-
-	/*If this form is defined, then it will hide the "virtual T operator()()" overload, unless that form is also explicitly declared even as pure virtual*/
-	//T operator()(const Number<T> a, const Number<T> b)
-	//{
-	//	return //a() - b();
-	//		;
-	//}
-	/*virtual void push_argument(T value)
-	{
-		m_parameters.push(value);
-	}*/
 	virtual short getPriority()
 	{
 		return 0; //default priority, less code but more error prone
 	}
-	/*virtual std::size_t get_params_count() const
-	{
-		return m_parameters.size();
-	}*/
-protected:
-	/*std::queue<T>& parameter_queue()
-	{
-		return m_parameters;
-	}
-	const std::queue<T>& parameter_queue() const
-	{
-		return m_parameters;
-	}*/
 };
 
 template <class T>
@@ -158,10 +115,6 @@ public:
 	{
 		return 2;
 	}
-	/*T operator()(const Number<T> a, const Number<T> b)
-	{
-		return a() + b();
-	}*/
 };
 template <class T>
 class OperatorMinus : public Operator<T>
@@ -187,7 +140,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return true;//this->parameter_queue().size() == 2;
+		return true;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -218,7 +171,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return true;//this->parameter_queue().size() == 2;
+		return true;
 	}
 	virtual short getPriority()
 	{
@@ -268,7 +221,7 @@ public:
 template <class T>
 class Function : public IToken<T> //sin,cos...
 {
-	std::queue<std::shared_ptr<IToken<T>>> m_parameters;
+	std::list<std::shared_ptr<IToken<T>>> m_parameters;
 	char* function_name;
 public:
 	virtual T operator()()
@@ -277,11 +230,11 @@ public:
 	}
 	virtual bool is_ready() const 
 	{
-		return true; //is it needed function?
+		return true;
 	}
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		m_parameters.push(value);
+		m_parameters.push_back(value);
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -292,11 +245,11 @@ public:
 		return function_name;
 	}
 protected:
-	std::queue<T>& parameter_queue()
+	std::list<T>& parameter_queue()
 	{
 		return m_parameters;
 	}
-	const std::queue<std::shared_ptr<IToken<T>>>& parameter_queue() const
+	const std::list<std::shared_ptr<IToken<T>>>& parameter_queue() const
 	{
 		return m_parameters;
 	}
@@ -448,7 +401,9 @@ public:
 	}
 	Variable(Variable<T>&& val) : op(val()), name_length(val.get_name_length())
 	{
-		name.reset(val.get_name());
+		this->name = std::make_unique<char[]>(val.get_name_length() + 1);
+		std::strncpy(this->name.get(), val.get_name(), len);
+		this->name[len] = 0;
 		isReady = true;
 	}
 
@@ -456,7 +411,6 @@ public:
 	{
 		if (isReady)
 			throw std::invalid_argument("ERROR!");
-		//op = value;
 	}
 	virtual T operator()() const
 	{
@@ -492,7 +446,6 @@ public:
 	Header(const char* expression, std::size_t expression_len, char** endPtr)
 	{
 		char* begPtr = (char*)(expression);
-		//char* endPtr = begPtr;
 		std::list<std::string> params;
 	
 		bool isOpeningBracket = false;
@@ -522,6 +475,7 @@ public:
 							this->function_name = std::make_unique<char[]>(size + 1);
 							std::strncpy(this->function_name.get(), expression, size);
 							this->function_name[size] = 0;
+							this->function_name_length = size;
 							break;
 						}
 					}
@@ -570,9 +524,15 @@ public:
 			m_parameters.emplace_back(std::move(param));
 		*endPtr = begPtr;
 	}
-	Header(Header<T>&& val) : function_name_length(val.get_name_length())
+	Header(const Header<T>& val) : function_name_length(val.get_name_length())
 	{
-		function_name.reset(std::move(varname));
+		std::size_t size = val.get_name_length();
+		this->function_name = std::make_unique<char[]>(size + 1);
+		std::strncpy(this->function_name.get(), val.get_function_name(), size);
+		this->function_name[size] = 0;
+		this->m_arguments = val.m_arguments;
+		this->m_parameters = val.m_parameters;
+		isReady = true;
 	}
 	virtual bool is_ready() const
 	{
@@ -604,4 +564,22 @@ public:
 	{
 		return function_name_length;
 	}
+};
+
+template <class T>
+class Mathexpr
+{
+public:
+	Mathexpr(Header<T> funcHeader, std::list<std::shared_ptr<IToken<T>>> funcBody):header(funcHeader), body(funcBody){}
+	Header<T>& get_header() const
+	{
+		return header;
+	}
+	std::list<std::shared_ptr<IToken<T>>>& get_body() const
+	{
+		return body;
+	}
+private:
+	Header<T> header;
+	std::list<std::shared_ptr<IToken<T>>> body;
 };

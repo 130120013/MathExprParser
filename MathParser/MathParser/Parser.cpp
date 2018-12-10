@@ -7,6 +7,14 @@
 #include <memory>
 #include <list>
 
+void skipSpaces(char* input_string, const int length)
+{
+	char* endTokPtr = (char*)(input_string + length);
+	while ((*input_string == '=' || *input_string == '\t' || *input_string == ' ' || *input_string == '\0') && input_string < endTokPtr)
+	{
+		input_string += 1;
+	}
+}
 
 template <class T>
 std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) //пока что только для чисел и операторов
@@ -91,7 +99,7 @@ std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int lengt
 	short hasPunct = 0;
 	std::stack<std::shared_ptr<IToken<double>>> operationQueue;
 
-	while (*begPtr != NULL || *begPtr != '\0' || begPtr != expr + length) 
+	while (*begPtr != NULL && *begPtr != '\0' && begPtr != expr + length - 1) 
 	{
 		try
 		{
@@ -140,8 +148,10 @@ std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int lengt
 
 				if (*begPtr == '+')
 				{
+
+					skipSpaces(begPtr + 1, expr + length - begPtr - 1);
 					char tok = *(begPtr + 1);
-					if (tok >= '0' && tok <= '9') //unary +
+					if (*begPtr == '+' && tok >= '0' && tok <= '9') //unary +
 					{
 						output.push_back(parse_token<double>(begPtr, &endPtr));
 						begPtr = endPtr;
@@ -159,8 +169,15 @@ std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int lengt
 				}
 				if (*begPtr == '-')
 				{
+					//char tok = *(begPtr + 1);
+					//if (tok >= '0' && tok <= '9') //unary -
+					//{
+					//	output.push_back(parse_token<double>(begPtr, &endPtr));
+					//	begPtr = endPtr;
+					//}
+					skipSpaces(begPtr + 1, expr + length - begPtr - 1);
 					char tok = *(begPtr + 1);
-					if (tok >= '0' && tok <= '9') //unary -
+					if (*begPtr == '-' && tok >= '0' && tok <= '9') //unary +
 					{
 						output.push_back(parse_token<double>(begPtr, &endPtr));
 						begPtr = endPtr;
@@ -265,13 +282,15 @@ std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int lengt
 int main()
 {
 	const char* func = "f(x) = 7 * 7 + 3";
-	int length = 10;
+	int length = 11;
 	//lex("7 + sin(6)", length);
-	const char funcHeader[] = "f(x) = ";
+	const char funcHeader[] = "f(x, y) = ";
 	int length1 = 4;
 	char *endptr;
 	Header<double> header(funcHeader, sizeof(funcHeader) - 1, &endptr);
 	std::cout << header.get_function_name();
+
+	Mathexpr<double> mathexpr(header, lex("7+sin(-6)", 10));
 	//lexHeader(funcHeader, length1);
 
 	return 0;
