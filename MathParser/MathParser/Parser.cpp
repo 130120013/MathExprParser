@@ -60,7 +60,7 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr) 
 }
 
 template <class T>
-std::shared_ptr<IToken<T>> parse_text_token(const char* input_string, char** endptr, char* tok_name)
+std::shared_ptr<Variable<T>> parse_text_token(const char* input_string, char** endptr)// char* tok_name
 {
 	std::size_t name_size;
 	char* endTokPtr = (char*)input_string;
@@ -70,8 +70,10 @@ std::shared_ptr<IToken<T>> parse_text_token(const char* input_string, char** end
 	}
 
 	name_size = endTokPtr - input_string;
-	tok_name = new char[name_size];
-	std::strncpy(tok_name, input_string, name_size);
+	std::string name(input_string, input_string + name_size);
+	char* tok_name = new char[name_size + 1];
+	tok_name = (char*)(name.c_str());
+	//std::strncpy(tok_name, name.c_str(), name_size);
 	auto token = std::make_shared<Variable<double>>(tok_name, name_size, 0);
 	*(endptr) = endTokPtr;
 	return token;
@@ -260,91 +262,6 @@ std::list<std::shared_ptr<IToken<double>>> lex(const char* expr, const int lengt
 	return output;
 }
 
-//std::shared_ptr<Header<double>> lexHeader(const char* expr, const int length) //returns Header
-//{
-//	std::size_t name_size = std::strstr(expr, "(") - expr;
-//	char* name = new char[name_size];
-//	std::strncpy(name, expr, name_size);
-//	auto funcName = std::make_shared<Header<double>>(name, name_size);
-//	//std::shared_ptr<Header<double>> funcName;
-//	char* begPtr = (char*)(expr + name_size);
-//	char* endPtr = begPtr;
-//	//funcName.set_name(name);
-//	
-//	bool isOpeningBracket = false;
-//	bool isClosingBracket = false;
-//	unsigned short commaCount = 0;
-//
-//	while (*begPtr != '\0' || begPtr != expr + length)
-//	{
-//		if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z'))
-//		{
-//			/*char* endTokPtr = begPtr;
-//			while ((*endTokPtr >= 'A' && *endTokPtr <= 'Z') || (*endTokPtr >= 'a' && *endTokPtr <= 'z') || (*endTokPtr >= '0' && *endTokPtr <= '9'))
-//			{
-//				endTokPtr += 1;
-//			}	
-//
-//			name_size = endTokPtr - begPtr;
-//			char* tok_name = (char*)malloc(name_size);
-//			std::strncpy(tok_name, begPtr, name_size);
-//			Variable<double> token(tok_name, name_size, 0);*/
-//
-//			
-//			funcName.get()->push_argument(parse_text_token<double>(begPtr, &endPtr, name));
-//			begPtr = endPtr;
-//		}
-//
-//		if (*begPtr == ' ')
-//		{
-//			begPtr += 1;
-//			continue;
-//		}
-//
-//		if (*begPtr == '(')
-//		{
-//			if(isOpeningBracket)
-//				throw std::invalid_argument("ERROR!"); //duplicated '('
-//			isOpeningBracket = true;
-//			begPtr += 1;
-//		}
-//
-//		if (*begPtr == ',') //a-zA_Z0-9
-//		{
-//			commaCount += 1;
-//			begPtr += 1;
-//		}
-//
-//		if (*begPtr == ')')
-//		{
-//			if(!isOpeningBracket)
-//				throw std::invalid_argument("ERROR!"); //missing ')'
-//			if(isClosingBracket)
-//				throw std::invalid_argument("ERROR!"); //dublicated ')'
-//			isClosingBracket = true;
-//			begPtr += 1;
-//		}
-//
-//		//if (*begPtr == ',')
-//		//{
-//
-//		//	while (isClosingBracket || isOpeningBracket || funcName.get_params_count() != 0) //while an opening bracket is not found or an operation stack is not empty
-//		//	{
-//		//		//if (dynamic_cast<Bracket<double>*>(operationQueue.top().get()) == nullptr) //if the cast to Bracket is not successfull, return NULL => it is not '('  
-//				//{
-//				//	outputQueue.push(operationQueue.top());
-//				//	operationQueue.pop();
-//				//}
-//				//else
-//				//{
-//				//	isOpeningBracket = true;
-//				//}
-//		//	}
-//		//	begPtr += 1;
-//		//}
-//	}
-//	return funcName;
-//}
 int main()
 {
 	const char* func = "f(x) = 7 * 7 + 3";

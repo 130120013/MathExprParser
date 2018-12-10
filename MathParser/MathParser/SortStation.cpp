@@ -435,13 +435,15 @@ template <class T>
 class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 {
 	T op = 0;
-	std::unique_ptr<char> name;
+	std::unique_ptr<char[]> name;
 	std::size_t name_length = 0;
 	bool isReady = false;
 public:
 	Variable(char* varname, std::size_t len, T value = 0) : op(value), name_length(len) 
 	{
-		name.reset(varname);
+		this->name = std::make_unique<char[]>(len + 1);
+		std::strncpy(this->name.get(), varname, len);
+		this->name[len] = 0;
 		isReady = true;
 	}
 	Variable(Variable<T>&& val) : op(val()), name_length(val.get_name_length())
@@ -475,7 +477,7 @@ public:
 };
 
 template <class T>
-std::shared_ptr<IToken<T>> parse_text_token(const char* input_string, char** endptr, char* tok_name);
+std::shared_ptr<Variable<T>> parse_text_token(const char* input_string, char** endptr, char* tok_name);
 
 template <class T>
 class Header
@@ -525,11 +527,11 @@ public:
 					}
 					continue;
 				}
-				std::string param_name;
-				std::string param = dynamic_cast<Variable<T>&>(*parse_text_token<double>(begPtr, endPtr, (char*)(param_name.c_str()))).get_name();
-				if (!m_arguments.emplace(param_name, T()).second)
+				//char param_name;
+				auto param = parse_text_token<double>(begPtr, endPtr);//, param_name
+				if (!m_arguments.emplace(param.get()->get_name(), T()).second)
 					throw std::invalid_argument("Parameter is not unique!"); //duplicated '('
-				params.emplace_back(std::move(param_name));
+				params.emplace_back(param.get()->get_name());
 				begPtr = *endPtr;
 			}
 
