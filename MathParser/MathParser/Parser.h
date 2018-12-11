@@ -27,18 +27,28 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 	if (*input_string == '+')
 	{
-		char tok = *(input_string + 1);
-		if (tok >= '0' && tok <= '9')
-			return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-		return std::make_shared<OperatorPlus<T>>();
+		//char tok = *(input_string + 1);
+		//if (tok >= '0' && tok <= '9')
+		//	return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
+		//return std::make_shared<OperatorPlus<T>>();
+		char* tok = (char*)input_string;
+		while (*tok != NULL && *tok == ' ')
+			tok += 1;
+
+		if (*tok == '-' || *tok == '+')
+			return std::make_shared<OperatorPlus<T>>();
+		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 	}
 
 	if (*input_string == '-')
 	{
-		char tok = *(input_string + 1);
-		if (tok >= '0' && tok <= '9')
-			return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-		return std::make_shared<OperatorMinus<T>>();
+		char* tok = (char*)input_string;
+		while (*tok != NULL && *tok == ' ')
+			tok += 1;
+
+		if (*tok == '-' || *tok == '+')
+			return std::make_shared<OperatorMinus<T>>();
+		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 	}
 
 	if (*input_string == '*')
@@ -99,6 +109,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 	char* endPtr = (char*)(expr + length - 1);
 	char* begPtr = (char*)(expr + 0);
 	auto it = expr;
+	bool isBinary = true;
 	short hasPunct = 0;
 	std::stack<std::shared_ptr<IToken<T>>> operationQueue; //maybe queue
 
@@ -168,14 +179,14 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 
 					skipSpaces(begPtr + 1, expr + length - begPtr - 1);
 					char tok = *(begPtr + 1);
-					if (*begPtr == '+' && tok >= '0' && tok <= '9') //unary +
+					if (*begPtr == '+' && (tok == '+' || tok == '-')) //unary +
 					{
 						output.push_back(parse_token<T>(begPtr, &endPtr));
 						begPtr = endPtr;
 					}
 					else //binary +
 					{
-						if (operationQueue.size() != 0)
+						while (operationQueue.size() != 0)
 						{
 							auto plus = dynamic_cast<Operator<T>*>(operationQueue.top().get());
 							if (plus == nullptr)
@@ -195,6 +206,8 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 								output.push_back(operationQueue.top());
 								operationQueue.pop();
 							}
+							else
+								break;
 						}
 						operationQueue.push(parse_token<T>(begPtr, &endPtr));
 						begPtr += 1;
@@ -204,14 +217,14 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 				{
 					skipSpaces(begPtr + 1, expr + length - begPtr - 1);
 					char tok = *(begPtr + 1);
-					if (*begPtr == '-' && tok >= '0' && tok <= '9') //unary +
+					if (*begPtr == '-' && (tok == '+' || tok == '-')) //unary -
 					{
 						output.push_back(parse_token<T>(begPtr, &endPtr));
 						begPtr = endPtr;
 					}
 					else //binary -
 					{
-						if (operationQueue.size() != 0)
+						while (operationQueue.size() != 0)
 						{
 							auto minus = dynamic_cast<Operator<T>*>(operationQueue.top().get());
 							if (minus == nullptr)
@@ -231,6 +244,8 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 								output.push_back(operationQueue.top());
 								operationQueue.pop();
 							}
+							else
+								break;
 						}
 						operationQueue.push(parse_token<T>(begPtr, &endPtr));
 						begPtr += 1;
@@ -238,8 +253,9 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 				}
 				if (*begPtr == '*')
 				{
-					if (operationQueue.size() != 0)
+					while (operationQueue.size() != 0)
 					{
+
 						auto mul = dynamic_cast<Operator<T>*>(operationQueue.top().get());
 						if (mul == nullptr)
 						{
@@ -258,13 +274,15 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 							output.push_back(operationQueue.top());
 							operationQueue.pop();
 						}
+						else
+							break;
 					}
 					operationQueue.push(parse_token<T>(begPtr, &endPtr));
 					begPtr += 1;
 				}
 				if (*begPtr == '/')
 				{
-					if (operationQueue.size() != 0)
+					while (operationQueue.size() != 0)
 					{
 						auto div = dynamic_cast<Operator<T>*>(operationQueue.top().get());
 						if (div == nullptr)
@@ -284,6 +302,8 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 							output.push_back(operationQueue.top());
 							operationQueue.pop();
 						}
+						else
+							break;
 					}
 					operationQueue.push(parse_token<T>(begPtr, &endPtr));
 					begPtr += 1;
