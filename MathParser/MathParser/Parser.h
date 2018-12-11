@@ -94,12 +94,13 @@ template <class T>
 std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length, const std::vector<std::string>& m_parameters)
 {
 	std::list<std::shared_ptr<IToken<T>>> output;
+	int prior;
 
 	char* endPtr = (char*)(expr + length - 1);
 	char* begPtr = (char*)(expr + 0);
 	auto it = expr;
 	short hasPunct = 0;
-	std::stack<std::shared_ptr<IToken<T>>> operationQueue;
+	std::stack<std::shared_ptr<IToken<T>>> operationQueue; //maybe queue
 
 	while (*begPtr != NULL && *begPtr != '\0' && begPtr != expr + length)
 	{
@@ -174,10 +175,26 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 					}
 					else //binary +
 					{
-						if (operationQueue.size() != 0 && OperatorPlus<T>().getPriority() <= dynamic_cast<Operator<T>*>(operationQueue.top().get())->getPriority())
+						if (operationQueue.size() != 0)
 						{
-							output.push_back(operationQueue.top());
-							operationQueue.pop();
+							auto plus = dynamic_cast<Operator<T>*>(operationQueue.top().get());
+							if (plus == nullptr)
+							{
+								auto plus1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
+								if (plus1 == nullptr)
+									throw std::invalid_argument("Error");
+								else
+									prior = plus1->getPriority();
+							}
+							else
+							{
+								prior = plus->getPriority();
+							}
+							if (OperatorPlus<T>().getPriority() <= prior)
+							{
+								output.push_back(operationQueue.top());
+								operationQueue.pop();
+							}
 						}
 						operationQueue.push(parse_token<T>(begPtr, &endPtr));
 						begPtr += 1;
@@ -194,10 +211,26 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 					}
 					else //binary -
 					{
-						if (operationQueue.size() != 0 && OperatorMinus<T>().getPriority() <= dynamic_cast<Operator<T>*>(operationQueue.top().get())->getPriority())
+						if (operationQueue.size() != 0)
 						{
-							output.push_back(operationQueue.top());
-							operationQueue.pop();
+							auto minus = dynamic_cast<Operator<T>*>(operationQueue.top().get());
+							if (minus == nullptr)
+							{
+								auto minus1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
+								if (minus1 == nullptr)
+									throw std::invalid_argument("Error");
+								else
+									prior = minus1->getPriority();
+							}
+							else
+							{
+								prior = minus->getPriority();
+							}
+							if (OperatorMinus<T>().getPriority() <= prior)
+							{
+								output.push_back(operationQueue.top());
+								operationQueue.pop();
+							}
 						}
 						operationQueue.push(parse_token<T>(begPtr, &endPtr));
 						begPtr += 1;
@@ -205,20 +238,52 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 				}
 				if (*begPtr == '*')
 				{
-					if (operationQueue.size() != 0 && OperatorMul<T>().getPriority() <= dynamic_cast<Operator<T>*>(operationQueue.top().get())->getPriority())
+					if (operationQueue.size() != 0)
 					{
-						output.push_back(operationQueue.top());
-						operationQueue.pop();
+						auto mul = dynamic_cast<Operator<T>*>(operationQueue.top().get());
+						if (mul == nullptr)
+						{
+							auto mul1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
+							if (mul1 == nullptr)
+								throw std::invalid_argument("Error");
+							else
+								prior = mul1->getPriority();
+						}
+						else
+						{
+							prior = mul->getPriority();
+						}
+						if (OperatorMul<T>().getPriority() <= prior)
+						{
+							output.push_back(operationQueue.top());
+							operationQueue.pop();
+						}
 					}
 					operationQueue.push(parse_token<T>(begPtr, &endPtr));
 					begPtr += 1;
 				}
 				if (*begPtr == '/')
 				{
-					if (operationQueue.size() != 0 && OperatorDiv<T>().getPriority() <= dynamic_cast<Operator<T>*>(operationQueue.top().get())->getPriority())
+					if (operationQueue.size() != 0)
 					{
-						output.push_back(operationQueue.top());
-						operationQueue.pop();
+						auto div = dynamic_cast<Operator<T>*>(operationQueue.top().get());
+						if (div == nullptr)
+						{
+							auto div1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
+							if (div1 == nullptr)
+								throw std::invalid_argument("Error");
+							else
+								prior = div1->getPriority();
+						}
+						else
+						{
+							prior = div->getPriority();
+						}
+						if (OperatorDiv<T>().getPriority() <= prior)
+						{
+							output.push_back(operationQueue.top());
+							operationQueue.pop();
+						}
 					}
 					operationQueue.push(parse_token<T>(begPtr, &endPtr));
 					begPtr += 1;
@@ -289,5 +354,75 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 	return output;
 }
 
+template <class T, class K>
+void compute(std::list<std::shared_ptr<IToken<K>>>& body, typename std::list<std::shared_ptr<IToken<K>>>::iterator elem)
+{
+	auto val = dynamic_cast<T*>((*elem).get());
+	bool isComputable = false;
+	int paramsCount = val->get_params_count();
+
+	for (int i = paramsCount; i > 0; --i)
+	{
+		auto param_it = elem;
+		std::advance(param_it, -1 * i);
+		((*elem).get())->push_argument(*param_it); //here std::move must be
+		body.remove(*param_it);
+	}
+
+	if (val->is_ready())
+	{
+		K res = val->operator()();
+		auto calc = std::make_shared<Number<K>>(res);
+		*elem = calc;
+	}
+	++elem;
+}
+
+template <class T>
+void simplify(std::list<std::shared_ptr<IToken<T>>>& body)
+{
+	auto it = body.begin();
+
+	while (body.size() > 1 )
+	{
+		std::string type = (*it).get()->type();
+		if (type == "plus")
+		{
+			compute<OperatorPlus<T>, T>(body, it);
+			continue;
+		}
+		if (type == "minus")
+		{
+			compute<OperatorMinus<T>, T>(body, it);
+			continue;
+		}
+		if (type == "mul")
+		{
+			compute<OperatorMul<T>, T>(body, it);
+			continue;
+		}
+		if (type == "div")
+		{
+			compute<OperatorDiv<T>, T>(body, it);
+			continue;
+		}
+		if (type == "sin")
+		{
+			compute<SinFunction<T>, T>(body, it);
+			continue;
+		}
+		if (type == "cos")
+		{
+			compute<CosFunction<T>, T>(body, it);
+			continue;
+		}
+		if (type == "tg")
+		{
+			compute<TgFunction<T>, T>(body, it);
+			continue;
+		}
+		++it;
+	}
+}
 
 #endif // !PARSER_H

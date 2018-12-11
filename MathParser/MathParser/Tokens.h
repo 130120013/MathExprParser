@@ -31,6 +31,7 @@ public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value) = 0;
 	virtual bool is_ready() const = 0; //all parameters are specified
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
+	virtual std::string type() = 0;
 };
 
 template <class T>
@@ -72,6 +73,10 @@ public:
 		//#ifndef __CUDACC__
 		//		throw bad_expession_parameters("An argument is specified for a literal");
 		//#endif
+	}
+	virtual std::string type()
+	{
+		return "num";
 	}
 protected:
 private:
@@ -118,6 +123,10 @@ public:
 	{
 		return 2;
 	}
+	virtual std::string type()
+	{
+		return "plus";
+	}
 };
 template <class T>
 class OperatorMinus : public Operator<T>
@@ -148,6 +157,10 @@ public:
 	virtual std::size_t get_params_count() const
 	{
 		return 2;
+	}
+	virtual std::string type()
+	{
+		return "minus";
 	}
 };
 template <class T>
@@ -184,6 +197,10 @@ public:
 	{
 		return 2;
 	}
+	virtual std::string type()
+	{
+		return "mul";
+	}
 };
 template <class T>
 class OperatorDiv : public Operator<T>
@@ -219,6 +236,10 @@ public:
 	{
 		return 2;
 	}
+	virtual std::string type()
+	{
+		return "div";
+	}
 };
 
 template <class T>
@@ -246,6 +267,14 @@ public:
 	virtual const char* get_function_name() const
 	{
 		return function_name;
+	}
+	virtual std::string type()
+	{
+		return "func";
+	}
+	virtual short getPriority()
+	{
+		return 1;
 	}
 protected:
 	std::list<T>& parameter_queue()
@@ -291,6 +320,14 @@ public:
 	{
 		return "sin";
 	}
+	virtual std::string type()
+	{
+		return "sin";
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
 };
 template <class T>
 class CosFunction : public Function<T>
@@ -323,6 +360,14 @@ public:
 	{
 		return "cos";
 	}
+	virtual std::string type()
+	{
+		return "cos";
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
 };
 template <class T>
 class TgFunction : public Function<T>
@@ -349,13 +394,17 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return -1;
+		return 2;
 	}
 	virtual std::size_t get_params_count() const
 	{
 		return 1;
 	}
 	virtual const char* get_function_name() const
+	{
+		return "tg";
+	}
+	virtual std::string type()
 	{
 		return "tg";
 	}
@@ -386,6 +435,10 @@ public:
 	virtual short getPriority()
 	{
 		return -1;
+	}
+	virtual std::string type()
+	{
+		return "br"; 
 	}
 };
 
@@ -434,6 +487,10 @@ public:
 	size_t get_name_length()
 	{
 		return name_length;
+	}
+	virtual std::string type()
+	{
+		return "var";
 	}
 };
 
