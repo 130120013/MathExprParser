@@ -479,8 +479,18 @@ std::list<std::shared_ptr<IToken<T>>> simplify(std::list<std::shared_ptr<IToken<
 			compute<TgFunction<T>, T>(body, it);
 			continue;
 		}
+		if (type == "num")
+		{
+			++it;
+			continue;
+		}
+		if (type == "var")
+		{
+			++it;
+			continue;
+		}
 
-		++it;
+		throw std::invalid_argument("Missed operator or function");
 	}
 	return body;
 }
