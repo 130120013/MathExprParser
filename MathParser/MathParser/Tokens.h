@@ -7,6 +7,7 @@
 #include <memory>
 #include <map>
 #include <list>
+#include <limits>
 
 struct invalid_exception :std::exception
 {
@@ -32,6 +33,7 @@ public:
 	virtual bool is_ready() const = 0; //all parameters are specified
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 	virtual std::string type() = 0;
+	virtual void drop_ready_flag() = 0;
 };
 
 template <class T>
@@ -78,9 +80,69 @@ public:
 	{
 		return "num";
 	}
+	void drop_ready_flag()
+	{
+		return;
+	}
 protected:
 private:
 	T value;
+};
+
+template <class T>
+class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
+{
+	T op = 0;
+	std::unique_ptr<char[]> name;
+	std::size_t name_length = 0;
+	bool isReady;
+public:
+	Variable(char* varname, std::size_t len, T value = std::numeric_limits<T>::max()) : op(value), name_length(len)
+	{
+		this->name = std::make_unique<char[]>(len + 1);
+		std::strncpy(this->name.get(), varname, len);
+		this->name[len] = 0;
+		this->op = value;
+		isReady = (value == std::numeric_limits<T>::max()) ? false : true;
+	}
+	Variable(Variable<T>&& val) : op(val()), name_length(val.get_name_length()), isReady(val.is_ready())
+	{
+		this->name = std::make_unique<char[]>(val.get_name_length() + 1);
+		std::strncpy(this->name.get(), val.get_name(), val.get_name_length());
+		this->name[val.get_name_length()] = 0;
+	}
+
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		if (this->isReady)
+			throw std::invalid_argument("ERROR!");
+		op = value.get()->operator()();
+		isReady = true;
+	}
+	virtual T operator()() const
+	{
+		return op;
+	}
+	virtual bool is_ready() const
+	{
+		return isReady;
+	}
+	char* get_name() const
+	{
+		return name.get();
+	}
+	size_t get_name_length()
+	{
+		return name_length;
+	}
+	virtual std::string type()
+	{
+		return "var";
+	}
+	void drop_ready_flag()
+	{
+		isReady = false;
+	}
 };
 
 template <class T>
@@ -105,15 +167,36 @@ public:
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		if (dynamic_cast<Number<T>*>(ops[0].get()) != nullptr && dynamic_cast<Number<T>*>(ops[1].get()) != nullptr)
+		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
+		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
+		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
+		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+
+		T val1, val2;
+
+		if (opN1 == nullptr)
 		{
-			const Number<T>* k1 = dynamic_cast<Number<T>*>(ops[0].get());
-			const Number<T>* k2 = dynamic_cast<Number<T>*>(ops[1].get());
-
-			return *k1 / *k2;
+			if (opV1->is_ready())
+				val1 = opV1->operator()();
+			else
+				return std::numeric_limits<T>::max();
 		}
-
-		return 0;
+		else
+		{
+			val1 = opN1->operator()();
+		}
+		if (opN2 == nullptr)
+		{
+			if (opV2->is_ready())
+				val2 = opV2->operator()();
+			else
+				return std::numeric_limits<T>::max();
+		}
+		else
+		{
+			val2 = opN2->operator()();
+		}
+		return val1 + val2;
 	}
 	virtual bool is_ready() const
 	{
@@ -126,6 +209,11 @@ public:
 	virtual std::string type()
 	{
 		return "plus";
+	}
+	void drop_ready_flag()
+	{
+		top = ops;
+		return;
 	}
 };
 template <class T>
@@ -140,15 +228,36 @@ public:
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		if (dynamic_cast<Number<T>*>(ops[0].get()) != nullptr && dynamic_cast<Number<T>*>(ops[1].get()) != nullptr)
+		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
+		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
+		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
+		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+
+		T val1, val2;
+
+		if (opN1 == nullptr)
 		{
-			const Number<T>* k1 = dynamic_cast<Number<T>*>(ops[0].get());
-			const Number<T>* k2 = dynamic_cast<Number<T>*>(ops[1].get());
-
-			return *k1 - *k2;
+			if (opV1->is_ready())
+				val1 = opV1->operator()();
+			else
+				return std::numeric_limits<T>::max();
 		}
-
-		return 0;
+		else
+		{
+			val1 = opN1->operator()();
+		}
+		if (opN2 == nullptr)
+		{
+			if (opV2->is_ready())
+				val2 = opV2->operator()();
+			else
+				return std::numeric_limits<T>::max();
+		}
+		else
+		{
+			val2 = opN2->operator()();
+		}
+		return val1 - val2;
 	}
 	virtual bool is_ready() const
 	{
@@ -161,6 +270,11 @@ public:
 	virtual std::string type()
 	{
 		return "minus";
+	}
+	void drop_ready_flag()
+	{
+		top = ops;
+		return;
 	}
 };
 template <class T>
@@ -175,15 +289,36 @@ public:
 	}
 	virtual T operator()() const
 	{
-		if (dynamic_cast<Number<T>*>(ops[0].get()) != nullptr && dynamic_cast<Number<T>*>(ops[1].get()) != nullptr)
+		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
+		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
+		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
+		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+
+		T val1, val2;
+
+		if (opN1 == nullptr)
 		{
-			const Number<T>* k1 = dynamic_cast<Number<T>*>(ops[0].get());
-			const Number<T>* k2 = dynamic_cast<Number<T>*>(ops[1].get());
-
-			return *k1 * *k2;
+			if (opV1->is_ready())
+				val1 = opV1->operator()();
+			else
+				return std::numeric_limits<T>::max();
 		}
-
-		return 0;
+		else
+		{
+			val1 = opN1->operator()();
+		}
+		if (opN2 == nullptr)
+		{
+			if (opV2->is_ready())
+				val2 = opV2->operator()();
+			else
+				return std::numeric_limits<T>::max();
+		}
+		else
+		{
+			val2 = opN2->operator()();
+		}
+		return val1 * val2;
 	}
 	virtual bool is_ready() const
 	{
@@ -201,6 +336,11 @@ public:
 	{
 		return "mul";
 	}
+	void drop_ready_flag()
+	{
+		top = ops;
+		return;
+	}
 };
 template <class T>
 class OperatorDiv : public Operator<T>
@@ -214,15 +354,36 @@ public:
 	}
 	virtual T operator()() const
 	{
-		if (dynamic_cast<Number<T>*>(ops[0].get()) != nullptr && dynamic_cast<Number<T>*>(ops[1].get()) != nullptr)
+		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
+		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
+		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
+		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+
+		T val1, val2;
+
+		if (opN1 == nullptr)
 		{
-			const Number<T>* k1 = dynamic_cast<Number<T>*>(ops[0].get());
-			const Number<T>* k2 = dynamic_cast<Number<T>*>(ops[1].get());
-
-			return *k1 / *k2;
+			if (opV1->is_ready())
+				val1 = opV1->operator()();
+			else
+				return std::numeric_limits<T>::max();
 		}
-
-		return 0;
+		else
+		{
+			val1 = opN1->operator()();
+		}
+		if (opN2 == nullptr)
+		{
+			if (opV2->is_ready())
+				val2 = opV2->operator()();
+			else
+				return std::numeric_limits<T>::max();
+		}
+		else
+		{
+			val2 = opN2->operator()();
+		}
+		return val1 / val2;
 	}
 	virtual bool is_ready() const
 	{
@@ -239,6 +400,76 @@ public:
 	virtual std::string type()
 	{
 		return "div";
+	}
+	void drop_ready_flag()
+	{
+		top = ops;
+		return;
+	}
+};
+template <class T>
+class OperatorPow : public Operator<T>
+{
+	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		*top++ = value;
+	}
+	virtual T operator()() const
+	{
+		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
+		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
+		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
+		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+
+		T val1, val2;
+
+		if (opN1 == nullptr)
+		{
+			if (opV1->is_ready())
+				val1 = opV1->operator()();
+			else
+				return std::numeric_limits<T>::max();
+		}
+		else
+		{
+			val1 = opN1->operator()();
+		}
+		if (opN2 == nullptr)
+		{
+			if (opV2->is_ready())
+				val2 = opV2->operator()();
+			else
+				return std::numeric_limits<T>::max();
+		}
+		else
+		{
+			val2 = opN2->operator()();
+		}
+		return std::pow(val1, val2);
+	}
+	virtual bool is_ready() const
+	{
+		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 2;
+	}
+	virtual std::string type()
+	{
+		return "pow";
+	}
+	void drop_ready_flag()
+	{
+		top = ops;
+		return;
 	}
 };
 
@@ -276,6 +507,10 @@ public:
 	{
 		return 1;
 	}
+	void drop_ready_flag()
+	{
+		return;
+	}
 protected:
 	std::list<T>& parameter_queue()
 	{
@@ -291,26 +526,35 @@ template <class T>
 class SinFunction : public Function<T>
 {
 	std::shared_ptr<IToken<T>> op;
-	bool isReady = false;
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		op = value;
-		isReady = true;
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		if (dynamic_cast<Number<T>*>(op.get()) != nullptr)
-		{
-			const Number<T>* k1 = dynamic_cast<Number<T>*>(op.get());
+		auto opN1 = dynamic_cast<Number<T>*>(op.get());
+		auto opV1 = dynamic_cast<Variable<T>*>(op.get());
 
-			return std::sin(k1->operator()());
+		T val1;
+
+		if (opN1 == nullptr)
+		{
+			if (opV1->is_ready())
+				val1 = opV1->operator()();
+			else
+				return std::numeric_limits<T>::max();
 		}
-		throw std::invalid_argument("ERROR!");
+		else
+		{
+			val1 = opN1->operator()();
+		}
+
+		return std::sin(val1);
 	}
 	virtual bool is_ready() const
 	{
-		return isReady;
+		return op->is_ready();
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -327,6 +571,10 @@ public:
 	virtual short getPriority()
 	{
 		return 2;
+	}
+	void drop_ready_flag()
+	{
+		return;
 	}
 };
 template <class T>
@@ -340,17 +588,28 @@ public:
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		if (dynamic_cast<Number<T>*>(op.get()) != nullptr)
-		{
-			const Number<T>* k1 = dynamic_cast<Number<T>*>(op.get());
+		auto opN1 = dynamic_cast<Number<T>*>(op.get());
+		auto opV1 = dynamic_cast<Variable<T>*>(op.get());
 
-			return std::cos(k1->operator()());
+		T val1;
+
+		if (opN1 == nullptr)
+		{
+			if (opV1->is_ready())
+				val1 = opV1->operator()();
+			else
+				return std::numeric_limits<T>::max();
 		}
-		throw std::invalid_argument("ERROR!");
+		else
+		{
+			val1 = opN1->operator()();
+		}
+
+		return std::cos(val1);
 	}
 	virtual bool is_ready() const
 	{
-		return this->parameter_queue().size() == 1;
+		return op->is_ready();
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -367,6 +626,10 @@ public:
 	virtual short getPriority()
 	{
 		return 2;
+	}
+	void drop_ready_flag()
+	{
+		return;
 	}
 };
 template <class T>
@@ -380,17 +643,28 @@ public:
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		if (dynamic_cast<Number<T>*>(op.get()) != nullptr)
-		{
-			const Number<T>* k1 = dynamic_cast<Number<T>*>(op.get());
+		auto opN1 = dynamic_cast<Number<T>*>(op.get());
+		auto opV1 = dynamic_cast<Variable<T>*>(op.get());
 
-			return std::tan(k1->operator()());
+		T val1;
+
+		if (opN1 == nullptr)
+		{
+			if (opV1->is_ready())
+				val1 = opV1->operator()();
+			else
+				return std::numeric_limits<T>::max();
 		}
-		throw std::invalid_argument("ERROR!");
+		else
+		{
+			val1 = opN1->operator()();
+		}
+
+		return std::tan(val1);
 	}
 	virtual bool is_ready() const
 	{
-		return this->parameter_queue().size() == 1;
+		return op->is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -408,14 +682,16 @@ public:
 	{
 		return "tg";
 	}
+	void drop_ready_flag()
+	{
+		return;
+	}
 };
 
 template <class T>
 class Bracket : public Operator<T> //,' '()
 {
-	//T openingBracket;
 public:
-	//Bracket(const T isOpeningBracket) : openingBracket(isOpeningBracket) {};
 	Bracket() = default;
 
 	virtual T operator()() const
@@ -440,57 +716,9 @@ public:
 	{
 		return "br"; 
 	}
-};
-
-template <class T>
-class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
-{
-	T op = 0;
-	std::unique_ptr<char[]> name;
-	std::size_t name_length = 0;
-	bool isReady = false;
-public:
-	Variable(char* varname, std::size_t len, T value = 0) : op(value), name_length(len)
+	void drop_ready_flag()
 	{
-		this->name = std::make_unique<char[]>(len + 1);
-		std::strncpy(this->name.get(), varname, len);
-		this->name[len] = 0;
-		this->op = value;
-		isReady = true;
-	}
-	Variable(Variable<T>&& val) : op(val()), name_length(val.get_name_length()), isReady(val.is_ready())
-	{
-		this->name = std::make_unique<char[]>(val.get_name_length() + 1);
-		std::strncpy(this->name.get(), val.get_name(), val.get_name_length());
-		this->name[val.get_name_length()] = 0;
-	}
-
-	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
-	{
-		if (isReady)
-			throw std::invalid_argument("ERROR!");
-		op = value.get()->operator()();
-		isReady = true;
-	}
-	virtual T operator()() const
-	{
-		return op;
-	}
-	virtual bool is_ready() const
-	{
-		return isReady;
-	}
-	char* get_name() const
-	{
-		return name.get();
-	}
-	size_t get_name_length()
-	{
-		return name_length;
-	}
-	virtual std::string type()
-	{
-		return "var";
+		return;
 	}
 };
 
@@ -600,23 +828,23 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return true; //is it needed function?
+		return true;
 	}
 	void push_argument(const char* name, std::size_t parameter_name_size, const T& value)
 	{
 		auto it = m_arguments.find(std::string(name, name + parameter_name_size));
 		if (it == m_arguments.end())
-			throw std::invalid_argument("Parameter not found");
+			throw std::invalid_argument("Parameter is not found");
 		it->second = value;
 	}
 	const T& get_argument(const char* parameter_name, std::size_t parameter_name_size) const //call this from Variable::operator()().
 	{
 		auto it = m_arguments.find(std::string(parameter_name, parameter_name + parameter_name_size));
 		if (it == m_arguments.end())
-			throw std::invalid_argument("Parameter not found");
+			throw std::invalid_argument("Parameter is not found");
 		return it->second;
 	}
-	std::size_t get_params_count() const //what does this have to return?
+	std::size_t get_params_count() const
 	{
 		return m_parameters.size();
 	}
@@ -632,7 +860,14 @@ public:
 	{
 		return m_parameters;
 	}
-
+	const std::size_t get_param_index(std::string param_name)
+	{
+		for (std::size_t i = 0; i < this->m_parameters.size(); ++i)
+		{
+			if (this->m_parameters[i] == param_name)
+				return i;
+		}
+	}
 };
 
 template <class T>
@@ -647,6 +882,37 @@ public:
 	std::list<std::shared_ptr<IToken<T>>>& get_body()
 	{
 		return body;
+	}
+	void init_variables(const std::vector<T>& parameters)
+	{
+		if (parameters.size() < header.get_params_count())
+			throw std::invalid_argument("Count of arguments < " + header.get_params_count());
+		auto it = this->body.begin();
+		while (it != this->body.end())
+		{
+			auto var = dynamic_cast<Variable<T>*>((*it).get());
+			if (var != nullptr)
+			{
+				int idx = header.get_param_index(std::string(var->get_name(), var->get_name_length()));
+				(*it).get()->push_argument(std::make_shared<Variable<T>>(var->get_name(), var->get_name_length(), parameters[idx]));
+			}
+			++it;
+		}
+	}
+	void clear_variables()
+	{
+		auto it = this->body.begin();
+		while (it != this->body.end())
+		{
+			if (dynamic_cast<Variable<T>*>((*it).get()) != nullptr ||
+				dynamic_cast<OperatorPlus<T>*>((*it).get()) != nullptr ||
+				dynamic_cast<OperatorMinus<T>*>((*it).get()) != nullptr ||
+				dynamic_cast<OperatorMul<T>*>((*it).get()) != nullptr ||
+				dynamic_cast<OperatorDiv<T>*>((*it).get()) != nullptr ||
+				dynamic_cast<OperatorPow<T>*>((*it).get()) != nullptr)
+				(*it).get()->drop_ready_flag();
+			++it;
+		}
 	}
 private:
 	Header<T> header;

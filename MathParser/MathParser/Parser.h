@@ -2,7 +2,6 @@
 #define PARSER_H
 
 #include <iostream> 
-#include <queue>
 #include <stack>
 #include "Tokens.h"
 #include <cstdlib>
@@ -27,10 +26,6 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
 	if (*input_string == '+')
 	{
-		//char tok = *(input_string + 1);
-		//if (tok >= '0' && tok <= '9')
-		//	return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-		//return std::make_shared<OperatorPlus<T>>();
 		char* tok = (char*)input_string;
 		while (*tok != NULL && *tok == ' ')
 			tok += 1;
@@ -54,8 +49,10 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 	if (*input_string == '*')
 		return std::make_shared<OperatorMul<T>>();
 	if (*input_string == '/')
-
 		return std::make_shared<OperatorDiv<T>>();
+	if (*input_string == '^')
+		return std::make_shared<OperatorPow<T>>();
+
 	if (*input_string == 's')
 	{
 		if (std::strstr(input_string, "sin") != NULL)
@@ -77,7 +74,6 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 			return std::make_shared<TgFunction<T>>();
 		}
 	}
-
 	return NULL;
 }
 
@@ -95,7 +91,7 @@ std::shared_ptr<Variable<T>> parse_text_token(const char* input_string, char** e
 	std::string name(input_string, input_string + name_size);
 	char* tok_name = new char[name_size + 1];
 	tok_name = (char*)(name.c_str());
-	auto token = std::make_shared<Variable<T>>(tok_name, name_size, 0);
+	auto token = std::make_shared<Variable<T>>(tok_name, name_size);
 	*(endptr) = endTokPtr;
 	return token;
 }
@@ -108,13 +104,14 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 
 	char* endPtr = (char*)(expr + length - 1);
 	char* begPtr = (char*)(expr + 0);
-	auto it = expr;
+	auto delta = (char*)expr;
 	bool isBinary = true;
 	short hasPunct = 0;
-	std::stack<std::shared_ptr<IToken<T>>> operationQueue; //maybe queue
+	std::stack<std::shared_ptr<IToken<T>>> operationQueue;
 
 	while (*begPtr != NULL && *begPtr != '\0' && begPtr != expr + length)
 	{
+		delta = begPtr;
 		try
 		{
 			if (*begPtr >= '0' && *begPtr <= '9')
@@ -122,7 +119,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 				output.push_back(parse_token<T>(begPtr, &endPtr));
 
 				if (begPtr == endPtr)
-					throw std::invalid_argument("ERROR!");
+					throw std::invalid_argument("Cannot parse: " + *begPtr);
 				begPtr = endPtr;
 			}
 			else
@@ -140,7 +137,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 						if (funcSin != NULL)
 							operationQueue.push(funcSin);
 						else
-							throw std::invalid_argument("ERROR!");
+							throw std::invalid_argument("Unexpected error at " + *begPtr);
 						begPtr += 3;
 						continue;
 					}
@@ -150,7 +147,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 						if (funcCos != NULL)
 							operationQueue.push(funcCos);
 						else
-							throw std::invalid_argument("ERROR!");
+							throw std::invalid_argument("Unexpected error at " + *begPtr);
 						begPtr += 3;
 						continue;
 					}
@@ -160,7 +157,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 						if (funcTg != NULL)
 							operationQueue.push(funcTg);
 						else
-							throw std::invalid_argument("ERROR!");
+							throw std::invalid_argument("Unexpected error at " + *begPtr);
 						begPtr += 2;
 						continue;
 					}
@@ -172,11 +169,10 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 						begPtr = endPtr;
 					}
 					else
-						throw std::invalid_argument("Error!");
+						throw std::invalid_argument("Parameter is not found: " + var_name);
 				}
 				if (*begPtr == '+')
 				{
-
 					skipSpaces(begPtr + 1, expr + length - begPtr - 1);
 					char tok = *(begPtr + 1);
 					if (*begPtr == '+' && (tok == '+' || tok == '-')) //unary +
@@ -193,7 +189,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 							{
 								auto plus1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
 								if (plus1 == nullptr)
-									throw std::invalid_argument("Error");
+									throw std::invalid_argument("Unexpected error at " + *begPtr);
 								else
 									prior = plus1->getPriority();
 							}
@@ -231,7 +227,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 							{
 								auto minus1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
 								if (minus1 == nullptr)
-									throw std::invalid_argument("Error");
+									throw std::invalid_argument("Unexpected error at " + *begPtr);
 								else
 									prior = minus1->getPriority();
 							}
@@ -261,7 +257,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 						{
 							auto mul1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
 							if (mul1 == nullptr)
-								throw std::invalid_argument("Error");
+								throw std::invalid_argument("Unexpected error at " + *begPtr);
 							else
 								prior = mul1->getPriority();
 						}
@@ -289,13 +285,41 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 						{
 							auto div1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
 							if (div1 == nullptr)
-								throw std::invalid_argument("Error");
+								throw std::invalid_argument("Unexpected error at " + *begPtr);
 							else
 								prior = div1->getPriority();
 						}
 						else
 						{
 							prior = div->getPriority();
+						}
+						if (OperatorDiv<T>().getPriority() <= prior)
+						{
+							output.push_back(operationQueue.top());
+							operationQueue.pop();
+						}
+						else
+							break;
+					}
+					operationQueue.push(parse_token<T>(begPtr, &endPtr));
+					begPtr += 1;
+				}
+				if (*begPtr == '^')
+				{
+					while (operationQueue.size() != 0)
+					{
+						auto pow = dynamic_cast<Operator<T>*>(operationQueue.top().get());
+						if (pow == nullptr)
+						{
+							auto pow1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
+							if (pow1 == nullptr)
+								throw std::invalid_argument("Unexpected error at " + *begPtr);
+							else
+								prior = pow1->getPriority();
+						}
+						else
+						{
+							prior = pow->getPriority();
 						}
 						if (OperatorDiv<T>().getPriority() <= prior)
 						{
@@ -324,7 +348,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 						}
 					}
 					if (!isOpeningBracket) //missing '('
-						throw std::invalid_argument("ERROR!");
+						throw std::invalid_argument("There is no opening bracket!");
 					begPtr += 1;
 				}
 				if (*begPtr == '(')
@@ -349,12 +373,14 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 						}
 					}
 					if (!isOpeningBracket)
-						throw std::invalid_argument("ERROR!");
+						throw std::invalid_argument("There is no opening bracket!");
 					else
 						operationQueue.pop();
 					begPtr += 1;
 				}
 			}
+		if (begPtr - delta == 0)
+			throw std::invalid_argument("Invalid symbol at " + *begPtr);
 		}
 		catch (std::exception e)
 		{
@@ -364,7 +390,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 	while (operationQueue.size() != 0)
 	{
 		if (dynamic_cast<Bracket<T>*>(operationQueue.top().get()) != NULL) //checking enclosing brackets
-			throw std::invalid_argument("ERROR!");
+			throw std::invalid_argument("Enclosing bracket!");
 		else
 		{
 			output.push_back(operationQueue.top());
@@ -377,29 +403,36 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, const int length
 template <class T, class K>
 void compute(std::list<std::shared_ptr<IToken<K>>>& body, typename std::list<std::shared_ptr<IToken<K>>>::iterator elem)
 {
-	auto val = dynamic_cast<T*>((*elem).get());
-	bool isComputable = false;
-	int paramsCount = val->get_params_count();
-
-	for (int i = paramsCount; i > 0; --i)
+	try
 	{
-		auto param_it = elem;
-		std::advance(param_it, -1 * i);
-		((*elem).get())->push_argument(*param_it); //here std::move must be
-		body.remove(*param_it);
-	}
+		auto val = dynamic_cast<T*>((*elem).get());
+		bool isComputable = false;
+		int paramsCount = val->get_params_count();
 
-	if (val->is_ready())
-	{
-		K res = val->operator()();
-		auto calc = std::make_shared<Number<K>>(res);
-		*elem = calc;
+		for (int i = paramsCount; i > 0; --i)
+		{
+			auto param_it = elem;
+			std::advance(param_it, -1 * i);
+			((*elem).get())->push_argument(*param_it); //here std::move must be
+			body.remove(*param_it);
+		}
+
+		if (val->is_ready())
+		{
+			K res = val->operator()();
+			auto calc = std::make_shared<Number<K>>(res);
+			*elem = calc;
+		}
+		++elem;
 	}
-	++elem;
+	catch (std::exception e)
+	{
+		throw std::invalid_argument("ERROR!");
+	}
 }
 
 template <class T>
-void simplify(std::list<std::shared_ptr<IToken<T>>>& body)
+std::list<std::shared_ptr<IToken<T>>> simplify(std::list<std::shared_ptr<IToken<T>>> body)
 {
 	auto it = body.begin();
 
@@ -426,6 +459,11 @@ void simplify(std::list<std::shared_ptr<IToken<T>>>& body)
 			compute<OperatorDiv<T>, T>(body, it);
 			continue;
 		}
+		if (type == "pow")
+		{
+			compute<OperatorPow<T>, T>(body, it);
+			continue;
+		}
 		if (type == "sin")
 		{
 			compute<SinFunction<T>, T>(body, it);
@@ -441,8 +479,10 @@ void simplify(std::list<std::shared_ptr<IToken<T>>>& body)
 			compute<TgFunction<T>, T>(body, it);
 			continue;
 		}
+
 		++it;
 	}
+	return body;
 }
 
 #endif // !PARSER_H
