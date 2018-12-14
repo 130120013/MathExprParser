@@ -133,7 +133,6 @@
     <ClCompile Include="SortStation.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="cuda_types.h" />
     <ClInclude Include="Parser.h" />
     <ClInclude Include="Tokens.h" />
   </ItemGroup>

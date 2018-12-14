@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CudaCompile Include="kernel.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="cuda_types">
+      <UniqueIdentifier>{f613d1b5-8b7c-4016-87a2-9941eba86801}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source">
+      <UniqueIdentifier>{a6bfe95c-9d09-455e-90e5-3e621a8b9006}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header">
+      <UniqueIdentifier>{7d3f763d-d832-46bc-beb7-9303145a5333}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\MathParser\cuda_types.h">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_list.cuh">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_stack.cuh">
+      <Filter>Header</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
