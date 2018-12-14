@@ -108,7 +108,7 @@ public:
 		std::strncpy(this->name.get(), varname, len);
 		this->name[len] = 0;
 		this->op = value;
-		isReady = (value == std::numeric_limits<T>::max()) ? false : true;
+		isReady = (value != std::numeric_limits<T>::max());
 	}
 	Variable(Variable<T>&& val) : op(val()), name_length(val.get_name_length()), isReady(val.is_ready())
 	{
@@ -172,36 +172,10 @@ public:
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
-		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
-		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
-		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
-		T val1, val2;
-
-		if (opN1 == nullptr)
-		{
-			if (opV1->is_ready())
-				val1 = opV1->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val1 = opN1->operator()();
-		}
-		if (opN2 == nullptr)
-		{
-			if (opV2->is_ready())
-				val2 = opV2->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val2 = opN2->operator()();
-		}
-		return val1 + val2;
+		return (*ops[0])() + (*ops[1])();
 	}
 	virtual bool is_ready() const
 	{
@@ -892,10 +866,7 @@ public:
 		simplify_body(result);
 		if (result.size() != 1)
 			throw std::exception("Invalid expression");
-		auto pNumber = dynamic_cast<Number<T>*>(result.front().get());
-		if (pNumber == nullptr)
-			throw std::exception("Invalid expression");
-		return (*pNumber)();
+		return (*result.front())();
 	}
 	void init_variables(const std::vector<T>& parameters)
 	{
@@ -908,7 +879,7 @@ public:
 			if (var != nullptr)
 			{
 				int idx = int(header.get_param_index(std::string(var->get_name(), var->get_name_length())));
-				(*it).get()->push_argument(std::make_shared<Variable<T>>(var->get_name(), var->get_name_length(), parameters[idx]));
+				(*it).get()->push_argument(std::make_shared<Number<T>>(parameters[idx]));
 			}
 			++it;
 		}
@@ -1324,29 +1295,28 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t leng
 }
 
 template <class T, class K>
-void compute(std::list<std::shared_ptr<IToken<K>>>& body, typename std::list<std::shared_ptr<IToken<K>>>::iterator elem)
+typename std::list<std::shared_ptr<IToken<K>>>::iterator compute(std::list<std::shared_ptr<IToken<K>>>& body, typename std::list<std::shared_ptr<IToken<K>>>::iterator elem)
 {
 	try
 	{
 		auto val = dynamic_cast<T*>((*elem).get());
 		bool isComputable = false;
 		auto paramsCount = val->get_params_count();
-
+		auto param_it = elem;
 		for (auto i = paramsCount; i > 0; --i)
 		{
-			auto param_it = elem;
-			std::advance(param_it, -1 * i);
+			--param_it;
 			((*elem).get())->push_argument(*param_it); //here std::move must be
-			body.remove(*param_it);
+			param_it = body.erase(param_it);
 		}
 
 		if (val->is_ready())
 		{
-			K res = val->operator()();
+			K res = (*val)();
 			auto calc = std::make_shared<Number<K>>(res);
 			*elem = calc;
 		}
-		++elem;
+		return ++elem;
 	}
 	catch (std::exception e)
 	{
@@ -1363,50 +1333,42 @@ void simplify_body(std::list<std::shared_ptr<IToken<T>>>& body)
 		std::string type = (*it).get()->type();
 		if (type == "plus")
 		{
-			compute<OperatorPlus<T>>(body, it);
-			it = body.begin();
+			it = compute<OperatorPlus<T>>(body, it);
 			continue;
 		}
 		if (type == "minus")
 		{
-			compute<OperatorMinus<T>>(body, it);
-			it = body.begin();
+			it = compute<OperatorMinus<T>>(body, it);
 			continue;
 		}
 		if (type == "mul")
 		{
-			compute<OperatorMul<T>>(body, it);
-			it = body.begin();
+			it = compute<OperatorMul<T>>(body, it);
 			continue;
 		}
 		if (type == "div")
 		{
-			compute<OperatorDiv<T>>(body, it);
-			it = body.begin();
+			it = compute<OperatorDiv<T>>(body, it);
 			continue;
 		}
 		if (type == "pow")
 		{
-			compute<OperatorPow<T>>(body, it);
-			it = body.begin();
+			it = compute<OperatorPow<T>>(body, it);
 			continue;
 		}
 		if (type == "sin")
 		{
-			compute<SinFunction<T>>(body, it);
-			it = body.begin();
+			it = compute<SinFunction<T>>(body, it);
 			continue;
 		}
 		if (type == "cos")
 		{
-			compute<CosFunction<T>>(body, it);
-			it = body.begin();
+			it = compute<CosFunction<T>>(body, it);
 			continue;
 		}
 		if (type == "tg")
 		{
-			compute<TgFunction<T>>(body, it);
-			it = body.begin();
+			it = compute<TgFunction<T>>(body, it);
 			continue;
 		}
 		if (type == "num")
