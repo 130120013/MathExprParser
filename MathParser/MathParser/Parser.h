@@ -11,6 +11,8 @@
 #include <list>
 #include <limits>
 
+#include <cassert>
+
 #ifndef PARSER_H
 #define PARSER_H
 
@@ -26,6 +28,14 @@ struct bad_expession_parameters :std::exception
 	bad_expession_parameters(const char* decription);
 };
 
+enum class TokenType
+{
+	Number,
+	Variable,
+	OperatorPlus
+	//etc.
+};
+
 template <class T>
 class IToken
 {
@@ -35,6 +45,8 @@ public:
 	Push arguments from first to last. Then call the operator() above.
 	*/
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value) = 0;
+	virtual std::shared_ptr<IToken<T>> simplify() const = 0;
+	virtual std::size_t get_params_count() const = 0;
 	virtual bool is_ready() const = 0; //all parameters are specified
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 	virtual std::string type() = 0;
@@ -50,6 +62,10 @@ public:
 	virtual T operator()() const
 	{
 		return value;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		return std::make_shared<Number<T>>(*this);
 	}
 	virtual bool is_ready() const
 	{
@@ -79,6 +95,10 @@ public:
 		throw std::invalid_argument("Unexpected call");
 #endif //__CUDACC__
 	}
+	virtual std::size_t get_params_count() const
+	{
+		return 0;
+	}
 	virtual std::string type()
 	{
 		return "num";
@@ -106,11 +126,24 @@ public:
 		std::strncpy(this->name.get(), varname, len);
 		this->name[len] = 0;
 	}
-	Variable(Variable<T>&& val) : m_pValue(val.m_pValue), name_length(val.get_name_length())/*, isReady(val.is_ready())*/
+	Variable(Variable<T>&& val) = default;
+	Variable(const Variable<T>& val)
 	{
-		this->name = std::make_unique<char[]>(val.get_name_length() + 1);
-		std::strncpy(this->name.get(), val.get_name(), val.get_name_length());
-		this->name[val.get_name_length()] = 0;
+		*this = val;
+	}
+	Variable& operator=(Variable<T>&& val) = default;
+	Variable& operator=(const Variable<T>& val)
+	{
+		m_pValue = val.m_pValue;
+		name_length = val.name_length;
+		this->name = std::make_unique<char[]>(val.name_length + 1);
+		std::strncpy(this->name.get(), val.name.get(), val.name_length);
+		this->name[val.name_length] = 0;
+		return *this;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		return std::make_shared<Variable<T>>(*this);
 	}
 
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
@@ -118,6 +151,10 @@ public:
 #ifndef __CUDACC__
 		throw std::invalid_argument("Unexpected call");
 #endif //__CUDACC__
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 0;
 	}
 	virtual T operator()() const
 	{
@@ -168,11 +205,25 @@ public:
 
 		return (*ops[0])() + (*ops[1])();
 	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == "num" && op1->type() == "num")
+			return std::make_shared<Number<T>>((*op0)() + (*op1)());
+		auto op_new = std::make_shared<OperatorPlus<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
+	}
 	virtual bool is_ready() const
 	{
 		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
 	}
-	virtual int get_params_count() const
+	virtual std::size_t get_params_count() const
 	{
 		return 2;
 	}
@@ -236,6 +287,20 @@ public:
 	{
 		return "minus";
 	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == "num" && op1->type() == "num")
+			return std::make_shared<Number<T>>((*op0)() - (*op1)());
+		auto op_new = std::make_shared<OperatorMinus<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
+	}
 };
 template <class T>
 class OperatorMul : public Operator<T>
@@ -295,6 +360,20 @@ public:
 	virtual std::string type()
 	{
 		return "mul";
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == "num" && op1->type() == "num")
+			return std::make_shared<Number<T>>((*op0)() * (*op1)());
+		auto op_new = std::make_shared<OperatorMul<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
 	}
 };
 template <class T>
@@ -356,6 +435,20 @@ public:
 	{
 		return "div";
 	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == "num" && op1->type() == "num")
+			return std::make_shared<Number<T>>((*op0)() / (*op1)());
+		auto op_new = std::make_shared<OperatorDiv<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
+	}
 };
 template <class T>
 class OperatorPow : public Operator<T>
@@ -415,6 +508,20 @@ public:
 	virtual std::string type()
 	{
 		return "pow";
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == "num" && op1->type() == "num")
+			return std::make_shared<Number<T>>(std::pow((*op0)(), (*op1)()));
+		auto op_new = std::make_shared<OperatorPow<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
 	}
 };
 
@@ -513,6 +620,17 @@ public:
 	{
 		return 2;
 	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == "num")
+			return std::make_shared<Number<T>>(std::sin((*newarg)()));
+		auto pNewTkn = std::make_shared<SinFunction<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
 };
 template <class T>
 class CosFunction : public Function<T>
@@ -563,6 +681,17 @@ public:
 	virtual short getPriority()
 	{
 		return 2;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == "num")
+			return std::make_shared<Number<T>>(std::cos((*newarg)()));
+		auto pNewTkn = std::make_shared<CosFunction<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
 	}
 };
 template <class T>
@@ -615,6 +744,17 @@ public:
 	{
 		return "tg";
 	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == "num")
+			return std::make_shared<Number<T>>(std::tan((*newarg)()));
+		auto pNewTkn = std::make_shared<TgFunction<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
 };
 
 template <class T>
@@ -644,6 +784,15 @@ public:
 	virtual std::string type()
 	{
 		return "br"; 
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		//return std::make_shared<Bracket<T>>(nullptr);
+		throw std::exception("Unexpected call");
+	}
+	std::size_t get_params_count() const
+	{
+		return 0;
 	}
 };
 
@@ -870,11 +1019,20 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 
 	auto iswhitespace = [](char ch) -> bool {return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\0';}; //see also std::isspace
 	if (std::strncmp(input_string, "sin", 3) == 0 && !iswhitespace(input_string[3]))
+	{
+		*endptr = (char*) input_string + 3;
 		return std::make_shared<SinFunction<T>>();
-	else if (std::strncmp(input_string, "cos", 3) != 0 && !iswhitespace(input_string[3]))
+	}
+	else if (std::strncmp(input_string, "cos", 3) == 0 && !iswhitespace(input_string[3]))
+	{
+		*endptr = (char*) input_string + 3;
 		return std::make_shared<CosFunction<T>>();
-	else if (std::strncmp(input_string, "tg", 2 && !iswhitespace(input_string[2])) != 0)
+	}
+	else if (std::strncmp(input_string, "tg", 2) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*) input_string + 2;
 		return std::make_shared<TgFunction<T>>();
+	}
 	return nullptr;
 }
 
@@ -910,7 +1068,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 	short hasPunct = 0;
 	std::stack<std::shared_ptr<IToken<T>>> operationQueue;
 
-	while (*begPtr != NULL && *begPtr != '\0' && begPtr != expr + length)
+	while (*begPtr != '\0' && begPtr != expr + length)
 	{
 		delta = begPtr;
 		try
@@ -1174,14 +1332,13 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 	return output;
 }
 
-template <class T, class K>
-typename std::list<std::shared_ptr<IToken<K>>>::iterator compute(std::list<std::shared_ptr<IToken<K>>>& body, typename std::list<std::shared_ptr<IToken<K>>>::iterator elem)
+template <class K>
+typename std::list<std::shared_ptr<IToken<K>>>::iterator simplify(std::list<std::shared_ptr<IToken<K>>>& body, typename std::list<std::shared_ptr<IToken<K>>>::iterator elem)
 {
 	try
 	{
-		auto val = dynamic_cast<T*>((*elem).get());
 		bool isComputable = false;
-		auto paramsCount = val->get_params_count();
+		auto paramsCount = elem->get()->get_params_count();
 		auto param_it = elem;
 		for (auto i = paramsCount; i > 0; --i)
 		{
@@ -1189,13 +1346,8 @@ typename std::list<std::shared_ptr<IToken<K>>>::iterator compute(std::list<std::
 			((*elem).get())->push_argument(*param_it); //here std::move must be
 			param_it = body.erase(param_it);
 		}
-
-		if (val->is_ready())
-		{
-			K res = (*val)();
-			auto calc = std::make_shared<Number<K>>(res);
-			*elem = calc;
-		}
+		if (elem->get()->is_ready())
+			*elem = elem->get()->simplify();
 		return ++elem;
 	}
 	catch (std::exception e)
@@ -1209,61 +1361,15 @@ void simplify_body(std::list<std::shared_ptr<IToken<T>>>& body)
 {
 	auto it = body.begin();
 	while (body.size() > 1 )
-	{
-		std::string type = (*it).get()->type();
-		if (type == "plus")
-		{
-			it = compute<OperatorPlus<T>>(body, it);
-			continue;
-		}
-		if (type == "minus")
-		{
-			it = compute<OperatorMinus<T>>(body, it);
-			continue;
-		}
-		if (type == "mul")
-		{
-			it = compute<OperatorMul<T>>(body, it);
-			continue;
-		}
-		if (type == "div")
-		{
-			it = compute<OperatorDiv<T>>(body, it);
-			continue;
-		}
-		if (type == "pow")
-		{
-			it = compute<OperatorPow<T>>(body, it);
-			continue;
-		}
-		if (type == "sin")
-		{
-			it = compute<SinFunction<T>>(body, it);
-			continue;
-		}
-		if (type == "cos")
-		{
-			it = compute<CosFunction<T>>(body, it);
-			continue;
-		}
-		if (type == "tg")
-		{
-			it = compute<TgFunction<T>>(body, it);
-			continue;
-		}
-		if (type == "num")
-		{
-			++it;
-			continue;
-		}
-		if (type == "var")
-		{
-			++it;
-			continue;
-		}
+		it = simplify(body, it);
+	//When everything goes right, you are left with only one element within the list - the root of the tree.
+}
 
-		throw std::invalid_argument("Missed operator or function");
-	}
+template <class T>
+T compute(const std::list<std::shared_ptr<IToken<T>>>& body)
+{
+	assert(body.size() == 1);
+	return body.front()();
 }
 
 template <class T>
