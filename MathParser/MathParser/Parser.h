@@ -38,7 +38,6 @@ public:
 	virtual bool is_ready() const = 0; //all parameters are specified
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 	virtual std::string type() = 0;
-	virtual void drop_ready_flag() = 0;
 };
 
 template <class T>
@@ -76,18 +75,13 @@ public:
 	{
 		//do nothing for literals - they do not accept parameters. But the implementation (even empty) must be provided for polymorphic methods.
 		//or throw an exception
-		return;
-		//#ifndef __CUDACC__
-		//		throw bad_expession_parameters("An argument is specified for a literal");
-		//#endif
+#ifndef __CUDACC__
+		throw std::invalid_argument("Unexpected call");
+#endif //__CUDACC__
 	}
 	virtual std::string type()
 	{
 		return "num";
-	}
-	void drop_ready_flag()
-	{
-		return;
 	}
 protected:
 private:
@@ -95,22 +89,24 @@ private:
 };
 
 template <class T>
+class Header;
+
+template <class T>
 class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 {
-	T op = 0;
+	const T* m_pValue = nullptr;
 	std::unique_ptr<char[]> name;
 	std::size_t name_length = 0;
-	bool isReady;
+	//bool isReady;
 public:
-	Variable(char* varname, std::size_t len, T value = std::numeric_limits<T>::max()) : op(value), name_length(len)
+	Variable(const Header<T>& header, const char* varname, std::size_t len)
+		:m_pValue(&header.get_argument(varname, len)), name_length(len)
 	{
 		this->name = std::make_unique<char[]>(len + 1);
 		std::strncpy(this->name.get(), varname, len);
 		this->name[len] = 0;
-		this->op = value;
-		isReady = (value != std::numeric_limits<T>::max());
 	}
-	Variable(Variable<T>&& val) : op(val()), name_length(val.get_name_length()), isReady(val.is_ready())
+	Variable(Variable<T>&& val) : m_pValue(val.m_pValue), name_length(val.get_name_length())/*, isReady(val.is_ready())*/
 	{
 		this->name = std::make_unique<char[]>(val.get_name_length() + 1);
 		std::strncpy(this->name.get(), val.get_name(), val.get_name_length());
@@ -119,34 +115,29 @@ public:
 
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		if (this->isReady)
-			throw std::invalid_argument("ERROR!");
-		op = value.get()->operator()();
-		isReady = true;
+#ifndef __CUDACC__
+		throw std::invalid_argument("Unexpected call");
+#endif //__CUDACC__
 	}
 	virtual T operator()() const
 	{
-		return op;
+		return *m_pValue;
 	}
 	virtual bool is_ready() const
 	{
-		return isReady;
+		return true;
 	}
-	char* get_name() const
+	/*char* get_name() const
 	{
 		return name.get();
-	}
-	size_t get_name_length()
+	}*/
+	/*size_t get_name_length()
 	{
 		return name_length;
-	}
+	}*/
 	virtual std::string type()
 	{
 		return "var";
-	}
-	void drop_ready_flag()
-	{
-		isReady = false;
 	}
 };
 
@@ -188,11 +179,6 @@ public:
 	virtual std::string type()
 	{
 		return "plus";
-	}
-	void drop_ready_flag()
-	{
-		top = ops;
-		return;
 	}
 };
 template <class T>
@@ -249,11 +235,6 @@ public:
 	virtual std::string type()
 	{
 		return "minus";
-	}
-	void drop_ready_flag()
-	{
-		top = ops;
-		return;
 	}
 };
 template <class T>
@@ -315,11 +296,6 @@ public:
 	{
 		return "mul";
 	}
-	void drop_ready_flag()
-	{
-		top = ops;
-		return;
-	}
 };
 template <class T>
 class OperatorDiv : public Operator<T>
@@ -379,11 +355,6 @@ public:
 	virtual std::string type()
 	{
 		return "div";
-	}
-	void drop_ready_flag()
-	{
-		top = ops;
-		return;
 	}
 };
 template <class T>
@@ -445,11 +416,6 @@ public:
 	{
 		return "pow";
 	}
-	void drop_ready_flag()
-	{
-		top = ops;
-		return;
-	}
 };
 
 template <class T>
@@ -485,10 +451,6 @@ public:
 	virtual short getPriority()
 	{
 		return 1;
-	}
-	void drop_ready_flag()
-	{
-		return;
 	}
 protected:
 	std::list<T>& parameter_queue()
@@ -551,10 +513,6 @@ public:
 	{
 		return 2;
 	}
-	void drop_ready_flag()
-	{
-		return;
-	}
 };
 template <class T>
 class CosFunction : public Function<T>
@@ -605,10 +563,6 @@ public:
 	virtual short getPriority()
 	{
 		return 2;
-	}
-	void drop_ready_flag()
-	{
-		return;
 	}
 };
 template <class T>
@@ -661,10 +615,6 @@ public:
 	{
 		return "tg";
 	}
-	void drop_ready_flag()
-	{
-		return;
-	}
 };
 
 template <class T>
@@ -695,22 +645,16 @@ public:
 	{
 		return "br"; 
 	}
-	void drop_ready_flag()
-	{
-		return;
-	}
 };
-
-template <class T>
-std::shared_ptr<Variable<T>> parse_text_token(const char* input_string, char** endptr);
 
 template <class T>
 class Header
 {
 	std::map<std::string, T> m_arguments;
 	std::vector<std::string> m_parameters;
-	std::unique_ptr<char[]> function_name;
-	std::size_t function_name_length = 0;
+	//std::unique_ptr<char[]> function_name;
+	//std::size_t function_name_length = 0;
+	std::string function_name;
 	bool isReady = false;
 public:
 	Header() = default;
@@ -723,41 +667,27 @@ public:
 		bool isClosingBracket = false;
 		unsigned short commaCount = 0;
 
+		auto isalpha = [](char ch) -> bool {return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');};
+		auto isalnum = [&isalpha](char ch) -> bool {return ch >= '0' && ch <= '9' || isalpha(ch);};
+
 		while (*begPtr != '=' && begPtr < expression + expression_len)
 		{
-			if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z'))
+			if (isalpha(*begPtr))
 			{
-				if (this->function_name == nullptr)
+				auto l_endptr = begPtr + 1;
+				for (; isalnum(*l_endptr); ++l_endptr);
+				if (this->function_name.empty())
+					this->function_name = std::string(begPtr, l_endptr);
+				else
 				{
-					while (begPtr < expression + expression_len + 1)
-					{
-
-						auto brPtr = std::strstr(expression, "(");
-						if (brPtr == nullptr)
-						{
-							if (begPtr == expression + expression_len)
-								throw std::invalid_argument("ERROR");
-							begPtr += 1;
-						}
-						else
-						{
-							begPtr = (char*)brPtr;
-							auto size = std::size_t(brPtr - expression);
-							this->function_name = std::make_unique<char[]>(size + 1);
-							std::strncpy(this->function_name.get(), expression, size);
-							this->function_name[size] = 0;
-							this->function_name_length = size;
-							break;
-						}
-					}
-					continue;
+					if (!isOpeningBracket)
+						throw std::invalid_argument("Unexpected token"); //parameter outside of parenthesis
+					auto param_name = std::string(begPtr, l_endptr);
+					if (!m_arguments.emplace(param_name, T()).second)
+						throw std::invalid_argument("Parameter " + param_name + " is not unique!"); //duplicated '('
+					params.emplace_back(std::move(param_name));
 				}
-				//char param_name;
-				auto param = parse_text_token<T>(begPtr, endPtr);//, param_name
-				if (!m_arguments.emplace(param.get()->get_name(), T()).second)
-					throw std::invalid_argument("Parameter is not unique!"); //duplicated '('
-				params.emplace_back(param.get()->get_name());
-				begPtr = *endPtr;
+				begPtr = l_endptr;
 			}
 
 			if (*begPtr == ' ')
@@ -795,12 +725,13 @@ public:
 			m_parameters.emplace_back(std::move(param));
 		*endPtr = begPtr;
 	}
-	Header(const Header<T>& val) : function_name_length(val.get_name_length())
+	Header(const Header<T>& val) /*: function_name_length(val.get_name_length())*/
 	{
 		std::size_t size = val.get_name_length();
-		this->function_name = std::make_unique<char[]>(size + 1);
+		/*this->function_name = std::make_unique<char[]>(size + 1);
 		std::strncpy(this->function_name.get(), val.get_function_name(), size);
-		this->function_name[size] = 0;
+		this->function_name[size] = 0;*/
+		this->function_name = val.function_name;
 		this->m_arguments = val.m_arguments;
 		this->m_parameters = val.m_parameters;
 		isReady = true;
@@ -823,22 +754,34 @@ public:
 			throw std::invalid_argument("Parameter is not found");
 		return it->second;
 	}
-	int get_params_count() const
+	T& get_argument(const char* parameter_name, std::size_t parameter_name_size) //call this from Variable::operator()().
+	{
+		return const_cast<T&>(const_cast<const Header<T>*>(this)->get_argument(parameter_name, parameter_name_size));
+	}
+	const T& get_argument_by_index(std::size_t index) const //call this from Variable::operator()().
+	{
+		return this->get_argument(m_parameters[index].c_str(), m_parameters[index].size());
+	}
+	T& get_argument_by_index(std::size_t index) //call this from Variable::operator()().
+	{
+		return this->get_argument(m_parameters[index].c_str(), m_parameters[index].size());
+	}
+	std::size_t get_params_count() const
 	{
 		return m_parameters.size();
 	}
 	const char* get_function_name() const
 	{
-		return function_name.get();
+		return function_name.c_str();
 	}
 	size_t get_name_length() const
 	{
-		return function_name_length;
+		return function_name.size();
 	}
-	const std::vector<std::string>& get_params_vector() const
+	/*const std::vector<std::string>& get_params_vector() const
 	{
 		return m_parameters;
-	}
+	}*/
 	std::size_t get_param_index(const std::string& param_name)
 	{
 		for (std::size_t i = 0; i < this->m_parameters.size(); ++i)
@@ -872,33 +815,11 @@ public:
 	{
 		if (parameters.size() < header.get_params_count())
 			throw std::invalid_argument("Count of arguments < " + header.get_params_count());
-		auto it = this->body.begin();
-		while (it != this->body.end())
-		{
-			auto var = dynamic_cast<Variable<T>*>((*it).get());
-			if (var != nullptr)
-			{
-				int idx = int(header.get_param_index(std::string(var->get_name(), var->get_name_length())));
-				(*it).get()->push_argument(std::make_shared<Number<T>>(parameters[idx]));
-			}
-			++it;
-		}
+		for (std::size_t iArg = 0; iArg < header.get_params_count(); ++iArg)
+			header.get_argument_by_index(iArg) = parameters[iArg];
 	}
-	void clear_variables()
-	{
-		auto it = this->body.begin();
-		while (it != this->body.end())
-		{
-			if (dynamic_cast<Variable<T>*>((*it).get()) != nullptr ||
-				dynamic_cast<OperatorPlus<T>*>((*it).get()) != nullptr ||
-				dynamic_cast<OperatorMinus<T>*>((*it).get()) != nullptr ||
-				dynamic_cast<OperatorMul<T>*>((*it).get()) != nullptr ||
-				dynamic_cast<OperatorDiv<T>*>((*it).get()) != nullptr ||
-				dynamic_cast<OperatorPow<T>*>((*it).get()) != nullptr)
-				(*it).get()->drop_ready_flag();
-			++it;
-		}
-	}
+	//void clear_variables(); With the map referencing approach this method is not necessary anymore because if we need to reuse the expression
+	//with different arguments, we just reassign them with init_variables
 private:
 	Header<T> header;
 	std::list<std::shared_ptr<IToken<T>>> body;
@@ -947,32 +868,18 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 	if (*input_string == '^')
 		return std::make_shared<OperatorPow<T>>();
 
-	if (*input_string == 's')
-	{
-		if (std::strstr(input_string, "sin") != NULL)
-		{
-			return std::make_shared<SinFunction<T>>();
-		}
-	}
-	if (*input_string == 'c')
-	{
-		if (std::strstr(input_string, "cos") != NULL)
-		{
-			return std::make_shared<CosFunction<T>>();
-		}
-	}
-	if (*input_string == 't')
-	{
-		if (std::strstr(input_string, "tg") != NULL)
-		{
-			return std::make_shared<TgFunction<T>>();
-		}
-	}
-	return NULL;
+	auto iswhitespace = [](char ch) -> bool {return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\0';}; //see also std::isspace
+	if (std::strncmp(input_string, "sin", 3) == 0 && !iswhitespace(input_string[3]))
+		return std::make_shared<SinFunction<T>>();
+	else if (std::strncmp(input_string, "cos", 3) != 0 && !iswhitespace(input_string[3]))
+		return std::make_shared<CosFunction<T>>();
+	else if (std::strncmp(input_string, "tg", 2 && !iswhitespace(input_string[2])) != 0)
+		return std::make_shared<TgFunction<T>>();
+	return nullptr;
 }
 
 template <class T>
-std::shared_ptr<Variable<T>> parse_text_token(const char* input_string, char** endptr)
+std::shared_ptr<Variable<T>> parse_text_token(const Header<T>& header, const char* input_string, char** endptr)
 {
 	std::size_t name_size;
 	char* endTokPtr = (char*)input_string;
@@ -985,13 +892,13 @@ std::shared_ptr<Variable<T>> parse_text_token(const char* input_string, char** e
 	std::string name(input_string, input_string + name_size);
 	char* tok_name = new char[name_size + 1];
 	tok_name = (char*)(name.c_str());
-	auto token = std::make_shared<Variable<T>>(tok_name, name_size);
+	auto token = std::make_shared<Variable<T>>(header, tok_name, name_size);
 	*(endptr) = endTokPtr;
 	return token;
 }
 
 template <class T>
-std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t length, const std::vector<std::string>& m_parameters)
+std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const char* expr, std::size_t length)
 {
 	std::list<std::shared_ptr<IToken<T>>> output;
 	int prior;
@@ -1025,45 +932,23 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t leng
 				}
 				if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z')) //if not sin, cos, tg, it is variable
 				{
-					if (*begPtr == 's') //sin
-					{
-						auto funcSin = parse_token<T>(begPtr, &endPtr);
-						if (funcSin != NULL)
-							operationQueue.push(funcSin);
-						else
-							throw std::invalid_argument("Unexpected error at " + *begPtr);
-						begPtr += 3;
-						continue;
-					}
-					if (*begPtr == 'c') //cos
-					{
-						auto funcCos = parse_token<T>(begPtr, &endPtr);
-						if (funcCos != NULL)
-							operationQueue.push(funcCos);
-						else
-							throw std::invalid_argument("Unexpected error at " + *begPtr);
-						begPtr += 3;
-						continue;
-					}
-					if (*begPtr == 't') //tg
-					{
-						auto funcTg = parse_token<T>(begPtr, &endPtr);
-						if (funcTg != NULL)
-							operationQueue.push(funcTg);
-						else
-							throw std::invalid_argument("Unexpected error at " + *begPtr);
-						begPtr += 2;
-						continue;
-					}
-					auto var = parse_text_token<T>(begPtr, &endPtr);
-					std::string var_name(var.get()->get_name(), var.get()->get_name_length());
-					if (find(m_parameters.begin(), m_parameters.end(), var_name) != m_parameters.end())
-					{
-						output.push_back(parse_text_token<T>(begPtr, &endPtr));
-						begPtr = endPtr;
-					}
+					/* In your former approach you checked the first letter, and if it was 's' or 'c' or 't' you assumed it was a sine, a cosine, 
+					or a tangent function. But, if the token wasn't actually a function, but, e.g. a parameter 's', the parse_token function would
+					return nullptr, and the lexBody would throw an exception in this case, which is not correct.
+					*/
+					auto func = parse_token<T>(begPtr, &endPtr);
+					if (func != nullptr)
+						operationQueue.push(func);
 					else
-						throw std::invalid_argument("Parameter is not found: " + var_name);
+						//If the parameter is not found, parse_text_token will throw via Variable c-tor, therefore there's no need for pre-check
+						//nor to create the token (var) twice.
+						/*auto var = parse_text_token<T>(begPtr, &endPtr);
+						std::string var_name(var->get_name(), var->get_name_length());
+						if (find(m_parameters.begin(), m_parameters.end(), var_name) == m_parameters.end())
+							throw std::invalid_argument("Parameter is not found: " + var_name);*/
+						output.push_back(parse_text_token<T>(header, begPtr, &endPtr));
+					begPtr = endPtr;
+					continue;
 				}
 				if (*begPtr == '+')
 				{
@@ -1102,8 +987,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t leng
 						operationQueue.push(parse_token<T>(begPtr, &endPtr));
 						begPtr += 1;
 					}
-				}
-				if (*begPtr == '-')
+				}else if (*begPtr == '-')
 				{
 					skipSpaces(begPtr + 1, expr + length - begPtr - 1);
 					char tok = *(begPtr + 1);
@@ -1140,8 +1024,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t leng
 						operationQueue.push(parse_token<T>(begPtr, &endPtr));
 						begPtr += 1;
 					}
-				}
-				if (*begPtr == '*')
+				}else if (*begPtr == '*')
 				{
 					while (operationQueue.size() != 0)
 					{
@@ -1169,8 +1052,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t leng
 					}
 					operationQueue.push(parse_token<T>(begPtr, &endPtr));
 					begPtr += 1;
-				}
-				if (*begPtr == '/')
+				}else if (*begPtr == '/')
 				{
 					while (operationQueue.size() != 0)
 					{
@@ -1197,8 +1079,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t leng
 					}
 					operationQueue.push(parse_token<T>(begPtr, &endPtr));
 					begPtr += 1;
-				}
-				if (*begPtr == '^')
+				}else if (*begPtr == '^')
 				{
 					while (operationQueue.size() != 0)
 					{
@@ -1225,8 +1106,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t leng
 					}
 					operationQueue.push(parse_token<T>(begPtr, &endPtr));
 					begPtr += 1;
-				}
-				if (*begPtr == ',')
+				}else if (*begPtr == ',')
 				{
 					bool isOpeningBracket = false;
 					while (!isOpeningBracket || operationQueue.size() != 0) //while an opening bracket is not found or an operation stack is not empty
@@ -1392,7 +1272,7 @@ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
 	const char* endptr;
 	header = Header<T>(sMathExpr, cbMathExpr, (char**) &endptr);
 	++endptr;
-	body = lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr), header.get_params_vector());
+	body = lexBody<T>(header, endptr, cbMathExpr - (endptr - sMathExpr));
 	simplify_body(body);
 }
 
