@@ -10,8 +10,8 @@ class cuda_stack
 		T data;
 		node* next;
 
-		node(T const& data, node* next): data(data), next(next) {}
-		node(T&& data, node* next): data(std::move(data)), next(next) {}
+		__host__ __device__ node(T const& data, node* next): data(data), next(next) {}
+		__host__ __device__ node(T&& data, node* next): data(std::move(data)), next(next) {}
 	};
 
 public:
@@ -63,10 +63,6 @@ int cuda_stack<T>::size() const
 template<typename T>
 T cuda_stack<T>::top() const
 {
-	if (root == nullptr)
-	{
-		throw std::runtime_error("Invalid Action");
-	}
 	return root->data;
 }
 template<typename T>
@@ -74,7 +70,7 @@ void cuda_stack<T>::pop()
 {
 	if (root == nullptr)
 	{
-		throw std::runtime_error("Invalid Action");
+		return;
 	}
 	node* tmp = root;
 	root = root->next;

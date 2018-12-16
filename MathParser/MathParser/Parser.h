@@ -30,10 +30,19 @@ struct bad_expession_parameters :std::exception
 
 enum class TokenType
 {
-	Number,
-	Variable,
-	OperatorPlus
-	//etc.
+	operatorPlus,
+	operatorMinus,
+	operatorMul,
+	operatorDiv,
+	operatorPow,
+	sinFunction,
+	cosFunction,
+	tgFunction,
+	function,
+	bracket,
+	Operator,
+	number,
+	variable,
 };
 
 template <class T>
@@ -49,7 +58,8 @@ public:
 	virtual std::size_t get_params_count() const = 0;
 	virtual bool is_ready() const = 0; //all parameters are specified
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
-	virtual std::string type() = 0;
+	virtual TokenType type() = 0;
+	virtual short getPriority() = 0;
 };
 
 template <class T>
@@ -99,9 +109,13 @@ public:
 	{
 		return 0;
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "num";
+		return TokenType::number;
+	}
+	virtual short getPriority()
+	{
+		return -2;
 	}
 protected:
 private:
@@ -172,9 +186,14 @@ public:
 	{
 		return name_length;
 	}*/
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "var";
+		return TokenType::variable;
+	}
+
+	virtual short getPriority()
+	{
+		return -2;
 	}
 };
 
@@ -185,6 +204,10 @@ public:
 	virtual short getPriority()
 	{
 		return 0; //default priority, less code but more error prone
+	}
+	virtual TokenType type()
+	{
+		return TokenType::Operator;
 	}
 };
 
@@ -212,7 +235,7 @@ public:
 		auto op0 = ops[0]->simplify();
 		auto op1 = ops[1]->simplify();
 
-		if (op0->type() == "num" && op1->type() == "num")
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 			return std::make_shared<Number<T>>((*op0)() + (*op1)());
 		auto op_new = std::make_shared<OperatorPlus<T>>();
 		op_new->push_argument(std::move(op0));
@@ -227,9 +250,9 @@ public:
 	{
 		return 2;
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "plus";
+		return TokenType::operatorPlus;
 	}
 };
 template <class T>
@@ -244,36 +267,10 @@ public:
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
-		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
-		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
-		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
-		T val1, val2;
-
-		if (opN1 == nullptr)
-		{
-			if (opV1->is_ready())
-				val1 = opV1->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val1 = opN1->operator()();
-		}
-		if (opN2 == nullptr)
-		{
-			if (opV2->is_ready())
-				val2 = opV2->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val2 = opN2->operator()();
-		}
-		return val1 - val2;
+		return (*ops[0])() - (*ops[1])();
 	}
 	virtual bool is_ready() const
 	{
@@ -283,9 +280,9 @@ public:
 	{
 		return 2;
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "minus";
+		return TokenType::operatorMinus;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -294,7 +291,7 @@ public:
 		auto op0 = ops[0]->simplify();
 		auto op1 = ops[1]->simplify();
 
-		if (op0->type() == "num" && op1->type() == "num")
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 			return std::make_shared<Number<T>>((*op0)() - (*op1)());
 		auto op_new = std::make_shared<OperatorMinus<T>>();
 		op_new->push_argument(std::move(op0));
@@ -314,36 +311,10 @@ public:
 	}
 	virtual T operator()() const
 	{
-		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
-		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
-		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
-		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
-		T val1, val2;
-
-		if (opN1 == nullptr)
-		{
-			if (opV1->is_ready())
-				val1 = opV1->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val1 = opN1->operator()();
-		}
-		if (opN2 == nullptr)
-		{
-			if (opV2->is_ready())
-				val2 = opV2->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val2 = opN2->operator()();
-		}
-		return val1 * val2;
+		return (*ops[0])() * (*ops[1])();
 	}
 	virtual bool is_ready() const
 	{
@@ -357,9 +328,9 @@ public:
 	{
 		return 2;
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "mul";
+		return TokenType::operatorMul;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -368,7 +339,7 @@ public:
 		auto op0 = ops[0]->simplify();
 		auto op1 = ops[1]->simplify();
 
-		if (op0->type() == "num" && op1->type() == "num")
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 			return std::make_shared<Number<T>>((*op0)() * (*op1)());
 		auto op_new = std::make_shared<OperatorMul<T>>();
 		op_new->push_argument(std::move(op0));
@@ -388,36 +359,10 @@ public:
 	}
 	virtual T operator()() const
 	{
-		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
-		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
-		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
-		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
-		T val1, val2;
-
-		if (opN1 == nullptr)
-		{
-			if (opV1->is_ready())
-				val1 = opV1->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val1 = opN1->operator()();
-		}
-		if (opN2 == nullptr)
-		{
-			if (opV2->is_ready())
-				val2 = opV2->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val2 = opN2->operator()();
-		}
-		return val1 / val2;
+		return (*ops[0])() / (*ops[1])();
 	}
 	virtual bool is_ready() const
 	{
@@ -431,9 +376,9 @@ public:
 	{
 		return 2;
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "div";
+		return TokenType::operatorDiv;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -442,7 +387,7 @@ public:
 		auto op0 = ops[0]->simplify();
 		auto op1 = ops[1]->simplify();
 
-		if (op0->type() == "num" && op1->type() == "num")
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 			return std::make_shared<Number<T>>((*op0)() / (*op1)());
 		auto op_new = std::make_shared<OperatorDiv<T>>();
 		op_new->push_argument(std::move(op0));
@@ -462,36 +407,10 @@ public:
 	}
 	virtual T operator()() const
 	{
-		auto opN1 = dynamic_cast<Number<T>*>(ops[0].get());
-		auto opN2 = dynamic_cast<Number<T>*>(ops[1].get());
-		auto opV1 = dynamic_cast<Variable<T>*>(ops[0].get());
-		auto opV2 = dynamic_cast<Variable<T>*>(ops[1].get());
+		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
-		T val1, val2;
-
-		if (opN1 == nullptr)
-		{
-			if (opV1->is_ready())
-				val1 = opV1->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val1 = opN1->operator()();
-		}
-		if (opN2 == nullptr)
-		{
-			if (opV2->is_ready())
-				val2 = opV2->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val2 = opN2->operator()();
-		}
-		return std::pow(val1, val2);
+		return std::pow((*ops[0])(), (*ops[1])());
 	}
 	virtual bool is_ready() const
 	{
@@ -505,9 +424,9 @@ public:
 	{
 		return 2;
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "pow";
+		return TokenType::operatorPow;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -516,7 +435,7 @@ public:
 		auto op0 = ops[0]->simplify();
 		auto op1 = ops[1]->simplify();
 
-		if (op0->type() == "num" && op1->type() == "num")
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 			return std::make_shared<Number<T>>(std::pow((*op0)(), (*op1)()));
 		auto op_new = std::make_shared<OperatorPow<T>>();
 		op_new->push_argument(std::move(op0));
@@ -551,9 +470,9 @@ public:
 	{
 		return function_name;
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "func";
+		return TokenType::function;
 	}
 	virtual short getPriority()
 	{
@@ -581,24 +500,10 @@ public:
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		auto opN1 = dynamic_cast<Number<T>*>(op.get());
-		auto opV1 = dynamic_cast<Variable<T>*>(op.get());
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
-		T val1;
-
-		if (opN1 == nullptr)
-		{
-			if (opV1->is_ready())
-				val1 = opV1->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val1 = opN1->operator()();
-		}
-
-		return std::sin(val1);
+		return std::sin((*op)());
 	}
 	virtual bool is_ready() const
 	{
@@ -612,9 +517,9 @@ public:
 	{
 		return "sin";
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "sin";
+		return TokenType::sinFunction;
 	}
 	virtual short getPriority()
 	{
@@ -625,7 +530,7 @@ public:
 		if (!is_ready())
 			throw std::exception("Not ready to simplify an operator");
 		auto newarg = op->simplify();
-		if (newarg->type() == "num")
+		if (newarg->type() == TokenType::number)
 			return std::make_shared<Number<T>>(std::sin((*newarg)()));
 		auto pNewTkn = std::make_shared<SinFunction<T>>();
 		pNewTkn->op = std::move(newarg);
@@ -643,24 +548,10 @@ public:
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		auto opN1 = dynamic_cast<Number<T>*>(op.get());
-		auto opV1 = dynamic_cast<Variable<T>*>(op.get());
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
-		T val1;
-
-		if (opN1 == nullptr)
-		{
-			if (opV1->is_ready())
-				val1 = opV1->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val1 = opN1->operator()();
-		}
-
-		return std::cos(val1);
+		return std::cos((*op)());
 	}
 	virtual bool is_ready() const
 	{
@@ -674,9 +565,9 @@ public:
 	{
 		return "cos";
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "cos";
+		return TokenType::cosFunction;
 	}
 	virtual short getPriority()
 	{
@@ -687,7 +578,7 @@ public:
 		if (!is_ready())
 			throw std::exception("Not ready to simplify an operator");
 		auto newarg = op->simplify();
-		if (newarg->type() == "num")
+		if (newarg->type() == TokenType::number)
 			return std::make_shared<Number<T>>(std::cos((*newarg)()));
 		auto pNewTkn = std::make_shared<CosFunction<T>>();
 		pNewTkn->op = std::move(newarg);
@@ -705,24 +596,10 @@ public:
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		auto opN1 = dynamic_cast<Number<T>*>(op.get());
-		auto opV1 = dynamic_cast<Variable<T>*>(op.get());
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
-		T val1;
-
-		if (opN1 == nullptr)
-		{
-			if (opV1->is_ready())
-				val1 = opV1->operator()();
-			else
-				return std::numeric_limits<T>::max();
-		}
-		else
-		{
-			val1 = opN1->operator()();
-		}
-
-		return std::tan(val1);
+		return std::tan((*op)());
 	}
 	virtual bool is_ready() const
 	{
@@ -740,16 +617,16 @@ public:
 	{
 		return "tg";
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "tg";
+		return TokenType::tgFunction;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
 		if (!is_ready())
 			throw std::exception("Not ready to simplify an operator");
 		auto newarg = op->simplify();
-		if (newarg->type() == "num")
+		if (newarg->type() == TokenType::number)
 			return std::make_shared<Number<T>>(std::tan((*newarg)()));
 		auto pNewTkn = std::make_shared<TgFunction<T>>();
 		pNewTkn->op = std::move(newarg);
@@ -781,9 +658,9 @@ public:
 	{
 		return -1;
 	}
-	virtual std::string type()
+	virtual TokenType type()
 	{
-		return "br"; 
+		return TokenType::bracket; 
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -1033,6 +910,7 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 		*endptr = (char*) input_string + 2;
 		return std::make_shared<TgFunction<T>>();
 	}
+	
 	return nullptr;
 }
 
@@ -1121,14 +999,15 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 					{
 						while (operationQueue.size() != 0)
 						{
-							auto plus = dynamic_cast<Operator<T>*>(operationQueue.top().get());
-							if (plus == nullptr)
+							//auto plus = dynamic_cast<Operator<T>*>(operationQueue.top().get());
+							auto plus = operationQueue.top().get();
+							if (plus->type() > TokenType::function)
 							{
-								auto plus1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
-								if (plus1 == nullptr)
+							//	auto plus1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
+							//	if (plus1 == nullptr)
 									throw std::invalid_argument("Unexpected error at " + *begPtr);
-								else
-									prior = plus1->getPriority();
+							//	else
+							//		prior = plus1->getPriority();
 							}
 							else
 							{
@@ -1158,14 +1037,10 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 					{
 						while (operationQueue.size() != 0)
 						{
-							auto minus = dynamic_cast<Operator<T>*>(operationQueue.top().get());
-							if (minus == nullptr)
+							auto minus = operationQueue.top().get();
+							if (minus->type() > TokenType::function)
 							{
-								auto minus1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
-								if (minus1 == nullptr)
-									throw std::invalid_argument("Unexpected error at " + *begPtr);
-								else
-									prior = minus1->getPriority();
+								throw std::invalid_argument("Unexpected error at " + *begPtr);
 							}
 							else
 							{
@@ -1186,15 +1061,10 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 				{
 					while (operationQueue.size() != 0)
 					{
-
-						auto mul = dynamic_cast<Operator<T>*>(operationQueue.top().get());
-						if (mul == nullptr)
+						auto mul = operationQueue.top().get();
+						if (mul->type() > TokenType::function)
 						{
-							auto mul1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
-							if (mul1 == nullptr)
-								throw std::invalid_argument("Unexpected error at " + *begPtr);
-							else
-								prior = mul1->getPriority();
+							throw std::invalid_argument("Unexpected error at " + *begPtr);
 						}
 						else
 						{
@@ -1214,14 +1084,10 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 				{
 					while (operationQueue.size() != 0)
 					{
-						auto div = dynamic_cast<Operator<T>*>(operationQueue.top().get());
-						if (div == nullptr)
+						auto div = operationQueue.top().get();
+						if (div->type() > TokenType::function)
 						{
-							auto div1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
-							if (div1 == nullptr)
-								throw std::invalid_argument("Unexpected error at " + *begPtr);
-							else
-								prior = div1->getPriority();
+							throw std::invalid_argument("Unexpected error at " + *begPtr);
 						}
 						else
 						{
@@ -1241,14 +1107,10 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 				{
 					while (operationQueue.size() != 0)
 					{
-						auto pow = dynamic_cast<Operator<T>*>(operationQueue.top().get());
-						if (pow == nullptr)
+						auto pow = operationQueue.top().get();
+						if (pow->type() > TokenType::function)
 						{
-							auto pow1 = dynamic_cast<Function<T>*>(operationQueue.top().get());
-							if (pow1 == nullptr)
-								throw std::invalid_argument("Unexpected error at " + *begPtr);
-							else
-								prior = pow1->getPriority();
+							throw std::invalid_argument("Unexpected error at " + *begPtr);
 						}
 						else
 						{
@@ -1269,7 +1131,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 					bool isOpeningBracket = false;
 					while (!isOpeningBracket || operationQueue.size() != 0) //while an opening bracket is not found or an operation stack is not empty
 					{
-						if (dynamic_cast<Bracket<T>*>(operationQueue.top().get()) == NULL) //if the cast to Bracket is not successfull, return NULL => it is not '('  
+						if (operationQueue.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('  
 						{
 							output.push_back(operationQueue.top());
 							operationQueue.pop();
@@ -1293,7 +1155,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 					bool isOpeningBracket = false;
 					while (operationQueue.size() != 0)
 					{
-						if (operationQueue.size() != 0 && dynamic_cast<Bracket<T>*>(operationQueue.top().get()) == NULL)
+						if (operationQueue.top().get()->type() != TokenType::bracket)
 						{
 							output.push_back(operationQueue.top());
 							operationQueue.pop();
@@ -1321,7 +1183,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 	}
 	while (operationQueue.size() != 0)
 	{
-		if (dynamic_cast<Bracket<T>*>(operationQueue.top().get()) != NULL) //checking enclosing brackets
+		if (operationQueue.top().get()->type() == TokenType::bracket) //checking enclosing brackets
 			throw std::invalid_argument("Enclosing bracket!");
 		else
 		{
