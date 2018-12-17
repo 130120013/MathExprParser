@@ -17,7 +17,7 @@ int main()
 	mathexpr.clear_variables();
 	mathexpr.init_variables(v);
 	res = simplify(mathexpr.get_body());*/
-	std::string expression = "f(x) = sin(x) + 5";
+	std::string expression = "f(x) = 4 - 5";
 	Mathexpr<double> mathexpr = {expression};
 	std::vector<double> v;
 	v.push_back(1);

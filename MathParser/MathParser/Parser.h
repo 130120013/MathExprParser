@@ -38,6 +38,11 @@ enum class TokenType
 	sinFunction,
 	cosFunction,
 	tgFunction,
+	logFunction,
+	j1Function,
+	j2Function,
+	minFunction,
+	maxFunction,
 	function,
 	bracket,
 	Operator,
@@ -258,12 +263,12 @@ public:
 template <class T>
 class OperatorMinus : public Operator<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	std::shared_ptr<IToken<T>> ops[2], *top = ops + 1;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		*top-- = value;
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
@@ -350,12 +355,12 @@ public:
 template <class T>
 class OperatorDiv : public Operator<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	std::shared_ptr<IToken<T>> ops[2], *top = ops + 1;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		*top-- = value;
 	}
 	virtual T operator()() const
 	{
@@ -600,6 +605,104 @@ public:
 			throw std::exception("Insufficient number are given for the plus operator.");
 
 		return std::tan((*op)());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "tg";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::tgFunction;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(std::tan((*newarg)()));
+		auto pNewTkn = std::make_shared<TgFunction<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+
+////////// not ready
+template <class T>
+class LogFunction : public Function<T>
+{
+	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		*top++ = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return std::log((*ops[1])()) / std::log((*ops[0])());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "log";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::logFunction;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(std::tan((*newarg)()));
+		auto pNewTkn = std::make_shared<LogFunction<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class JnFunction : public Function<T>
+{
+	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		*top++ = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _jn((*ops[1])(), (*ops[0])());
 	}
 	virtual bool is_ready() const
 	{
