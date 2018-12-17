@@ -90,6 +90,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\MathParser\cuda_types.h" />
+    <ClInclude Include="CudaParser.h" />
     <ClInclude Include="cuda_list.cuh" />
     <ClInclude Include="cuda_stack.cuh" />
   </ItemGroup>

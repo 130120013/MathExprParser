@@ -4,14 +4,15 @@
 #include "cuda_list.cuh"
 #include "cuda_stack.cuh"
 #include <stdio.h>
+#include "CudaParser.h"
 
-cudaError_t addWithCuda(int *c, const int *a, const int *b, cuda_list<double>* hlist, unsigned int size);
+cudaError_t addWithCuda(int *c, const int *a, const int *b,  unsigned int size);
 
-__global__ void addKernel(int *c, const int *a, const int *b, cuda_list<double>* l)
+__global__ void addKernel(int *c, const int *a, const int *b)
 {
     int i = threadIdx.x;
-	l->push_back(a[i] + b[i]);
-    //c[i] = a[i] + b[i];
+	//l->push_back(a[i] + b[i]);
+    c[i] = a[i] + b[i];
 }
 
 int main()
@@ -20,10 +21,10 @@ int main()
     const int a[arraySize] = { 1, 2, 3, 4, 5 };
     const int b[arraySize] = { 10, 20, 30, 40, 50 };
     int c[arraySize] = { 0 };
-	cuda_list<double> l;
+	//cuda_list<double> l;
 
     // Add vectors in parallel.
-    cudaError_t cudaStatus = addWithCuda(c, a, b, &l, arraySize);
+    cudaError_t cudaStatus = addWithCuda(c, a, b, arraySize);
     if (cudaStatus != cudaSuccess) {
         fprintf(stderr, "addWithCuda failed!");
         return 1;
@@ -32,7 +33,7 @@ int main()
     printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n",
         c[0], c[1], c[2], c[3], c[4]);
 
-	printf("%d", l.front());
+	//printf("%d", l.front());
 
     // cudaDeviceReset must be called before exiting in order for profiling and
     // tracing tools such as Nsight and Visual Profiler to show complete traces.
@@ -46,12 +47,12 @@ int main()
 }
 
 // Helper function for using CUDA to add vectors in parallel.
-cudaError_t addWithCuda(int *c, const int *a, const int *b, cuda_list<double>* hlist, unsigned int size)
+cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size)
 {
     int *dev_a = 0;
     int *dev_b = 0;
     int *dev_c = 0;
-	cuda_list<double>* dlist = 0;
+	//cuda_list<double>* dlist = 0;
     cudaError_t cudaStatus;
 
     // Choose which GPU to run on, change this on a multi-GPU system.
@@ -80,11 +81,11 @@ cudaError_t addWithCuda(int *c, const int *a, const int *b, cuda_list<double>* h
         goto Error;
     }
 
-	cudaStatus = cudaMalloc((void**)&dlist, size * sizeof(cuda_list<double>));
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMalloc failed!");
-		goto Error;
-	}
+	//cudaStatus = cudaMalloc((void**)&dlist, size * sizeof(cuda_list<double>));
+	//if (cudaStatus != cudaSuccess) {
+	//	fprintf(stderr, "cudaMalloc failed!");
+	//	goto Error;
+	//}
 
     // Copy input vectors from host memory to GPU buffers.
     cudaStatus = cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
@@ -100,7 +101,7 @@ cudaError_t addWithCuda(int *c, const int *a, const int *b, cuda_list<double>* h
     }
 
     // Launch a kernel on the GPU with one thread for each element.
-    addKernel<<<1, size>>>(dev_c, dev_a, dev_b, dlist);
+    addKernel<<<1, size>>>(dev_c, dev_a, dev_b);
 
     // Check for any errors launching the kernel
     cudaStatus = cudaGetLastError();
@@ -124,11 +125,11 @@ cudaError_t addWithCuda(int *c, const int *a, const int *b, cuda_list<double>* h
     //    goto Error;
     //}
 	//size * sizeof(double) + sizeof(cuda_list<double>)
-	cudaStatus = cudaMemcpy(hlist, dlist, size * sizeof(cuda_list<double>), cudaMemcpyDeviceToHost);
-	if (cudaStatus != cudaSuccess) {
-		fprintf(stderr, "cudaMemcpy failed!");
-		goto Error;
-	}
+	//cudaStatus = cudaMemcpy(hlist, dlist, size * sizeof(cuda_list<double>), cudaMemcpyDeviceToHost);
+	//if (cudaStatus != cudaSuccess) {
+	//	fprintf(stderr, "cudaMemcpy failed!");
+	//	goto Error;
+	//}
 
 Error:
     cudaFree(dev_c);

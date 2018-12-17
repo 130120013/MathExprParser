@@ -24,5 +24,8 @@
     <ClInclude Include="cuda_stack.cuh">
       <Filter>Header</Filter>
     </ClInclude>
+    <ClInclude Include="CudaParser.h">
+      <Filter>Header</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
