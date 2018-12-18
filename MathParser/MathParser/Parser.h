@@ -38,9 +38,15 @@ enum class TokenType
 	sinFunction,
 	cosFunction,
 	tgFunction,
+	log10Function,
+	lnFunction,
 	logFunction,
+	j0Function,
 	j1Function,
-	j2Function,
+	jnFunction, 
+	y0Function,
+	y1Function,
+	ynFunction,
 	minFunction,
 	maxFunction,
 	function,
@@ -640,6 +646,103 @@ public:
 };
 
 ////////// not ready
+
+template <class T>
+class Log10Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return std::log10((*op)());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "log10";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::log10Function;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(std::log10((*newarg)()));
+		auto pNewTkn = std::make_shared<Log10Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class LnFunction : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return std::log((*op)());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "ln";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::lnFunction;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(std::log((*newarg)()));
+		auto pNewTkn = std::make_shared<LnFunction<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
 template <class T>
 class LogFunction : public Function<T>
 {
@@ -658,7 +761,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -680,12 +783,15 @@ public:
 	{
 		if (!is_ready())
 			throw std::exception("Not ready to simplify an operator");
-		auto newarg = op->simplify();
-		if (newarg->type() == TokenType::number)
-			return std::make_shared<Number<T>>(std::tan((*newarg)()));
-		auto pNewTkn = std::make_shared<LogFunction<T>>();
-		pNewTkn->op = std::move(newarg);
-		return pNewTkn;
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
+			return std::make_shared<Number<T>>(std::pow((*op0)(), (*op1)()));
+		auto op_new = std::make_shared<OperatorPow<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
 	}
 };
 template <class T>
@@ -702,7 +808,58 @@ public:
 		if (!ops[0]->is_ready() || !ops[1]->is_ready())
 			throw std::exception("Insufficient number are given for the plus operator.");
 
-		return _jn((*ops[1])(), (*ops[0])());
+		return _jn(int((*ops[0])()), (*ops[1])());
+	}
+	virtual bool is_ready() const
+	{
+		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "jn";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::logFunction;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_jn(int((*ops[0])()), (*ops[1])()));
+		auto op_new = std::make_shared<JnFunction<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
+	}
+};
+template <class T>
+class J0Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _j0((*op)());
 	}
 	virtual bool is_ready() const
 	{
@@ -718,11 +875,11 @@ public:
 	}
 	virtual const char* get_function_name() const
 	{
-		return "tg";
+		return "j0";
 	}
 	virtual TokenType type()
 	{
-		return TokenType::tgFunction;
+		return TokenType::lnFunction;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -730,8 +887,301 @@ public:
 			throw std::exception("Not ready to simplify an operator");
 		auto newarg = op->simplify();
 		if (newarg->type() == TokenType::number)
-			return std::make_shared<Number<T>>(std::tan((*newarg)()));
-		auto pNewTkn = std::make_shared<TgFunction<T>>();
+			return std::make_shared<Number<T>>(_j0((*newarg)()));
+		auto pNewTkn = std::make_shared<J0Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class J1Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _j1((*op)());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "j1";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::lnFunction;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_j1((*newarg)()));
+		auto pNewTkn = std::make_shared<J1Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class YnFunction : public Function<T>
+{
+	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		*top++ = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _yn(int((*ops[0])()), (*ops[1])());
+	}
+	virtual bool is_ready() const
+	{
+		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "yn";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::logFunction;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_yn(int((*ops[0])()), (*ops[1])()));
+		auto op_new = std::make_shared<YnFunction<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
+	}
+};
+template <class T>
+class Y0Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _y0((*op)());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "y0";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::y0Function;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_y0((*newarg)()));
+		auto pNewTkn = std::make_shared<Y0Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class Y1Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _y1((*op)());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "y1";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::y1Function;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_y1((*newarg)()));
+		auto pNewTkn = std::make_shared<Y1Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+
+//////////// not ready
+template <class T>
+class MaxFunction : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _y1((*op)());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "y1";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::y1Function;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_y1((*newarg)()));
+		auto pNewTkn = std::make_shared<Y1Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class MinFunction : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _y1((*op)());
+	}
+	virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	virtual short getPriority()
+	{
+		return 2;
+	}
+	virtual std::size_t get_params_count() const
+	{
+		return 1;
+	}
+	virtual const char* get_function_name() const
+	{
+		return "y1";
+	}
+	virtual TokenType type()
+	{
+		return TokenType::y1Function;
+	}
+	virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_y1((*newarg)()));
+		auto pNewTkn = std::make_shared<Y1Function<T>>();
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
 	}
@@ -1013,7 +1463,61 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 		*endptr = (char*) input_string + 2;
 		return std::make_shared<TgFunction<T>>();
 	}
-	
+	else if (std::strncmp(input_string, "log10", 3) == 0 && !iswhitespace(input_string[5]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<Log10Function<T>>();
+	}
+	else if (std::strncmp(input_string, "ln", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<LnFunction<T>>();
+	}
+	else if (std::strncmp(input_string, "log", 3) == 0 && !iswhitespace(input_string[3]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<LogFunction<T>>();
+	}
+	else if (std::strncmp(input_string, "j0", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<J0Function<T>>();
+	}
+	else if (std::strncmp(input_string, "j1", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<J1Function<T>>();
+	}
+	else if (std::strncmp(input_string, "jn", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<JnFunction<T>>();
+	}
+	else if (std::strncmp(input_string, "y0", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<Y0Function<T>>();
+	}
+	else if (std::strncmp(input_string, "y1", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<Y1Function<T>>();
+	}
+	else if (std::strncmp(input_string, "yn", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<YnFunction<T>>();
+	}
+	else if (std::strncmp(input_string, "max", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<CosFunction<T>>();
+	}
+	else if (std::strncmp(input_string, "min", 3) == 0 && !iswhitespace(input_string[2]))
+	{
+		*endptr = (char*)input_string + 3;
+		return std::make_shared<CosFunction<T>>();
+	}
 	return nullptr;
 }
 
