@@ -1093,22 +1093,31 @@ public:
 template <class T>
 class MaxFunction : public Function<T>
 {
-	std::shared_ptr<IToken<T>> op;
+	std::vector<std::shared_ptr<IToken<T>>> ops;
 public:
+	short paramsCount;
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		op = value;
+		ops.push_back(value);
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		if (!op->is_ready())
-			throw std::exception("Insufficient number are given for the plus operator.");
+		for (auto op = ops.begin(); op != ops.end(); ++op)
+		{
+			if (!op->is_ready())
+				throw std::exception("Insufficient number are given for the plus operator.");
+		}
 
-		return _y1((*op)());
+		return std::max_element(ops.begin(), ops.end()); //нужен компаратор
 	}
 	virtual bool is_ready() const
 	{
-		return op->is_ready();
+		for (auto op = ops.begin(); op != ops.end(); ++op)
+		{
+			if (!op->is_ready())
+				return false;
+		}
+		return true;
 	}
 	virtual short getPriority()
 	{
@@ -1116,47 +1125,59 @@ public:
 	}
 	virtual std::size_t get_params_count() const
 	{
-		return 1;
+		return paramsCount;
 	}
 	virtual const char* get_function_name() const
 	{
-		return "y1";
+		return "max";
 	}
 	virtual TokenType type()
 	{
-		return TokenType::y1Function;
+		return TokenType::maxFunction;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
 		if (!is_ready())
 			throw std::exception("Not ready to simplify an operator");
-		auto newarg = op->simplify();
-		if (newarg->type() == TokenType::number)
-			return std::make_shared<Number<T>>(_y1((*newarg)()));
-		auto pNewTkn = std::make_shared<Y1Function<T>>();
-		pNewTkn->op = std::move(newarg);
-		return pNewTkn;
+		for (auto op = ops.begin(); op != ops.end(); ++op)
+		{
+			auto newarg = op->simplify();
+			if (newarg->type() == TokenType::number)
+				return std::make_shared<Number<T>>(_y1((*newarg)()));
+			auto pNewTkn = std::make_shared<MaxFunction<T>>();
+			pNewTkn->ops = std::move(newarg);
+			return pNewTkn;
+		}
 	}
 };
 template <class T>
 class MinFunction : public Function<T>
 {
-	std::shared_ptr<IToken<T>> op;
+	std::vector<std::shared_ptr<IToken<T>>> ops;
 public:
+	short paramsCount;
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		op = value;
+		ops.push_back(value);
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		if (!op->is_ready())
-			throw std::exception("Insufficient number are given for the plus operator.");
+		for (auto op = ops.begin(); op != ops.end(); ++op)
+		{
+			if (!op->is_ready())
+				throw std::exception("Insufficient number are given for the plus operator.");
+		}
 
-		return _y1((*op)());
+		return std::min_element(ops.begin(), ops.end()); //нужен компаратор
 	}
 	virtual bool is_ready() const
 	{
-		return op->is_ready();
+		for (auto op = ops.begin(); op != ops.end(); ++op)
+		{
+			if (!op->is_ready())
+				return false;
+		}
+		return true;
 	}
 	virtual short getPriority()
 	{
@@ -1164,15 +1185,15 @@ public:
 	}
 	virtual std::size_t get_params_count() const
 	{
-		return 1;
+		return paramsCount;
 	}
 	virtual const char* get_function_name() const
 	{
-		return "y1";
+		return "min";
 	}
 	virtual TokenType type()
 	{
-		return TokenType::y1Function;
+		return TokenType::minFunction;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -1508,12 +1529,12 @@ std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
 		*endptr = (char*)input_string + 3;
 		return std::make_shared<YnFunction<T>>();
 	}
-	else if (std::strncmp(input_string, "max", 3) == 0 && !iswhitespace(input_string[2]))
+	else if (std::strncmp(input_string, "max", 3) == 0 && !iswhitespace(input_string[3]))
 	{
 		*endptr = (char*)input_string + 3;
 		return std::make_shared<CosFunction<T>>();
 	}
-	else if (std::strncmp(input_string, "min", 3) == 0 && !iswhitespace(input_string[2]))
+	else if (std::strncmp(input_string, "min", 3) == 0 && !iswhitespace(input_string[3]))
 	{
 		*endptr = (char*)input_string + 3;
 		return std::make_shared<CosFunction<T>>();
@@ -1549,8 +1570,7 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 	char* endPtr = (char*)(expr + length - 1);
 	char* begPtr = (char*)(expr + 0);
 	auto delta = (char*)expr;
-	bool isBinary = true;
-	short hasPunct = 0;
+	short paramCount = 1;
 	std::stack<std::shared_ptr<IToken<T>>> operationQueue;
 
 	while (*begPtr != '\0' && begPtr != expr + length)
@@ -1740,6 +1760,9 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 					{
 						if (operationQueue.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('  
 						{
+							if (operationQueue.top().get()->type() == TokenType::maxFunction || operationQueue.top().get()->type() == TokenType::minFunction)
+								++paramCount;
+
 							output.push_back(operationQueue.top());
 							operationQueue.pop();
 						}
@@ -1754,6 +1777,9 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 				}
 				if (*begPtr == '(')
 				{
+					if (operationQueue.top().get()->type() == TokenType::maxFunction || operationQueue.top().get()->type() == TokenType::minFunction)
+						paramCount = 1;
+
 					operationQueue.push(std::make_shared<Bracket<T>>());
 					begPtr += 1;
 				}
@@ -1764,6 +1790,24 @@ std::list<std::shared_ptr<IToken<T>>> lexBody(const Header<T>& header, const cha
 					{
 						if (operationQueue.top().get()->type() != TokenType::bracket)
 						{
+							if (operationQueue.top().get()->type() == TokenType::maxFunction || operationQueue.top().get()->type() == TokenType::minFunction)
+							{
+								auto min = dynamic_cast<MinFunction<T>*>(operationQueue.top().get());
+								auto max = dynamic_cast<MaxFunction<T>*>(operationQueue.top().get());
+								if (min == nullptr)
+								{
+									if (max == nullptr)
+										throw std::invalid_argument("ERROR!");
+									else
+										(*max).paramsCount = paramCount;
+								}
+								else
+								{
+									(*min).paramsCount = paramCount;
+								}
+								paramCount = 1;
+							}//проверить, является ли фукнция мин макс, записать туда количество аргументов в поле paramsCount
+
 							output.push_back(operationQueue.top());
 							operationQueue.pop();
 						}
