@@ -1556,7 +1556,7 @@ class TokenStorage
 	std::list<std::shared_ptr<IToken<T>>> outputList;
 
 public:
-	void push_operator(const std::shared_ptr<IToken<T>>& op)
+	void push_operation(const std::shared_ptr<IToken<T>>& op)
 	{
 		//not ready
 		auto my_priority = op->getPriority();
@@ -1569,9 +1569,8 @@ public:
 		pLastToken = operationStack.top().get();
 	}
 
-	void push_operator(std::shared_ptr<IToken<T>>&& op)
+	void push_operation(std::shared_ptr<IToken<T>>&& op)
 	{
-		//not ready
 		auto my_priority = op->getPriority();
 		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
 		{
@@ -1582,43 +1581,32 @@ public:
 		pLastToken = operationStack.top().get();
 	}
 
-		void push_operator(std::shared_ptr<IToken<T>>&& op)
+	void push_value(const std::shared_ptr<IToken<T>>& value)
 	{
 		//not ready
-		auto my_priority = op->getPriority();
-		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
-		{
-			outputList.push_back(operationStack.top());
-			operationStack.pop();
-		}
-		operationStack.push(std::move(op));
-		pLastToken = operationStack.top().get();
-	}
-	void push_operator(std::shared_ptr<IToken<T>>&& op)
-	{
-		//not ready
-		auto my_priority = op->getPriority();
-		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
-		{
-			outputList.push_back(operationStack.top());
-			operationStack.pop();
-		}
-		operationStack.push(std::move(op));
-		pLastToken = operationStack.top().get();
-	}
-	void push_operator(std::shared_ptr<IToken<T>>&& op)
-	{
-		//not ready
-		auto my_priority = op->getPriority();
-		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
-		{
-			outputList.push_back(operationStack.top());
-			operationStack.pop();
-		}
-		operationStack.push(std::move(op));
-		pLastToken = operationStack.top().get();
+		outputList.push_back(value);
 	}
 
+	void push_value(std::shared_ptr<IToken<T>>&& op)
+	{
+		//not ready
+		outputList.push_back(std::move(value));
+	}
+
+	void pop_operator() //is it needed? maybe for brackets
+	{
+		operationStack.pop();
+	}
+
+	std::stack<std::shared_ptr<IToken<T>>>& get_operation_stack
+	{
+		return operationStack;
+	}
+
+	std::list<std::shared_ptr<IToken<T>>>& get_output_list
+	{
+		return outputList;
+	}
 
 };
 
