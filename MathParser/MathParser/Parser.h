@@ -89,11 +89,11 @@ struct token_string_entity
 	}
 	inline int compare(const token_string_entity& right) const noexcept
 	{
-		this->compare(right.begin(), right.size());
+		return this->compare(right.begin(), right.size());
 	}
 	inline int compare(const char* pszString) const noexcept
 	{
-		this->compare(pszString, std::strlen(pszString));
+		return this->compare(pszString, std::strlen(pszString));
 	}
 	template <std::size_t N>
 	inline auto compare(const char(&strArray)[N]) const noexcept -> std::enable_if_t<N == 0, int>
@@ -492,7 +492,7 @@ public:
 		if (!this->is_ready())
 			throw std::exception("Invalid arguments of an unary plus operator.");
 
-		return (*ops)();
+		return (*op)();
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -567,6 +567,10 @@ public:
 	{
 		return TokenType::BinaryPlus;
 	}
+	virtual short getPriority()
+	{
+		return 3;
+	}
 };
 template <class T>
 class BinaryMinus : public Operator<T>
@@ -610,6 +614,10 @@ public:
 		op_new->push_argument(std::move(op0));
 		op_new->push_argument(std::move(op1));
 		return op_new;
+	}
+	virtual short getPriority()
+	{
+		return 3;
 	}
 };
 template <class T>
@@ -1396,8 +1404,11 @@ template <class T>
 class MaxFunction : public Function<T>
 {
 	std::vector<std::shared_ptr<IToken<T>>> ops;
-public:
 	short paramsCount;
+public:
+	MaxFunction() = default;
+	MaxFunction(short paramsNumber) : paramsCount(paramsNumber) {}
+
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		ops.push_back(value);
@@ -1456,8 +1467,11 @@ template <class T>
 class MinFunction : public Function<T>
 {
 	std::vector<std::shared_ptr<IToken<T>>> ops;
-public:
 	short paramsCount;
+public:
+	MinFunction() = default;
+	MinFunction(short paramsNumber) : paramsCount(paramsNumber) {}
+
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		ops.push_back(value);
@@ -1501,12 +1515,15 @@ public:
 	{
 		if (!is_ready())
 			throw std::exception("Not ready to simplify an operator");
-		auto newarg = op->simplify();
-		if (newarg->type() == TokenType::number)
-			return std::make_shared<Number<T>>(_y1((*newarg)()));
-		auto pNewTkn = std::make_shared<Y1Function<T>>();
-		pNewTkn->op = std::move(newarg);
-		return pNewTkn;
+		for (auto op = ops.begin(); op != ops.end(); ++op)
+		{
+			auto newarg = op->simplify();
+			if (newarg->type() == TokenType::number)
+				return std::make_shared<Number<T>>(_y1((*newarg)()));
+			auto pNewTkn = std::make_shared<Y1Function<T>>();
+			pNewTkn->op = std::move(newarg);
+		}
+		return nullptr;//pNewTkn;
 	}
 };
 
@@ -1560,6 +1577,7 @@ public:
 	{
 		//not ready
 		auto my_priority = op->getPriority();
+		IToken<T> *pLastToken = nullptr;
 		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
 		{
 			outputList.push_back(operationStack.top());
@@ -1572,6 +1590,7 @@ public:
 	void push_operation(std::shared_ptr<IToken<T>>&& op)
 	{
 		auto my_priority = op->getPriority();
+		IToken<T> *pLastToken = nullptr;
 		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
 		{
 			outputList.push_back(operationStack.top());
@@ -1587,7 +1606,7 @@ public:
 		outputList.push_back(value);
 	}
 
-	void push_value(std::shared_ptr<IToken<T>>&& op)
+	void push_value(std::shared_ptr<IToken<T>>&& value)
 	{
 		//not ready
 		outputList.push_back(std::move(value));
@@ -1598,16 +1617,15 @@ public:
 		operationStack.pop();
 	}
 
-	std::stack<std::shared_ptr<IToken<T>>>& get_operation_stack
+	std::stack<std::shared_ptr<IToken<T>>>& get_operation_stack()
 	{
 		return operationStack;
 	}
 
-	std::list<std::shared_ptr<IToken<T>>>& get_output_list
+	std::list<std::shared_ptr<IToken<T>>>& get_output_list()
 	{
 		return outputList;
 	}
-
 };
 
 template <class T>
@@ -1788,17 +1806,18 @@ private:
 	void lexBody(const char* expr, std::size_t length)
 	{
 		int prior;
-		char* begPtr = expr;
+		char* begPtr = (char*)expr;
 		std::size_t cbRest = length;
-		auto delta;
+		char* delta;
 		short paramCount = 1;
+		TokenStorage<T> tokens;
 		std::stack<std::shared_ptr<IToken<T>>> operationStack;
 		IToken<T> *pLastToken = nullptr;
 
 		while (cbRest > 0)
 		{
 			delta = begPtr;
-			auto tkn = parse_string_token(begPtr, cbRest);
+			auto tkn = parse_text_token<T>(this->header, begPtr, &begPtr);
 			if (tkn == "+")
 			{
 				if (pLastToken == nullptr 
@@ -1807,25 +1826,29 @@ private:
 					|| pLastToken->type() == TokenType::operatorPow) //unary form
 				{
 					auto pMyTkn = std::make_shared<UnaryPlus<T>>();
-					auto my_priority = pMyTkn->getPriority();
-					while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
-					{
-						body.push_back(operationStack.top());
-						operationStack.pop();
-					}
-					operationStack.push(std::move(pMyTkn));
-					pLastToken = operationStack.top().get();
+					//auto my_priority = pMyTkn->getPriority();
+					//while (tokens.get_operation_stack().size() != 0 && my_priority <= tokens.get_operation_stack().top()->getPriority())
+					//{
+					//	tokens.push_value(tokens.get_operation_stack().top());
+					//	tokens.pop_operator();
+					//	//body.push_back(operationStack.top());
+					//	//operationStack.pop();
+					//}
+					tokens.push_operation(std::move(pMyTkn));
+					//operationStack.push(std::move(pMyTkn));
+					//pLastToken = tokens.get_operation_stack().top().get(); // operationStack.top().get();
 				}else //binary form
 				{
 					auto pMyTkn = std::make_shared<BinaryPlus<T>>();
-					auto my_priority = pMyTkn->getPriority();
+					tokens.push_operation(std::move(pMyTkn));
+				/*	auto my_priority = pMyTkn->getPriority();
 					while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
 					{
 						body.push_back(operationStack.top());
 						operationStack.pop();
 					}
 					operationStack.push(std::move(pMyTkn));
-					pLastToken = operationStack.top().get();
+					pLastToken = operationStack.top().get();*/
 				}
 			}else if (tkn == "-")
 			{
@@ -1859,7 +1882,7 @@ private:
 			}
 
 			/////////////////////////
-
+/*
 			try
 			{
 				auto func = parse_token<T>(begPtr, &endPtr);
@@ -1892,20 +1915,14 @@ private:
 					}
 					if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z')) //if not sin, cos, tg, it is variable
 					{
-						/* In your former approach you checked the first letter, and if it was 's' or 'c' or 't' you assumed it was a sine, a cosine, 
-						or a tangent function. But, if the token wasn't actually a function, but, e.g. a parameter 's', the parse_token function would
-						return nullptr, and the lexBody would throw an exception in this case, which is not correct.
-						*/
+						
 						auto func = parse_token<T>(begPtr, &endPtr);
 						if (func != nullptr)
 							operationStack.push(func);
 						else
 							//If the parameter is not found, parse_text_token will throw via Variable c-tor, therefore there's no need for pre-check
 							//nor to create the token (var) twice.
-							/*auto var = parse_text_token<T>(begPtr, &endPtr);
-							std::string var_name(var->get_name(), var->get_name_length());
-							if (find(m_parameters.begin(), m_parameters.end(), var_name) == m_parameters.end())
-								throw std::invalid_argument("Parameter is not found: " + var_name);*/
+							
 							body.push_back(parse_text_token<T>(header, begPtr, &endPtr));
 						begPtr = endPtr;
 						continue;
@@ -2126,19 +2143,21 @@ private:
 			}catch (std::exception e)
 			{
 				throw std::invalid_argument("ERROR!");
-			}
+			}*/
 		}
-		while (operationStack.size() != 0)
+		while (tokens.get_operation_stack().size() != 0)
 		{
-			if (operationStack.top().get()->type() == TokenType::bracket) //checking enclosing brackets
+			if (tokens.get_operation_stack().top().get()->type() == TokenType::bracket) //checking enclosing brackets
 				throw std::invalid_argument("Enclosing bracket!");
 			else
 			{
-				body.push_back(operationStack.top());
-				operationStack.pop();
+				tokens.push_value(tokens.get_operation_stack().top());
+				tokens.pop_operator();
+				//body.push_back(operationStack.top());
+				//operationStack.pop();
 			}
 		}
-		return body;
+		//return body;
 	}
 };
 
@@ -2313,7 +2332,7 @@ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
 	const char* endptr;
 	header = Header<T>(sMathExpr, cbMathExpr, (char**) &endptr);
 	++endptr;
-	body = lexBody<T>(header, endptr, cbMathExpr - (endptr - sMathExpr));
+	lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
 	simplify_body(body);
 }
 
