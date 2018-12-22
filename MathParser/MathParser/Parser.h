@@ -255,12 +255,17 @@ enum class TokenType
 	ynFunction,
 	minFunction,
 	maxFunction,
-	function,
 	bracket,
-	Operator,
 	number,
 	variable
 };
+
+constexpr bool IsOperatorTokenTypeId(TokenType id)
+{
+	return id == TokenType::BinaryPlus || id == TokenType::BinaryMinus
+			|| id == TokenType::operatorMul || id == TokenType::operatorDiv
+			|| id == TokenType::operatorPow;
+}
 
 template <class T>
 class IToken
@@ -1575,59 +1580,62 @@ class TokenStorage
 	std::list<std::shared_ptr<IToken<T>>> outputList;
 
 public:
-	void push_operation(const std::shared_ptr<IToken<T>>& op)
+	template <class TokenParamType>
+	auto push_token(TokenParamType&& op) -> std::enable_if_t<
+		std::is_base_of<Operator<T>, std::decay_t<TokenParamType>>::value ||
+		std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value,
+		IToken<T>*
+	>
 	{
 		//not ready
-		auto my_priority = op->getPriority();
-		IToken<T> *pLastToken = nullptr;
+		auto my_priority = op.getPriority();
 		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
 		{
 			outputList.push_back(operationStack.top());
 			operationStack.pop();
 		}
-		operationStack.push(op);
-		pLastToken = operationStack.top().get();
+		operationStack.push(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
+		return operationStack.top().get();
 	}
 
-	void push_operation(std::shared_ptr<IToken<T>>&& op)
+	template <class TokenParamType>
+	auto push_token(TokenParamType&& value) -> std::enable_if_t<
+		!(std::is_base_of<Operator<T>, std::decay_t<TokenParamType>>::value ||
+		std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value),
+		IToken<T>*
+	>
 	{
-		auto my_priority = op->getPriority();
-		IToken<T> *pLastToken = nullptr;
-		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
+		//not ready
+		outputList.push_back(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(value)));
+		return outputList.back().get();
+	}
+	std::list<std::shared_ptr<IToken<T>>>&& finalize() &&
+	{
+		while (operationStack.size() != 0)
 		{
-			outputList.push_back(operationStack.top());
-			operationStack.pop();
+			if (operationStack.top().get()->type() == TokenType::bracket) //checking enclosing brackets
+				throw std::invalid_argument("Enclosing bracket!");
+			else
+			{
+				outputList.push_back(std::move(operationStack.top()));
+				operationStack.pop();
+			}
 		}
-		operationStack.push(std::move(op));
-		pLastToken = operationStack.top().get();
+		return std::move(outputList);
 	}
-
-	void push_value(const std::shared_ptr<IToken<T>>& value)
-	{
-		//not ready
-		outputList.push_back(value);
-	}
-
-	void push_value(std::shared_ptr<IToken<T>>&& value)
-	{
-		//not ready
-		outputList.push_back(std::move(value));
-	}
-
-	void pop_operator() //is it needed? maybe for brackets
-	{
-		operationStack.pop();
-	}
-
-	std::stack<std::shared_ptr<IToken<T>>>& get_operation_stack()
+	/*std::stack<std::shared_ptr<IToken<T>>>& get_operation_stack()
 	{
 		return operationStack;
 	}
 
-	std::list<std::shared_ptr<IToken<T>>>& get_output_list()
+	const std::list<std::shared_ptr<IToken<T>>>& get_output_list() const
 	{
 		return outputList;
 	}
+	std::list<std::shared_ptr<IToken<T>>>& get_output_list()
+	{
+		return outputList;
+	}*/
 };
 
 template <class T>
@@ -1811,159 +1819,78 @@ private:
 		std::size_t cbRest = length;
 		//short paramCount = 1;
 		TokenStorage<T> tokens;
-		std::stack<std::shared_ptr<IToken<T>>> operationStack;
 		IToken<T> *pLastToken = nullptr;
+		int last_type_id = -1;
 
 		while (cbRest > 0)
 		{
 			auto tkn = parse_string_token(begPtr, length);
 			if (tkn == "+")
 			{
-				if (pLastToken == nullptr ||
-					 pLastToken->type() != TokenType::BinaryPlus || pLastToken->type() != TokenType::BinaryMinus
-					|| pLastToken->type() != TokenType::operatorMul || pLastToken->type() != TokenType::operatorDiv
-					|| pLastToken->type() != TokenType::operatorPow) //unary form
-				{
-					//auto pMyTkn = std::make_shared<UnaryPlus<T>>();
-					tokens.push_operation(std::make_shared<BinaryPlus<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}else //binary form
-				{
-					//auto pMyTkn = std::make_shared<BinaryPlus<T>>();
-					tokens.push_operation(std::make_shared<UnaryPlus<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+				if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
+					last_type_id = int(tokens.push_token(UnaryPlus<T>())->type());
+				else //binary form
+					last_type_id = int(tokens.push_token(BinaryPlus<T>())->type());
 			}else if (tkn == "-")
 			{
-				if (pLastToken == nullptr 
-					|| pLastToken->type() == TokenType::BinaryPlus || pLastToken->type() == TokenType::BinaryMinus
-					|| pLastToken->type() == TokenType::operatorMul || pLastToken->type() == TokenType::operatorDiv
-					|| pLastToken->type() == TokenType::operatorPow) //unary form
-				{
-					tokens.push_operation(std::make_shared<UnaryMinus<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}else //binary form
-				{
-					tokens.push_operation(std::make_shared<BinaryMinus<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+				if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
+					last_type_id = int(tokens.push_token(UnaryMinus<T>())->type());
+				else //binary form
+					last_type_id = int(tokens.push_token(BinaryMinus<T>())->type());
 			}else if (tkn == "*")
+				last_type_id = int(tokens.push_token(OperatorMul<T>())->type());
+			else if (tkn == "/")
+				last_type_id = int(tokens.push_token(OperatorDiv<T>())->type());
+			else if (tkn == "^")
+				last_type_id = int(tokens.push_token(OperatorPow<T>())->type());
+			else if (tkn == ",")
 			{
-				tokens.push_operation(std::make_shared<OperatorMul<T>>());
-				begPtr = (char*)tkn.end();
-				cbRest = length - (begPtr - expr);
-			}else if (tkn == "/")
+			}else if (isdigit(*tkn.begin()))
 			{
-				tokens.push_operation(std::make_shared<OperatorDiv<T>>());
-				begPtr = (char*)tkn.end();
-				cbRest = length - (begPtr - expr);
-			}else if (tkn == "^")
-			{
-				tokens.push_operation(std::make_shared<UnaryMinus<T>>());
-				begPtr = (char*)tkn.end();
-				cbRest = length - (begPtr - expr);
-			}else if (tkn == ",")
-			{
-			}else if (*tkn.begin() >= '0' && *tkn.begin() <= '9')
-			{
-				tokens.push_value(std::make_shared<Number<T>>(std::strtod(tkn.begin(), &begPtr)));
-				begPtr = (char*)tkn.end();
-				cbRest = length - (begPtr - expr);
-			}else if ((*tkn.begin() >= 'a' && *tkn.begin() <= 'z') || (*tkn.begin() >= 'A' && *tkn.begin() <= 'Z'))
+				char* conversion_end;
+				static_assert(std::is_same<T, double>::value, "The following line is only applicable to double");
+				auto value = std::strtod(tkn.begin(), (char**) &conversion_end);
+				if (conversion_end != tkn.end())
+					std::exception("Invalid syntax");
+				last_type_id = int(tokens.push_token(Number<T>(value))->type());
+			}
+			else if (isalpha(*tkn.begin()))
 			{
 				if (tkn == "sin")
-				{
-					tokens.push_value(std::make_shared<SinFunction<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(SinFunction<T>())->type());
 				else if (tkn == "cos")
-				{
-					tokens.push_value(std::make_shared<CosFunction<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(CosFunction<T>())->type());
 				else if (tkn == "tg")
-				{
-					tokens.push_value(std::make_shared<TgFunction<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(TgFunction<T>())->type());
 				else if (tkn == "log10")
-				{
-					tokens.push_value(std::make_shared<Log10Function<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(Log10Function<T>())->type());
 				else if (tkn == "ln")
-				{
-					tokens.push_value(std::make_shared<LnFunction<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(LnFunction<T>())->type());
 				else if (tkn == "log")
-				{
-					tokens.push_value(std::make_shared<Log10Function<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(LogFunction<T>())->type());
 				else if (tkn == "j0")
-				{
-					tokens.push_value(std::make_shared<J0Function<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(J0Function<T>())->type());
 				else if (tkn == "j1")
-				{
-					tokens.push_value(std::make_shared<J1Function<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(J1Function<T>())->type());
 				else if (tkn == "jn")
-				{
-					tokens.push_value(std::make_shared<JnFunction<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(JnFunction<T>())->type());
 				else if (tkn == "y0")
-				{
-					tokens.push_value(std::make_shared<Y0Function<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(Y0Function<T>())->type());
 				else if (tkn == "y1")
-				{
-					tokens.push_value(std::make_shared<Y1Function<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(Y1Function<T>())->type());
 				else if (tkn == "yn")
-				{
-					tokens.push_value(std::make_shared<YnFunction<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(YnFunction<T>())->type());
 				else if (tkn == "max")
-				{
-					tokens.push_value(std::make_shared<MaxFunction<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(MaxFunction<T>())->type());
 				else if (tkn == "min")
-				{
-					tokens.push_value(std::make_shared<MinFunction<T>>());
-					begPtr = (char*)tkn.end();
-					cbRest = length - (begPtr - expr);
-				}
+					last_type_id = int(tokens.push_token(MinFunction<T>())->type());
 				else if (this->header.get_param_index(std::string(tkn.begin(), tkn.end())) >= 0)
-					tokens.push_value(std::make_shared<Variable<T>>(this->header, std::string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()));
-				cbRest = length - (tkn.end() - tkn.begin());
-				begPtr = (char*)tkn.end();
+					tokens.push_token(Variable<T>(this->header, std::string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()));
 			}
+			else
+				throw std::exception("Unexpected token");
+			cbRest = length - (tkn.end() - begPtr);
+			begPtr = (char*)tkn.end();
 
 
 			/////////////////////////
@@ -2230,20 +2157,8 @@ private:
 				throw std::invalid_argument("ERROR!");
 			}*/
 		}
-		while (tokens.get_operation_stack().size() != 0)
-		{
-			if (tokens.get_operation_stack().top().get()->type() == TokenType::bracket) //checking enclosing brackets
-				throw std::invalid_argument("Enclosing bracket!");
-			else
-			{
-				tokens.push_value(tokens.get_operation_stack().top());
-				tokens.pop_operator();
-				//body.push_back(operationStack.top());
-				//operationStack.pop();
-			}
-		}
-		body = tokens.get_output_list();
-		//return body;
+		
+		body = std::move(tokens).finalize();
 	}
 };
 

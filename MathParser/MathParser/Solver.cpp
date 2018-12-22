@@ -17,6 +17,19 @@ int main()
 	mathexpr.clear_variables();
 	mathexpr.init_variables(v);
 	res = simplify(mathexpr.get_body());*/
+	/*
+	FAILS:
+	1. "f(x) = -x"
+	2. "f(x) = +x"
+	3. "f(x) = 5 - -x"
+	4. "f(x) = 5 - +x"
+	5. "f(x) = 5 - x"
+	6. "f(x) = 5 + x"
+	7. "f(x) = x - 5"
+	8. "f(x) = x + -5"
+	9. "f(x) = x - 5"
+	10. "f(x) = x + +5"
+	*/
 	std::string expression = "f(x) = x + 5";
 	Mathexpr<double> mathexpr = {expression};
 	std::vector<double> v;
