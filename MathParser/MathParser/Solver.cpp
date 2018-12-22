@@ -25,12 +25,10 @@ int main()
 	4. "f(x) = 5 - +x"
 	5. "f(x) = 5 - x"
 	6. "f(x) = 5 + x"
-	7. "f(x) = x - 5"
 	8. "f(x) = x + -5"
-	9. "f(x) = x - 5"
 	10. "f(x) = x + +5"
 	*/
-	std::string expression = "f(x) = x + 5";
+	std::string expression = "f(x) = x + -5";
 	Mathexpr<double> mathexpr = {expression};
 	std::vector<double> v;
 	v.push_back(1);

@@ -267,6 +267,79 @@ constexpr bool IsOperatorTokenTypeId(TokenType id)
 			|| id == TokenType::operatorPow;
 }
 
+/*
+Before this class was introduced function and operator tokens with fixed numbers
+of parameters used static arrays and a top pointer to store and address arguments.
+The top pointer required special copy-construction, copy-assignment, move-construction
+and move-assignment because implicitly generated counterparts copied the value of the top 
+pointers as well as the params vector. This resulted in the top pointer of a copy/move 
+constructed/assigned-to class to point to the params vector of the original class instance
+which was read from to create the copy. And this yielded incorrect behaviour of the program.
+
+To rectify this, the copy/move construction/assignment must be specially implemented for each
+class which would require a much of similar code in the classes.
+
+To reduce the ammount of this repeated code, the static_parameter_storage class is introduced. 
+*/
+template <class T, std::size_t N>
+class static_parameter_storage
+{
+	struct {T params[N];} strg;
+	T* top = strg.params;
+public:
+	static_parameter_storage() = default;
+	static_parameter_storage(const static_parameter_storage& right)
+	{
+		*this = right;
+	}
+	static_parameter_storage(static_parameter_storage&& right)
+	{
+		*this = std::move(right);
+	}
+	static_parameter_storage& operator=(const static_parameter_storage& right)
+	{
+		strg = right.strg;
+		return *this;
+	}
+	static_parameter_storage& operator=(static_parameter_storage&& right)
+	{
+		strg = std::move(right.strg);
+		return *this;
+	}
+	const T& operator[](std::size_t index) const
+	{
+		if (index < N)
+			return strg.params[index];
+		throw std::range_error("static_parameter_storage: invalid parameter index");
+	}
+	T& operator[](std::size_t index)
+	{
+		return const_cast<T&>(const_cast<const static_parameter_storage&>(*this)[index]);
+	}
+	template <class U>
+	auto push_argument(U&& arg) -> std::enable_if_t<std::is_convertible<std::decay_t<U>, T>::value>
+	{
+		if (top - strg.params >= N)
+			throw std::range_error("static_parameter_storage: buffer overflow");
+		*(top++) = std::forward<U>(arg);
+	}
+	bool is_ready() const
+	{
+		return top == &strg.params[N] && this->is_ready_from<0>();
+	}
+private:
+	template <std::size_t I, class = void>
+	auto is_ready_from() const -> std::enable_if_t<(I >= N), bool>
+	{
+		return true;
+	}
+	template <std::size_t I, class = void>
+	auto is_ready_from() const -> std::enable_if_t<(I < N), bool>
+	{
+		return strg.params[I]->is_ready() && this->is_ready_from<I + 1>();
+	}
+};
+
 template <class T>
 class IToken
 {
@@ -436,33 +509,31 @@ class Operator : public IToken<T>
 template <class T>
 class UnaryPlus : public Operator<T> //+-*/
 {
-	std::shared_ptr<IToken<T>> op;
-	bool fOpSet = false;
+	/*This replacement is unnecessary, but the code would be more maintainable, if the storage of parameters
+	for functions (with fixed numbers of the parameters) will be managed in one place (static_parameter_storage). */
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 1> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		if (fOpSet)
-			throw std::exception("Invalid arguments of an unary plus operator.");
-		op = value;
-		fOpSet = true;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
 		if (!this->is_ready())
 			throw std::exception("Invalid arguments of an unary plus operator.");
 
-		return (*op)();
+		return (*ops[0])();
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
 		if (!this->is_ready())
 			throw std::exception("Not ready to simplify an operator");
-		return op->simplify(); //unary + does no do anything
+		return ops[0]->simplify(); //unary + does no do anything
 	}
 	virtual bool is_ready() const
 	{
-		return fOpSet && op->is_ready();
+		return ops.is_ready();
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -481,29 +552,25 @@ public:
 template <class T>
 class UnaryMinus : public Operator<T> //+-*/
 {
-	std::shared_ptr<IToken<T>> op;
-	bool fOpSet = false;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 1> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		if (fOpSet)
-			throw std::exception("Invalid arguments of an unary plus operator.");
-		op = value;
-		fOpSet = true;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
 		if (!this->is_ready())
 			throw std::exception("Invalid arguments of an unary plus operator.");
 
-		return (*op)();
+		return (*ops[0])();
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
 		if (!this->is_ready())
 			throw std::exception("Not ready to simplify an operator");
-		auto op0 = op->simplify();
+		auto op0 = ops[0]->simplify();
 
 		if (op0->type() == TokenType::number)
 			return std::make_shared<Number<T>>(-(*dynamic_cast<Number<T>*>(op0.get()))());
@@ -513,7 +580,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return fOpSet && op->is_ready();
+		return ops.is_ready();
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -532,16 +599,17 @@ public:
 template <class T>
 class BinaryPlus : public Operator<T> //+-*/
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
+
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a binary plus operator.");
 
 		return (*ops[0])() + (*ops[1])();
@@ -562,7 +630,7 @@ public:
 	}
 	virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -580,23 +648,23 @@ public:
 template <class T>
 class BinaryMinus : public Operator<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops + 1;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top-- = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a binary minus operator.");
 
-		return (*ops[0])() - (*ops[1])();
+		return  (*ops[1])() - (*ops[0])();
 	}
 	virtual bool is_ready() const
 	{
-		return true;
+		return ops.is_ready();
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -628,23 +696,23 @@ public:
 template <class T>
 class OperatorMul : public Operator<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a multiplication operator.");
 
 		return (*ops[0])() * (*ops[1])();
 	}
 	virtual bool is_ready() const
 	{
-		return true;
+		return ops.is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -676,23 +744,23 @@ public:
 template <class T>
 class OperatorDiv : public Operator<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops + 1;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top-- = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a division operator.");
 
-		return (*ops[0])() / (*ops[1])();
+		return (*ops[1])() / (*ops[0])();
 	}
 	virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -724,23 +792,23 @@ public:
 template <class T>
 class OperatorPow : public Operator<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a power operator.");
 
 		return std::pow((*ops[0])(), (*ops[1])());
 	}
 	virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -818,22 +886,22 @@ protected:
 template <class T>
 class SinFunction : public Function<T>
 {
-	std::shared_ptr<IToken<T>> op;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 1> ops;
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		op = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		if (!op->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Insufficient number are given for the plus operator.");
 
-		return std::sin((*op)());
+		return std::sin((*ops[0])());
 	}
 	virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -855,11 +923,11 @@ public:
 	{
 		if (!is_ready())
 			throw std::exception("Not ready to simplify an operator");
-		auto newarg = op->simplify();
+		auto newarg = ops[0]->simplify();
 		if (newarg->type() == TokenType::number)
 			return std::make_shared<Number<T>>(std::sin((*newarg)()));
 		auto pNewTkn = std::make_shared<SinFunction<T>>();
-		pNewTkn->op = std::move(newarg);
+		pNewTkn->push_argument(std::move(newarg));
 		return pNewTkn;
 	}
 };
@@ -1061,22 +1129,22 @@ public:
 template <class T>
 class LogFunction : public Function<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Insufficient number are given for the plus operator.");
 
 		return std::log((*ops[1])()) / std::log((*ops[0])());
 	}
 	virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -1112,22 +1180,22 @@ public:
 template <class T>
 class JnFunction : public Function<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Insufficient number are given for the plus operator.");
 
 		return _jn(int((*ops[0])()), (*ops[1])());
 	}
 	virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -1259,22 +1327,22 @@ public:
 template <class T>
 class YnFunction : public Function<T>
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		ops.push_argument(value);
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!this->is_ready())
 			throw std::exception("Insufficient number are given for the plus operator.");
 
 		return _yn(int((*ops[0])()), (*ops[1])());
 	}
 	virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
 	virtual short getPriority()
 	{
@@ -1824,7 +1892,7 @@ private:
 
 		while (cbRest > 0)
 		{
-			auto tkn = parse_string_token(begPtr, length);
+			auto tkn = parse_string_token(begPtr, cbRest);
 			if (tkn == "+")
 			{
 				if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
@@ -1885,11 +1953,11 @@ private:
 				else if (tkn == "min")
 					last_type_id = int(tokens.push_token(MinFunction<T>())->type());
 				else if (this->header.get_param_index(std::string(tkn.begin(), tkn.end())) >= 0)
-					tokens.push_token(Variable<T>(this->header, std::string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()));
+					last_type_id = int(tokens.push_token(Variable<T>(this->header, std::string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()))->type());
 			}
 			else
 				throw std::exception("Unexpected token");
-			cbRest = length - (tkn.end() - begPtr);
+			cbRest -= tkn.end() - begPtr;
 			begPtr = (char*)tkn.end();
 
 
@@ -2162,130 +2230,130 @@ private:
 	}
 };
 
-template <class T>
-std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
-{
-	auto tok = skipSpaces(input_string);
-	if (*input_string == '+')
-	{
-		auto tok = skipSpaces(input_string);
-		if (*tok == '-' || *tok == '+')
-		{
-			*endptr = (char*) tok;
-			return std::make_shared<BinaryPlus<T>>();
-		}
-		//return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-		return nullptr;
-	} //TODO: Adjust other operators accordingly
+//template <class T>
+//std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
+//{
+//	auto tok = skipSpaces(input_string);
+//	if (*input_string == '+')
+//	{
+//		auto tok = skipSpaces(input_string);
+//		if (*tok == '-' || *tok == '+')
+//		{
+//			*endptr = (char*) tok;
+//			return std::make_shared<BinaryPlus<T>>();
+//		}
+//		//return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
+//		return nullptr;
+//	} //TODO: Adjust other operators accordingly
+//
+//	if (*input_string == '-')
+//	{
+//		auto tok = skipSpaces(input_string);
+//		if (*tok == '-' || *tok == '+')
+//			return std::make_shared<BinaryMinus<T>>();
+//		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
+//	}
+//
+//	if (*input_string == '*')
+//		return std::make_shared<OperatorMul<T>>();
+//	if (*input_string == '/')
+//		return std::make_shared<OperatorDiv<T>>();
+//	if (*input_string == '^')
+//		return std::make_shared<OperatorPow<T>>();
+//
+//	if (std::strncmp(input_string, "sin", 3) == 0 && !iswhitespace(input_string[3]))
+//	{
+//		*endptr = (char*) input_string + 3;
+//		return std::make_shared<SinFunction<T>>();
+//	}
+//	else if (std::strncmp(input_string, "cos", 3) == 0 && !iswhitespace(input_string[3]))
+//	{
+//		*endptr = (char*) input_string + 3;
+//		return std::make_shared<CosFunction<T>>();
+//	}
+//	else if (std::strncmp(input_string, "tg", 2) == 0 && !iswhitespace(input_string[2]))
+//	{
+//		*endptr = (char*) input_string + 2;
+//		return std::make_shared<TgFunction<T>>();
+//	}
+//	else if (std::strncmp(input_string, "log10", 3) == 0 && !iswhitespace(input_string[5]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<Log10Function<T>>();
+//	}
+//	else if (std::strncmp(input_string, "ln", 3) == 0 && !iswhitespace(input_string[2]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<LnFunction<T>>();
+//	}
+//	else if (std::strncmp(input_string, "log", 3) == 0 && !iswhitespace(input_string[3]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<LogFunction<T>>();
+//	}
+//	else if (std::strncmp(input_string, "j0", 3) == 0 && !iswhitespace(input_string[2]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<J0Function<T>>();
+//	}
+//	else if (std::strncmp(input_string, "j1", 3) == 0 && !iswhitespace(input_string[2]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<J1Function<T>>();
+//	}
+//	else if (std::strncmp(input_string, "jn", 3) == 0 && !iswhitespace(input_string[2]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<JnFunction<T>>();
+//	}
+//	else if (std::strncmp(input_string, "y0", 3) == 0 && !iswhitespace(input_string[2]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<Y0Function<T>>();
+//	}
+//	else if (std::strncmp(input_string, "y1", 3) == 0 && !iswhitespace(input_string[2]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<Y1Function<T>>();
+//	}
+//	else if (std::strncmp(input_string, "yn", 3) == 0 && !iswhitespace(input_string[2]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<YnFunction<T>>();
+//	}
+//	else if (std::strncmp(input_string, "max", 3) == 0 && !iswhitespace(input_string[3]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<CosFunction<T>>();
+//	}
+//	else if (std::strncmp(input_string, "min", 3) == 0 && !iswhitespace(input_string[3]))
+//	{
+//		*endptr = (char*)input_string + 3;
+//		return std::make_shared<CosFunction<T>>();
+//	}
+//	return nullptr;
+//}
 
-	if (*input_string == '-')
-	{
-		auto tok = skipSpaces(input_string);
-		if (*tok == '-' || *tok == '+')
-			return std::make_shared<BinaryMinus<T>>();
-		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-	}
-
-	if (*input_string == '*')
-		return std::make_shared<OperatorMul<T>>();
-	if (*input_string == '/')
-		return std::make_shared<OperatorDiv<T>>();
-	if (*input_string == '^')
-		return std::make_shared<OperatorPow<T>>();
-
-	if (std::strncmp(input_string, "sin", 3) == 0 && !iswhitespace(input_string[3]))
-	{
-		*endptr = (char*) input_string + 3;
-		return std::make_shared<SinFunction<T>>();
-	}
-	else if (std::strncmp(input_string, "cos", 3) == 0 && !iswhitespace(input_string[3]))
-	{
-		*endptr = (char*) input_string + 3;
-		return std::make_shared<CosFunction<T>>();
-	}
-	else if (std::strncmp(input_string, "tg", 2) == 0 && !iswhitespace(input_string[2]))
-	{
-		*endptr = (char*) input_string + 2;
-		return std::make_shared<TgFunction<T>>();
-	}
-	else if (std::strncmp(input_string, "log10", 3) == 0 && !iswhitespace(input_string[5]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<Log10Function<T>>();
-	}
-	else if (std::strncmp(input_string, "ln", 3) == 0 && !iswhitespace(input_string[2]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<LnFunction<T>>();
-	}
-	else if (std::strncmp(input_string, "log", 3) == 0 && !iswhitespace(input_string[3]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<LogFunction<T>>();
-	}
-	else if (std::strncmp(input_string, "j0", 3) == 0 && !iswhitespace(input_string[2]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<J0Function<T>>();
-	}
-	else if (std::strncmp(input_string, "j1", 3) == 0 && !iswhitespace(input_string[2]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<J1Function<T>>();
-	}
-	else if (std::strncmp(input_string, "jn", 3) == 0 && !iswhitespace(input_string[2]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<JnFunction<T>>();
-	}
-	else if (std::strncmp(input_string, "y0", 3) == 0 && !iswhitespace(input_string[2]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<Y0Function<T>>();
-	}
-	else if (std::strncmp(input_string, "y1", 3) == 0 && !iswhitespace(input_string[2]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<Y1Function<T>>();
-	}
-	else if (std::strncmp(input_string, "yn", 3) == 0 && !iswhitespace(input_string[2]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<YnFunction<T>>();
-	}
-	else if (std::strncmp(input_string, "max", 3) == 0 && !iswhitespace(input_string[3]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<CosFunction<T>>();
-	}
-	else if (std::strncmp(input_string, "min", 3) == 0 && !iswhitespace(input_string[3]))
-	{
-		*endptr = (char*)input_string + 3;
-		return std::make_shared<CosFunction<T>>();
-	}
-	return nullptr;
-}
-
-template <class T>
-std::shared_ptr<IToken<T>> parse_text_token(const Header<T>& header, const char* input_string, char** endptr)
-{
-	std::size_t name_size;
-	char* endTokPtr = (char*)input_string;
-	if (*input_string >= '0' && *input_string <= '9')
-		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-	while ((*endTokPtr >= 'A' && *endTokPtr <= 'Z') || (*endTokPtr >= 'a' && *endTokPtr <= 'z') || (*endTokPtr >= '0' && *endTokPtr <= '9'))
-	{
-		endTokPtr += 1;
-	}
-
-	name_size = endTokPtr - input_string;
-	std::string name(input_string, input_string + name_size);
-	char* tok_name = new char[name_size + 1];
-	tok_name = (char*)(name.c_str());
-	auto token = std::make_shared<Variable<T>>(header, tok_name, name_size);
-	*(endptr) = endTokPtr;
-	return token;
-}
+//template <class T>
+//std::shared_ptr<IToken<T>> parse_text_token(const Header<T>& header, const char* input_string, char** endptr)
+//{
+//	std::size_t name_size;
+//	char* endTokPtr = (char*)input_string;
+//	if (*input_string >= '0' && *input_string <= '9')
+//		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
+//	while ((*endTokPtr >= 'A' && *endTokPtr <= 'Z') || (*endTokPtr >= 'a' && *endTokPtr <= 'z') || (*endTokPtr >= '0' && *endTokPtr <= '9'))
+//	{
+//		endTokPtr += 1;
+//	}
+//
+//	name_size = endTokPtr - input_string;
+//	std::string name(input_string, input_string + name_size);
+//	char* tok_name = new char[name_size + 1];
+//	tok_name = (char*)(name.c_str());
+//	auto token = std::make_shared<Variable<T>>(header, tok_name, name_size);
+//	*(endptr) = endTokPtr;
+//	return token;
+//}
 
 template <class K>
 typename std::list<std::shared_ptr<IToken<K>>>::iterator simplify(std::list<std::shared_ptr<IToken<K>>>& body, typename std::list<std::shared_ptr<IToken<K>>>::iterator elem)
