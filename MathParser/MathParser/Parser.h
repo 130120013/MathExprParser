@@ -1417,17 +1417,17 @@ public:
 	{
 		for (auto op = ops.begin(); op != ops.end(); ++op)
 		{
-			if (!op->is_ready())
+			if (!op->get()->is_ready())
 				throw std::exception("Insufficient number are given for the plus operator.");
 		}
 
-		return std::max_element(ops.begin(), ops.end()); //нужен компаратор
+		return (*std::max_element(ops.begin(), ops.end())).get()->operator()();
 	}
 	virtual bool is_ready() const
 	{
 		for (auto op = ops.begin(); op != ops.end(); ++op)
 		{
-			if (!op->is_ready())
+			if (!op->get()->is_ready())
 				return false;
 		}
 		return true;
@@ -1450,17 +1450,18 @@ public:
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
-		if (!is_ready())
-			throw std::exception("Not ready to simplify an operator");
-		for (auto op = ops.begin(); op != ops.end(); ++op)
-		{
-			auto newarg = op->simplify();
-			if (newarg->type() == TokenType::number)
-				return std::make_shared<Number<T>>(_y1((*newarg)()));
-			auto pNewTkn = std::make_shared<MaxFunction<T>>();
-			pNewTkn->ops = std::move(newarg);
-			return pNewTkn;
-		}
+		//if (!is_ready())
+		//	throw std::exception("Not ready to simplify an operator");
+		//for (auto op = ops.begin(); op != ops.end(); ++op)
+		//{
+		//	auto newarg = op->simplify();
+		//	if (newarg->type() == TokenType::number)
+		//		return std::make_shared<Number<T>>(_y1((*newarg)()));
+		//	auto pNewTkn = std::make_shared<MaxFunction<T>>();
+		//	pNewTkn->ops = std::move(newarg);
+		//	return pNewTkn;
+		//}
+		return 0;
 	}
 };
 template <class T>
@@ -1480,17 +1481,17 @@ public:
 	{
 		for (auto op = ops.begin(); op != ops.end(); ++op)
 		{
-			if (!op->is_ready())
+			if (!op->get()->is_ready())
 				throw std::exception("Insufficient number are given for the plus operator.");
 		}
 
-		return std::min_element(ops.begin(), ops.end()); //нужен компаратор
+		return (*std::min_element(ops.begin(), ops.end())).get()->operator()();
 	}
 	virtual bool is_ready() const
 	{
 		for (auto op = ops.begin(); op != ops.end(); ++op)
 		{
-			if (!op->is_ready())
+			if (!op->get()->is_ready())
 				return false;
 		}
 		return true;
@@ -1513,17 +1514,18 @@ public:
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
-		if (!is_ready())
-			throw std::exception("Not ready to simplify an operator");
-		for (auto op = ops.begin(); op != ops.end(); ++op)
-		{
-			auto newarg = op->simplify();
-			if (newarg->type() == TokenType::number)
-				return std::make_shared<Number<T>>(_y1((*newarg)()));
-			auto pNewTkn = std::make_shared<Y1Function<T>>();
-			pNewTkn->op = std::move(newarg);
-		}
-		return nullptr;//pNewTkn;
+		//if (!is_ready())
+		//	throw std::exception("Not ready to simplify an operator");
+		//for (auto op = ops.begin(); op != ops.end(); ++op)
+		//{
+		//	auto newarg = op->simplify();
+		//	if (newarg->type() == TokenType::number)
+		//		return std::make_shared<Number<T>>(_y1((*newarg)()));
+		//	auto pNewTkn = std::make_shared<MaxFunction<T>>();
+		//	pNewTkn->ops = std::move(newarg);
+		//	return pNewTkn;
+		//}
+		return 0;
 	}
 };
 
@@ -1803,13 +1805,11 @@ private:
 	std::list<std::shared_ptr<IToken<T>>> body;
 
 	template <class T>
-	std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t length)
+	void lexBody(const char* expr, std::size_t length)
 	{
-		int prior;
 		char* begPtr = (char*)expr;
 		std::size_t cbRest = length;
-		char* delta;
-		short paramCount = 1;
+		//short paramCount = 1;
 		TokenStorage<T> tokens;
 		std::stack<std::shared_ptr<IToken<T>>> operationStack;
 		IToken<T> *pLastToken = nullptr;
@@ -1843,27 +1843,128 @@ private:
 					|| pLastToken->type() == TokenType::operatorPow) //unary form
 				{
 					tokens.push_operation(std::make_shared<UnaryMinus<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
 				}else //binary form
 				{
 					tokens.push_operation(std::make_shared<BinaryMinus<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
 				}
 			}else if (tkn == "*")
 			{
 				tokens.push_operation(std::make_shared<OperatorMul<T>>());
+				begPtr = (char*)tkn.end();
+				cbRest = length - (begPtr - expr);
 			}else if (tkn == "/")
 			{
 				tokens.push_operation(std::make_shared<OperatorDiv<T>>());
+				begPtr = (char*)tkn.end();
+				cbRest = length - (begPtr - expr);
 			}else if (tkn == "^")
 			{
 				tokens.push_operation(std::make_shared<UnaryMinus<T>>());
+				begPtr = (char*)tkn.end();
+				cbRest = length - (begPtr - expr);
 			}else if (tkn == ",")
 			{
-			}
-			else if (*tkn.begin() >= '0' && *tkn.begin() <= '9')
+			}else if (*tkn.begin() >= '0' && *tkn.begin() <= '9')
 			{
 				tokens.push_value(std::make_shared<Number<T>>(std::strtod(tkn.begin(), &begPtr)));
+				begPtr = (char*)tkn.end();
 				cbRest = length - (begPtr - expr);
+			}else if ((*tkn.begin() >= 'a' && *tkn.begin() <= 'z') || (*tkn.begin() >= 'A' && *tkn.begin() <= 'Z'))
+			{
+				if (tkn == "sin")
+				{
+					tokens.push_value(std::make_shared<SinFunction<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "cos")
+				{
+					tokens.push_value(std::make_shared<CosFunction<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "tg")
+				{
+					tokens.push_value(std::make_shared<TgFunction<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "log10")
+				{
+					tokens.push_value(std::make_shared<Log10Function<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "ln")
+				{
+					tokens.push_value(std::make_shared<LnFunction<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "log")
+				{
+					tokens.push_value(std::make_shared<Log10Function<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "j0")
+				{
+					tokens.push_value(std::make_shared<J0Function<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "j1")
+				{
+					tokens.push_value(std::make_shared<J1Function<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "jn")
+				{
+					tokens.push_value(std::make_shared<JnFunction<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "y0")
+				{
+					tokens.push_value(std::make_shared<Y0Function<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "y1")
+				{
+					tokens.push_value(std::make_shared<Y1Function<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "yn")
+				{
+					tokens.push_value(std::make_shared<YnFunction<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "max")
+				{
+					tokens.push_value(std::make_shared<MaxFunction<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (tkn == "min")
+				{
+					tokens.push_value(std::make_shared<MinFunction<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
+				}
+				else if (this->header.get_param_index(std::string(tkn.begin(), tkn.end())) >= 0)
+					tokens.push_value(std::make_shared<Variable<T>>(this->header, std::string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()));
+				cbRest = length - (tkn.end() - tkn.begin());
+				begPtr = (char*)tkn.end();
 			}
+
 
 			/////////////////////////
 /*
@@ -2141,7 +2242,7 @@ private:
 				//operationStack.pop();
 			}
 		}
-		return tokens.get_output_list();
+		body = tokens.get_output_list();
 		//return body;
 	}
 };
@@ -2317,7 +2418,7 @@ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
 	const char* endptr;
 	header = Header<T>(sMathExpr, cbMathExpr, (char**) &endptr);
 	++endptr;
-	body = lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
+	lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
 	simplify_body(body);
 }
 
