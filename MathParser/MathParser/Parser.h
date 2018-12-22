@@ -1803,7 +1803,7 @@ private:
 	std::list<std::shared_ptr<IToken<T>>> body;
 
 	template <class T>
-	void lexBody(const char* expr, std::size_t length)
+	std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t length)
 	{
 		int prior;
 		char* begPtr = (char*)expr;
@@ -1816,39 +1816,24 @@ private:
 
 		while (cbRest > 0)
 		{
-			delta = begPtr;
-			auto tkn = parse_text_token<T>(this->header, begPtr, &begPtr);
+			auto tkn = parse_string_token(begPtr, length);
 			if (tkn == "+")
 			{
-				if (pLastToken == nullptr 
-					|| pLastToken->type() == TokenType::BinaryPlus || pLastToken->type() == TokenType::BinaryMinus
-					|| pLastToken->type() == TokenType::operatorMul || pLastToken->type() == TokenType::operatorDiv
-					|| pLastToken->type() == TokenType::operatorPow) //unary form
+				if (pLastToken == nullptr ||
+					 pLastToken->type() != TokenType::BinaryPlus || pLastToken->type() != TokenType::BinaryMinus
+					|| pLastToken->type() != TokenType::operatorMul || pLastToken->type() != TokenType::operatorDiv
+					|| pLastToken->type() != TokenType::operatorPow) //unary form
 				{
-					auto pMyTkn = std::make_shared<UnaryPlus<T>>();
-					//auto my_priority = pMyTkn->getPriority();
-					//while (tokens.get_operation_stack().size() != 0 && my_priority <= tokens.get_operation_stack().top()->getPriority())
-					//{
-					//	tokens.push_value(tokens.get_operation_stack().top());
-					//	tokens.pop_operator();
-					//	//body.push_back(operationStack.top());
-					//	//operationStack.pop();
-					//}
-					tokens.push_operation(std::move(pMyTkn));
-					//operationStack.push(std::move(pMyTkn));
-					//pLastToken = tokens.get_operation_stack().top().get(); // operationStack.top().get();
+					//auto pMyTkn = std::make_shared<UnaryPlus<T>>();
+					tokens.push_operation(std::make_shared<BinaryPlus<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
 				}else //binary form
 				{
-					auto pMyTkn = std::make_shared<BinaryPlus<T>>();
-					tokens.push_operation(std::move(pMyTkn));
-				/*	auto my_priority = pMyTkn->getPriority();
-					while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
-					{
-						body.push_back(operationStack.top());
-						operationStack.pop();
-					}
-					operationStack.push(std::move(pMyTkn));
-					pLastToken = operationStack.top().get();*/
+					//auto pMyTkn = std::make_shared<BinaryPlus<T>>();
+					tokens.push_operation(std::make_shared<UnaryPlus<T>>());
+					begPtr = (char*)tkn.end();
+					cbRest = length - (begPtr - expr);
 				}
 			}else if (tkn == "-")
 			{
@@ -1857,28 +1842,27 @@ private:
 					|| pLastToken->type() == TokenType::operatorMul || pLastToken->type() == TokenType::operatorDiv
 					|| pLastToken->type() == TokenType::operatorPow) //unary form
 				{
-					operationStack.push(std::make_shared<UnaryMinus<T>>());
-					pLastToken = operationStack.top().get();
+					tokens.push_operation(std::make_shared<UnaryMinus<T>>());
 				}else //binary form
 				{
-					auto pMyTkn = std::make_shared<BinaryMinus<T>>();
-					auto my_priority = pMyTkn->getPriority();
-					while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
-					{
-						body.push_back(operationStack.top());
-						operationStack.pop();
-					}
-					operationStack.push(std::move(pMyTkn));
-					pLastToken = operationStack.top().get();
+					tokens.push_operation(std::make_shared<BinaryMinus<T>>());
 				}
 			}else if (tkn == "*")
 			{
+				tokens.push_operation(std::make_shared<OperatorMul<T>>());
 			}else if (tkn == "/")
 			{
+				tokens.push_operation(std::make_shared<OperatorDiv<T>>());
 			}else if (tkn == "^")
 			{
+				tokens.push_operation(std::make_shared<UnaryMinus<T>>());
 			}else if (tkn == ",")
 			{
+			}
+			else if (*tkn.begin() >= '0' && *tkn.begin() <= '9')
+			{
+				tokens.push_value(std::make_shared<Number<T>>(std::strtod(tkn.begin(), &begPtr)));
+				cbRest = length - (begPtr - expr);
 			}
 
 			/////////////////////////
@@ -2157,6 +2141,7 @@ private:
 				//operationStack.pop();
 			}
 		}
+		return tokens.get_output_list();
 		//return body;
 	}
 };
@@ -2332,7 +2317,7 @@ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
 	const char* endptr;
 	header = Header<T>(sMathExpr, cbMathExpr, (char**) &endptr);
 	++endptr;
-	lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
+	body = lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
 	simplify_body(body);
 }
 
