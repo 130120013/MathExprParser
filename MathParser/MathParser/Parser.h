@@ -545,7 +545,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 };
 
@@ -564,7 +564,7 @@ public:
 		if (!this->is_ready())
 			throw std::exception("Invalid arguments of an unary plus operator.");
 
-		return (*ops[0])();
+		return -(*ops[0])();
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -592,7 +592,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 };
 

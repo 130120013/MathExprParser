@@ -19,14 +19,14 @@ int main()
 	res = simplify(mathexpr.get_body());*/
 	/*
 	FAILS:
-	1. "f(x) = -x"
-	2. "f(x) = +x"
-	3. "f(x) = 5 - -x"
-	4. "f(x) = 5 - +x"
-	5. "f(x) = 5 - x"
-	6. "f(x) = 5 + x"
-	8. "f(x) = x + -5"
-	10. "f(x) = x + +5"
+	1. "f(x) = -x" - passed
+	2. "f(x) = +x" - passed
+	3. "f(x) = 5 - -x" - passed
+	4. "f(x) = 5 - +x" - passed
+	5. "f(x) = 5 - x" - passed
+	6. "f(x) = 5 + x" - passed
+	8. "f(x) = x + -5" - passed
+	10. "f(x) = x + +5" - passed
 	*/
 	std::string expression = "f(x) = x + -5";
 	Mathexpr<double> mathexpr = {expression};
