@@ -340,66 +340,6 @@ private:
 	}
 };
 
-template <class T, std::size_t N>
-class reverse_static_parameter_storage
-{
-	struct { T params[N]; } strg;
-	T* top = strg.params + (N -1);
-public:
-	reverse_static_parameter_storage() = default;
-	reverse_static_parameter_storage(const reverse_static_parameter_storage& right)
-	{
-		*this = right;
-	}
-	reverse_static_parameter_storage(reverse_static_parameter_storage&& right)
-	{
-		*this = std::move(right);
-	}
-	reverse_static_parameter_storage& operator=(const reverse_static_parameter_storage& right)
-	{
-		strg = right.strg;
-		return *this;
-	}
-	reverse_static_parameter_storage& operator=(reverse_static_parameter_storage&& right)
-	{
-		strg = std::move(right.strg);
-		return *this;
-	}
-	const T& operator[](std::size_t index) const
-	{
-		if (index < N)
-			return strg.params[index];
-		throw std::range_error("static_parameter_storage: invalid parameter index");
-	}
-	T& operator[](std::size_t index)
-	{
-		return const_cast<T&>(const_cast<const reverse_static_parameter_storage&>(*this)[index]);
-	}
-	template <class U>
-	auto push_argument(U&& arg) -> std::enable_if_t<std::is_convertible<std::decay_t<U>, T>::value>
-	{
-		if (top - strg.params >= N)
-			throw std::range_error("static_parameter_storage: buffer overflow");
-		*(top--) = std::forward<U>(arg);
-	}
-	bool is_ready() const
-	{
-		//return top == &strg.params[0] && 
-			return this->is_ready_from<N-1>();
-	} 
-private:
-	template <std::size_t I, class = void>
-	auto is_ready_from() const -> std::enable_if_t<(I >= N), bool>
-	{
-		return true;
-	}
-	template <std::size_t I, class = void>
-	auto is_ready_from() const->std::enable_if_t<(I < N), bool>
-	{
-		return strg.params[I]->is_ready() && this->is_ready_from<I + 1>();
-	}
-};
-
 template <class T>
 class IToken
 {
@@ -742,7 +682,7 @@ public:
 		auto op1 = ops[1]->simplify();
 
 		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
-			return std::make_shared<Number<T>>((*op0)() - (*op1)());
+			return std::make_shared<Number<T>>((*op1)() - (*op0)());
 		auto op_new = std::make_shared<BinaryMinus<T>>();
 		op_new->push_argument(std::move(op0));
 		op_new->push_argument(std::move(op1));
@@ -804,7 +744,7 @@ public:
 template <class T>
 class OperatorDiv : public Operator<T>
 {
-	reverse_static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
@@ -816,7 +756,7 @@ public:
 		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a division operator.");
 
-		return (*ops[1])() / (*ops[0])();
+		return (*ops[0])() / (*ops[1])();
 	}
 	virtual bool is_ready() const
 	{
@@ -842,7 +782,7 @@ public:
 		auto op1 = ops[1]->simplify();
 
 		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
-			return std::make_shared<Number<T>>((*op0)() / (*op1)());
+			return std::make_shared<Number<T>>((*op1)() / (*op0)());
 		auto op_new = std::make_shared<OperatorDiv<T>>();
 		op_new->push_argument(std::move(op0));
 		op_new->push_argument(std::move(op1));
@@ -852,7 +792,7 @@ public:
 template <class T>
 class OperatorPow : public Operator<T>
 {
-	reverse_static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
@@ -864,7 +804,7 @@ public:
 		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a power operator.");
 
-		return std::pow((*ops[1])(), (*ops[0])());
+		return std::pow((*ops[0])(), (*ops[1])());
 	}
 	virtual bool is_ready() const
 	{
@@ -890,7 +830,7 @@ public:
 		auto op1 = ops[1]->simplify();
 
 		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
-			return std::make_shared<Number<T>>(std::pow((*op0)(), (*op1)()));
+			return std::make_shared<Number<T>>(std::pow((*op1)(), (*op0)()));
 		auto op_new = std::make_shared<OperatorPow<T>>();
 		op_new->push_argument(std::move(op0));
 		op_new->push_argument(std::move(op1));
@@ -1708,15 +1648,15 @@ class TokenStorage
 	std::list<std::shared_ptr<IToken<T>>> outputList;
 
 public:
-	template <class TokenParamType>
-	auto push_token(TokenParamType&& op) -> std::enable_if_t<
-		std::is_base_of<Bracket<T>, std::decay_t<TokenParamType>>::value
-	>
-	{
+	//template <class TokenParamType>
+	//auto push_token(TokenParamType&& op) -> std::enable_if_t<
+	//	std::is_base_of<Bracket<T>, std::decay_t<TokenParamType>>::value
+	//>
+	//{
 
-		operationStack.push(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
-		return operationStack.top().get();
-	}
+	//	operationStack.push(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
+	//	return operationStack.top().get();
+	//}
 
 	template <class TokenParamType>
 	auto push_token(TokenParamType&& op) -> std::enable_if_t<
