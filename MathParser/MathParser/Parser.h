@@ -384,7 +384,8 @@ public:
 	}
 	bool is_ready() const
 	{
-		return top == &strg.params[N] && this->is_ready_from<0>();
+		//return top == &strg.params[0] && 
+			return this->is_ready_from<N-1>();
 	} 
 private:
 	template <std::size_t I, class = void>
@@ -851,7 +852,7 @@ public:
 template <class T>
 class OperatorPow : public Operator<T>
 {
-	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+	reverse_static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
@@ -863,7 +864,7 @@ public:
 		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a power operator.");
 
-		return std::pow((*ops[0])(), (*ops[1])());
+		return std::pow((*ops[1])(), (*ops[0])());
 	}
 	virtual bool is_ready() const
 	{
