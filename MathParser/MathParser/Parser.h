@@ -1684,7 +1684,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return -1;
+		return 5;
 	}
 	virtual TokenType type()
 	{
@@ -1710,6 +1710,16 @@ class TokenStorage
 public:
 	template <class TokenParamType>
 	auto push_token(TokenParamType&& op) -> std::enable_if_t<
+		std::is_base_of<Bracket<T>, std::decay_t<TokenParamType>>::value
+	>
+	{
+
+		operationStack.push(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
+		return operationStack.top().get();
+	}
+
+	template <class TokenParamType>
+	auto push_token(TokenParamType&& op) -> std::enable_if_t<
 		std::is_base_of<Operator<T>, std::decay_t<TokenParamType>>::value ||
 		std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value,
 		IToken<T>*
@@ -1729,13 +1739,38 @@ public:
 	template <class TokenParamType>
 	auto push_token(TokenParamType&& value) -> std::enable_if_t<
 		!(std::is_base_of<Operator<T>, std::decay_t<TokenParamType>>::value ||
-		std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value),
+		std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value ||
+		std::is_base_of<Bracket<T>, std::decay_t<TokenParamType>>::value),
 		IToken<T>*
 	>
 	{
 		//not ready
 		outputList.push_back(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(value)));
 		return outputList.back().get();
+	}
+
+	IToken<T>* pop_bracket()
+	{
+		bool isOpeningBracket = false;
+		while (operationStack.size() != 0)
+		{
+			if (operationStack.top().get()->type() != TokenType::bracket)
+			{
+				this->outputList.push_back(operationStack.top());
+				operationStack.pop();
+			}
+			else
+			{
+				isOpeningBracket = true;
+				break;
+			}
+		}
+		if (!isOpeningBracket)
+			throw std::invalid_argument("There is no opening bracket!");
+		else
+			operationStack.pop();
+
+		return operationStack.top().get();
 	}
 	std::list<std::shared_ptr<IToken<T>>>&& finalize() &&
 	{
@@ -1959,13 +1994,15 @@ private:
 					last_type_id = int(tokens.push_token(UnaryPlus<T>())->type());
 				else //binary form
 					last_type_id = int(tokens.push_token(BinaryPlus<T>())->type());
-			}else if (tkn == "-")
+			}
+			else if (tkn == "-")
 			{
 				if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
 					last_type_id = int(tokens.push_token(UnaryMinus<T>())->type());
 				else //binary form
 					last_type_id = int(tokens.push_token(BinaryMinus<T>())->type());
-			}else if (tkn == "*")
+			}
+			else if (tkn == "*")
 				last_type_id = int(tokens.push_token(OperatorMul<T>())->type());
 			else if (tkn == "/")
 				last_type_id = int(tokens.push_token(OperatorDiv<T>())->type());
@@ -1973,7 +2010,29 @@ private:
 				last_type_id = int(tokens.push_token(OperatorPow<T>())->type());
 			else if (tkn == ",")
 			{
-			}else if (isdigit(*tkn.begin()))
+				/*
+				bool isOpeningBracket = false;
+						while (!isOpeningBracket || operationStack.size() != 0) //while an opening bracket is not found or an operation stack is not empty
+						{
+							if (operationStack.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('
+							{
+								if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
+									++paramCount;
+
+								body.push_back(operationStack.top());
+								operationStack.pop();
+							}
+							else
+							{
+								isOpeningBracket = true;
+							}
+						}
+						if (!isOpeningBracket) //missing '('
+							throw std::invalid_argument("There is no opening bracket!");
+						begPtr += 1;
+				*/
+			}
+			else if (isdigit(*tkn.begin()))
 			{
 				char* conversion_end;
 				static_assert(std::is_same<T, double>::value, "The following line is only applicable to double");
@@ -2014,6 +2073,60 @@ private:
 					last_type_id = int(tokens.push_token(MinFunction<T>())->type());
 				else if (this->header.get_param_index(std::string(tkn.begin(), tkn.end())) >= 0)
 					last_type_id = int(tokens.push_token(Variable<T>(this->header, std::string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()))->type());
+			}
+			else if (tkn == ")")
+			{
+				/*
+				bool isOpeningBracket = false;
+						while (operationStack.size() != 0)
+						{
+							if (operationStack.top().get()->type() != TokenType::bracket)
+							{
+								if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
+								{
+									auto min = dynamic_cast<MinFunction<T>*>(operationStack.top().get());
+									auto max = dynamic_cast<MaxFunction<T>*>(operationStack.top().get());
+									if (min == nullptr)
+									{
+										if (max == nullptr)
+											throw std::invalid_argument("ERROR!");
+										else
+											(*max).paramsCount = paramCount;
+									}
+									else
+									{
+										(*min).paramsCount = paramCount;
+									}
+									paramCount = 1;
+								}//проверить, является ли фукнция мин макс, записать туда количество аргументов в поле paramsCount
+
+								body.push_back(operationStack.top());
+								operationStack.pop();
+							}
+							else
+							{
+								isOpeningBracket = true;
+								break;
+							}
+						}
+						if (!isOpeningBracket)
+							throw std::invalid_argument("There is no opening bracket!");
+						else
+							operationStack.pop();
+						begPtr += 1;
+				*/
+				tokens.pop_bracket();
+			}
+			else if (tkn == "(")
+			{
+				/*
+				if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
+							paramCount = 1;
+
+						operationStack.push(std::make_shared<Bracket<T>>());
+						begPtr += 1;
+				*/
+				last_type_id = int(tokens.push_token(Bracket<T>())->type());
 			}
 			else
 				throw std::exception("Unexpected token");
