@@ -340,6 +340,65 @@ private:
 	}
 };
 
+template <class T, std::size_t N>
+class reverse_static_parameter_storage
+{
+	struct { T params[N]; } strg;
+	T* top = strg.params + (N -1);
+public:
+	reverse_static_parameter_storage() = default;
+	reverse_static_parameter_storage(const reverse_static_parameter_storage& right)
+	{
+		*this = right;
+	}
+	reverse_static_parameter_storage(reverse_static_parameter_storage&& right)
+	{
+		*this = std::move(right);
+	}
+	reverse_static_parameter_storage& operator=(const reverse_static_parameter_storage& right)
+	{
+		strg = right.strg;
+		return *this;
+	}
+	reverse_static_parameter_storage& operator=(reverse_static_parameter_storage&& right)
+	{
+		strg = std::move(right.strg);
+		return *this;
+	}
+	const T& operator[](std::size_t index) const
+	{
+		if (index < N)
+			return strg.params[index];
+		throw std::range_error("static_parameter_storage: invalid parameter index");
+	}
+	T& operator[](std::size_t index)
+	{
+		return const_cast<T&>(const_cast<const reverse_static_parameter_storage&>(*this)[index]);
+	}
+	template <class U>
+	auto push_argument(U&& arg) -> std::enable_if_t<std::is_convertible<std::decay_t<U>, T>::value>
+	{
+		if (top - strg.params >= N)
+			throw std::range_error("static_parameter_storage: buffer overflow");
+		*(top--) = std::forward<U>(arg);
+	}
+	bool is_ready() const
+	{
+		return top == &strg.params[N] && this->is_ready_from<0>();
+	} 
+private:
+	template <std::size_t I, class = void>
+	auto is_ready_from() const -> std::enable_if_t<(I >= N), bool>
+	{
+		return true;
+	}
+	template <std::size_t I, class = void>
+	auto is_ready_from() const->std::enable_if_t<(I < N), bool>
+	{
+		return strg.params[I]->is_ready() && this->is_ready_from<I + 1>();
+	}
+};
+
 template <class T>
 class IToken
 {
@@ -642,7 +701,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 3;
+		return 2;
 	}
 };
 template <class T>
@@ -690,7 +749,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 3;
+		return 2;
 	}
 };
 template <class T>
@@ -716,7 +775,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 1;
+		return 3;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -744,7 +803,7 @@ public:
 template <class T>
 class OperatorDiv : public Operator<T>
 {
-	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+	reverse_static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
 
 public:
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
@@ -764,7 +823,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 1;
+		return 3;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -812,7 +871,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 3;
 	}
 	virtual std::size_t get_params_count() const
 	{
