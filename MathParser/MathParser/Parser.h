@@ -716,7 +716,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 3;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -764,7 +764,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 3;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -812,7 +812,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 3;
+		return 5;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -917,7 +917,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -965,7 +965,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
@@ -1001,7 +1001,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1052,7 +1052,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1100,7 +1100,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1148,7 +1148,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1199,7 +1199,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1250,7 +1250,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1298,7 +1298,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1346,7 +1346,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1397,7 +1397,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1445,7 +1445,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1507,7 +1507,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1571,7 +1571,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	virtual std::size_t get_params_count() const
 	{
@@ -1624,7 +1624,7 @@ public:
 	}
 	virtual short getPriority()
 	{
-		return 5;
+		return -1;
 	}
 	virtual TokenType type()
 	{
@@ -1667,7 +1667,7 @@ public:
 	{
 		//not ready
 		auto my_priority = op.getPriority();
-		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority())
+		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority() && op.type() != TokenType::bracket)
 		{
 			outputList.push_back(operationStack.top());
 			operationStack.pop();
@@ -1689,7 +1689,7 @@ public:
 		return outputList.back().get();
 	}
 
-	IToken<T>* pop_bracket()
+	void pop_bracket()
 	{
 		bool isOpeningBracket = false;
 		while (operationStack.size() != 0)
@@ -1710,7 +1710,7 @@ public:
 		else
 			operationStack.pop();
 
-		return operationStack.top().get();
+		//return Bracket<T>(); //: operationStack.top().get();
 	}
 	std::list<std::shared_ptr<IToken<T>>>&& finalize() &&
 	{
