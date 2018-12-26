@@ -28,7 +28,7 @@ int main()
 	8. "f(x) = x + -5" - passed
 	10. "f(x) = x + +5" - passed
 	*/
-	std::string expression = "f(x) = 8 ^ 2 * (4 + 5) + sin(1)";
+	std::string expression = "f(x) = sin(3.14/6) + min(10, 2, 51, 4)";
 	Mathexpr<double> mathexpr = {expression};
 	std::vector<double> v;
 	v.push_back(1);

@@ -350,7 +350,7 @@ public:
 	*/
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value) = 0;
 	virtual std::shared_ptr<IToken<T>> simplify() const = 0;
-	virtual std::size_t get_params_count() const = 0;
+	virtual std::size_t get_required_parameter_count() const = 0;
 	virtual bool is_ready() const = 0; //all parameters are specified
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 	virtual TokenType type() = 0;
@@ -400,7 +400,7 @@ public:
 		throw std::invalid_argument("Unexpected call");
 #endif //__CUDACC__
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 0;
 	}
@@ -461,7 +461,7 @@ public:
 		throw std::invalid_argument("Unexpected call");
 #endif //__CUDACC__
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 0;
 	}
@@ -535,7 +535,7 @@ public:
 	{
 		return ops.is_ready();
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -582,7 +582,7 @@ public:
 	{
 		return ops.is_ready();
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -632,7 +632,7 @@ public:
 	{
 		return ops.is_ready();
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 2;
 	}
@@ -666,7 +666,7 @@ public:
 	{
 		return ops.is_ready();
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 2;
 	}
@@ -718,7 +718,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 2;
 	}
@@ -766,7 +766,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 2;
 	}
@@ -814,7 +814,7 @@ public:
 	{
 		return 5;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 2;
 	}
@@ -856,7 +856,7 @@ public:
 	{
 		m_parameters.push_back(value);
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return m_parameters.size();
 	}
@@ -903,7 +903,7 @@ public:
 	{
 		return ops.is_ready();
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -951,7 +951,7 @@ public:
 	{
 		return op->is_ready();
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1003,7 +1003,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1054,7 +1054,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1102,7 +1102,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1150,7 +1150,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1201,7 +1201,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1252,7 +1252,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1300,7 +1300,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1348,7 +1348,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1399,7 +1399,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1447,7 +1447,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return 1;
 	}
@@ -1509,7 +1509,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
 		return paramsCount;
 	}
@@ -1541,10 +1541,14 @@ template <class T>
 class MinFunction : public Function<T>
 {
 	std::vector<std::shared_ptr<IToken<T>>> ops;
-	short paramsCount = 0;
+	short nRequiredParamsCount = 0;
 public:
 	MinFunction() = default;
-	MinFunction(short paramsNumber) : paramsCount(paramsNumber) {}
+	MinFunction(short paramsNumber) : nRequiredParamsCount(paramsNumber)
+	{
+		if (nRequiredParamsCount == 0)
+			throw std::invalid_argument("At least one parameter must be specified for the min function.");
+	}
 
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
@@ -1552,16 +1556,15 @@ public:
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		for (auto op = ops.begin(); op != ops.end(); ++op)
-		{
-			if (!op->get()->is_ready())
-				throw std::exception("Insufficient number are given for the plus operator.");
-		}
+		if (!this->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
 		return (*std::min_element(ops.begin(), ops.end())).get()->operator()();
 	}
 	virtual bool is_ready() const
 	{
+		if (ops.size() != nRequiredParamsCount)
+			return false;
 		for (auto op = ops.begin(); op != ops.end(); ++op)
 		{
 			if (!op->get()->is_ready())
@@ -1573,9 +1576,9 @@ public:
 	{
 		return 4;
 	}
-	virtual std::size_t get_params_count() const
+	virtual std::size_t get_required_parameter_count() const
 	{
-		return paramsCount;
+		return nRequiredParamsCount;
 	}
 	virtual const char* get_function_name() const
 	{
@@ -1592,8 +1595,9 @@ public:
 		std::vector<std::shared_ptr<IToken<T>>> newargs;
 		newargs.reserve(ops.size());
 		std::vector<std::shared_ptr<IToken<T>>> newargsVar;
+		newargsVar.reserve(ops.size());
 		
-		for (auto op = ops.begin(); op != ops.end(); ++op)
+		for (const auto& op:ops)
 		{
 			auto newarg = op->simplify();
 			if (newarg->type() == TokenType::number)
@@ -1604,14 +1608,18 @@ public:
 				//return std::make_shared<Number<T>>(_y1((*newarg)()));
 
 		}
-		if (newargsVar.size() == 0)
-			return std::make_shared<MaxFunction<T>>(std::max(newargs.begin(), newargs.end()));
-		auto pNewTkn = std::make_shared<MaxFunction<T>>();
-		for(auto op = newargsVar.begin(); op != newargsVar.end(); ++op)
-			pNewTkn->push_argument(*(op->get()));
-
-			pNewTkn->push_argument(std::max(newargs.begin(), newargs.end()));
-			return pNewTkn;
+		auto cmp_token_ptr = [](const std::shared_ptr<IToken<T>>& left, const std::shared_ptr<IToken<T>>& right) -> bool
+		{
+			return (*left)() < (*right)();
+		};
+		if (newargsVar.empty())
+			return *std::min_element(newargs.begin(), newargs.end(), cmp_token_ptr);
+		auto pNewTkn = std::make_shared<MinFunction<T>>();
+		for(const auto& op:newargsVar)
+			pNewTkn->push_argument(op);
+		if (!newargs.empty())
+			pNewTkn->push_argument(*std::min_element(newargs.begin(), newargs.end(), cmp_token_ptr));
+		return pNewTkn;
 	}
 };
 
@@ -1648,7 +1656,7 @@ public:
 		//return std::make_shared<Bracket<T>>(nullptr);
 		throw std::exception("Unexpected call");
 	}
-	std::size_t get_params_count() const
+	std::size_t get_required_parameter_count() const
 	{
 		return 0;
 	}
@@ -1870,7 +1878,7 @@ public:
 	{
 		return this->get_argument(m_parameters[index].c_str(), m_parameters[index].size());
 	}
-	std::size_t get_params_count() const
+	std::size_t get_required_parameter_count() const
 	{
 		return m_parameters.size();
 	}
@@ -1917,9 +1925,9 @@ public:
 	}
 	void init_variables(const std::vector<T>& parameters)
 	{
-		if (parameters.size() < header.get_params_count())
-			throw std::invalid_argument("Count of arguments < " + header.get_params_count());
-		for (std::size_t iArg = 0; iArg < header.get_params_count(); ++iArg)
+		if (parameters.size() < header.get_required_parameter_count())
+			throw std::invalid_argument("Count of arguments < " + header.get_required_parameter_count());
+		for (std::size_t iArg = 0; iArg < header.get_required_parameter_count(); ++iArg)
 			header.get_argument_by_index(iArg) = parameters[iArg];
 	}
 	//void clear_variables(); With the map referencing approach this method is not necessary anymore because if we need to reuse the expression
@@ -2487,7 +2495,7 @@ typename std::list<std::shared_ptr<IToken<K>>>::iterator simplify(std::list<std:
 	try
 	{
 		bool isComputable = false;
-		auto paramsCount = elem->get()->get_params_count();
+		auto paramsCount = elem->get()->get_required_parameter_count();
 		auto param_it = elem;
 		for (auto i = paramsCount; i > 0; --i)
 		{
