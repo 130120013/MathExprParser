@@ -1477,7 +1477,7 @@ template <class T>
 class MaxFunction : public Function<T>
 {
 	std::vector<std::shared_ptr<IToken<T>>> ops;
-	short paramsCount;
+	short paramsCount = 0;
 public:
 	MaxFunction() = default;
 	MaxFunction(short paramsNumber) : paramsCount(paramsNumber) {}
@@ -1541,7 +1541,7 @@ template <class T>
 class MinFunction : public Function<T>
 {
 	std::vector<std::shared_ptr<IToken<T>>> ops;
-	short paramsCount;
+	short paramsCount = 0;
 public:
 	MinFunction() = default;
 	MinFunction(short paramsNumber) : paramsCount(paramsNumber) {}
@@ -1587,18 +1587,31 @@ public:
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
-		//if (!is_ready())
-		//	throw std::exception("Not ready to simplify an operator");
-		//for (auto op = ops.begin(); op != ops.end(); ++op)
-		//{
-		//	auto newarg = op->simplify();
-		//	if (newarg->type() == TokenType::number)
-		//		return std::make_shared<Number<T>>(_y1((*newarg)()));
-		//	auto pNewTkn = std::make_shared<MaxFunction<T>>();
-		//	pNewTkn->ops = std::move(newarg);
-		//	return pNewTkn;
-		//}
-		return 0;
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		std::vector<std::shared_ptr<IToken<T>>> newargs;
+		newargs.reserve(ops.size());
+		std::vector<std::shared_ptr<IToken<T>>> newargsVar;
+		
+		for (auto op = ops.begin(); op != ops.end(); ++op)
+		{
+			auto newarg = op->simplify();
+			if (newarg->type() == TokenType::number)
+				newargs.push_back(newarg);
+			else
+				newargsVar.push_back(newarg);
+
+				//return std::make_shared<Number<T>>(_y1((*newarg)()));
+
+		}
+		if (newargsVar.size() == 0)
+			return std::make_shared<MaxFunction<T>>(std::max(newargs.begin(), newargs.end()));
+		auto pNewTkn = std::make_shared<MaxFunction<T>>();
+		for(auto op = newargsVar.begin(); op != newargsVar.end(); ++op)
+			pNewTkn->push_argument(*(op->get()));
+
+			pNewTkn->push_argument(std::max(newargs.begin(), newargs.end()));
+			return pNewTkn;
 	}
 };
 
