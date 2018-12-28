@@ -355,6 +355,7 @@ public:
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 	virtual TokenType type() = 0;
 	virtual short getPriority() = 0;
+	virtual void set_required_parameter_count(short value) = 0;
 };
 
 template <class T>
@@ -411,6 +412,10 @@ public:
 	virtual short getPriority()
 	{
 		return -2;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 protected:
 private:
@@ -490,6 +495,10 @@ public:
 	{
 		return -2;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 
 template <class T>
@@ -504,6 +513,7 @@ class Operator : public IToken<T>
 	{
 		return TokenType::Operator;
 	}*/
+	virtual void set_required_parameter_count(short value) = 0;
 };
 
 template <class T>
@@ -546,6 +556,10 @@ public:
 	virtual short getPriority()
 	{
 		return 4;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 
@@ -593,6 +607,10 @@ public:
 	virtual short getPriority()
 	{
 		return 4;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 
@@ -644,6 +662,10 @@ public:
 	{
 		return 2;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class BinaryMinus : public Operator<T>
@@ -691,6 +713,10 @@ public:
 	virtual short getPriority()
 	{
 		return 2;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 template <class T>
@@ -740,6 +766,10 @@ public:
 		op_new->push_argument(std::move(op1));
 		return op_new;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class OperatorDiv : public Operator<T>
@@ -787,6 +817,10 @@ public:
 		op_new->push_argument(std::move(op0));
 		op_new->push_argument(std::move(op1));
 		return op_new;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 template <class T>
@@ -836,6 +870,10 @@ public:
 		op_new->push_argument(std::move(op1));
 		return op_new;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 
 template <class T>
@@ -881,6 +919,8 @@ protected:
 	{
 		return m_parameters;
 	}*/
+public:
+	virtual void set_required_parameter_count(short value) = 0;
 };
 
 template <class T>
@@ -930,6 +970,10 @@ public:
 		pNewTkn->push_argument(std::move(newarg));
 		return pNewTkn;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class CosFunction : public Function<T>
@@ -978,6 +1022,10 @@ public:
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class TgFunction : public Function<T>
@@ -1025,6 +1073,10 @@ public:
 		auto pNewTkn = std::make_shared<TgFunction<T>>();
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 
@@ -1077,6 +1129,10 @@ public:
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class LnFunction : public Function<T>
@@ -1124,6 +1180,10 @@ public:
 		auto pNewTkn = std::make_shared<LnFunction<T>>();
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 template <class T>
@@ -1176,6 +1236,10 @@ public:
 		op_new->push_argument(std::move(op1));
 		return op_new;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class JnFunction : public Function<T>
@@ -1227,6 +1291,10 @@ public:
 		op_new->push_argument(std::move(op1));
 		return op_new;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class J0Function : public Function<T>
@@ -1275,6 +1343,10 @@ public:
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class J1Function : public Function<T>
@@ -1322,6 +1394,10 @@ public:
 		auto pNewTkn = std::make_shared<J1Function<T>>();
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 template <class T>
@@ -1374,6 +1450,10 @@ public:
 		op_new->push_argument(std::move(op1));
 		return op_new;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 template <class T>
 class Y0Function : public Function<T>
@@ -1421,6 +1501,10 @@ public:
 		auto pNewTkn = std::make_shared<Y0Function<T>>();
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 template <class T>
@@ -1470,6 +1554,10 @@ public:
 		pNewTkn->op = std::move(newarg);
 		return pNewTkn;
 	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
+	}
 };
 
 //////////// not ready
@@ -1477,10 +1565,10 @@ template <class T>
 class MaxFunction : public Function<T>
 {
 	std::vector<std::shared_ptr<IToken<T>>> ops;
-	short paramsCount = 0;
+	short nRequiredParamsCount = 0;
 public:
 	MaxFunction() = default;
-	MaxFunction(short paramsNumber) : paramsCount(paramsNumber) {}
+	MaxFunction(short paramsNumber) : nRequiredParamsCount(paramsNumber) {}
 
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
@@ -1488,16 +1576,15 @@ public:
 	}
 	virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
-		for (auto op = ops.begin(); op != ops.end(); ++op)
-		{
-			if (!op->get()->is_ready())
-				throw std::exception("Insufficient number are given for the plus operator.");
-		}
+		if (!this->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
 
 		return (*std::max_element(ops.begin(), ops.end())).get()->operator()();
 	}
 	virtual bool is_ready() const
 	{
+		if (ops.size() != nRequiredParamsCount)
+			return false;
 		for (auto op = ops.begin(); op != ops.end(); ++op)
 		{
 			if (!op->get()->is_ready())
@@ -1511,7 +1598,7 @@ public:
 	}
 	virtual std::size_t get_required_parameter_count() const
 	{
-		return paramsCount;
+		return nRequiredParamsCount;
 	}
 	virtual const char* get_function_name() const
 	{
@@ -1523,18 +1610,40 @@ public:
 	}
 	virtual std::shared_ptr<IToken<T>> simplify() const
 	{
-		//if (!is_ready())
-		//	throw std::exception("Not ready to simplify an operator");
-		//for (auto op = ops.begin(); op != ops.end(); ++op)
-		//{
-		//	auto newarg = op->simplify();
-		//	if (newarg->type() == TokenType::number)
-		//		return std::make_shared<Number<T>>(_y1((*newarg)()));
-		//	auto pNewTkn = std::make_shared<MaxFunction<T>>();
-		//	pNewTkn->ops = std::move(newarg);
-		//	return pNewTkn;
-		//}
-		return 0;
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		std::vector<std::shared_ptr<IToken<T>>> newargs;
+		newargs.reserve(ops.size());
+		std::vector<std::shared_ptr<IToken<T>>> newargsVar;
+		newargsVar.reserve(ops.size());
+
+		for (const auto& op : ops)
+		{
+			auto newarg = op->simplify();
+			if (newarg->type() == TokenType::number)
+				newargs.push_back(newarg);
+			else
+				newargsVar.push_back(newarg);
+
+			//return std::make_shared<Number<T>>(_y1((*newarg)()));
+
+		}
+		auto cmp_token_ptr = [](const std::shared_ptr<IToken<T>>& left, const std::shared_ptr<IToken<T>>& right) -> bool
+		{
+			return (*left)() < (*right)();
+		};
+		if (newargsVar.empty())
+			return *std::max_element(newargs.begin(), newargs.end(), cmp_token_ptr);
+		auto pNewTkn = std::make_shared<MaxFunction<T>>();
+		for (const auto& op : newargsVar)
+			pNewTkn->push_argument(op);
+		if (!newargs.empty())
+			pNewTkn->push_argument(*std::max_element(newargs.begin(), newargs.end(), cmp_token_ptr));
+		return pNewTkn;
+	}
+	void set_required_parameter_count(short value)
+	{
+		nRequiredParamsCount = value;
 	}
 };
 template <class T>
@@ -1579,6 +1688,10 @@ public:
 	virtual std::size_t get_required_parameter_count() const
 	{
 		return nRequiredParamsCount;
+	}
+	void set_required_parameter_count(short value)
+	{
+		nRequiredParamsCount = value;
 	}
 	virtual const char* get_function_name() const
 	{
@@ -1659,6 +1772,10 @@ public:
 	std::size_t get_required_parameter_count() const
 	{
 		return 0;
+	}
+	void set_required_parameter_count(short value)
+	{
+		throw std::exception("Invalid operation");
 	}
 };
 
@@ -1746,6 +1863,30 @@ public:
 			}
 		}
 		return std::move(outputList);
+	}
+	std::shared_ptr<IToken<T>>& get_top_operation()
+	{
+		return operationStack.top();
+	}
+	void comma()
+	{
+		bool isOpeningBracket = false;
+
+		while (!isOpeningBracket && operationStack.size() != 0) //while an opening bracket is not found or an operation stack is not empty
+		{
+			if (operationStack.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('
+			{
+				outputList.push_back(operationStack.top());
+				operationStack.pop();
+			}
+			else
+			{
+				isOpeningBracket = true;
+			}
+		}
+
+		if (!isOpeningBracket) //missing '('
+			throw std::invalid_argument("There is no opening bracket!");
 	}
 	/*std::stack<std::shared_ptr<IToken<T>>>& get_operation_stack()
 	{
@@ -1944,6 +2085,7 @@ private:
 		//short paramCount = 1;
 		TokenStorage<T> tokens;
 		IToken<T> *pLastToken = nullptr;
+		std::stack <std::pair<std::shared_ptr<Function<T>>, short>> funcStack;
 		int last_type_id = -1;
 
 		while (cbRest > 0)
@@ -1971,27 +2113,30 @@ private:
 				last_type_id = int(tokens.push_token(OperatorPow<T>())->type());
 			else if (tkn == ",")
 			{
-				/*
-				bool isOpeningBracket = false;
-						while (!isOpeningBracket || operationStack.size() != 0) //while an opening bracket is not found or an operation stack is not empty
-						{
-							if (operationStack.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('
-							{
-								if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
-									++paramCount;
+				//bool isOpeningBracket = false;
 
-								body.push_back(operationStack.top());
-								operationStack.pop();
-							}
-							else
-							{
-								isOpeningBracket = true;
-							}
-						}
-						if (!isOpeningBracket) //missing '('
-							throw std::invalid_argument("There is no opening bracket!");
-						begPtr += 1;
-				*/
+				//while (!isOpeningBracket || tokens.operationStack.size() != 0) //while an opening bracket is not found or an operation stack is not empty
+				//{
+				//	if (tokens.operationStack.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('
+				//	{
+				//		tokens.outputList.push_back(tokens.operationStack.top());
+				//		tokens.operationStack.pop();
+				//	}
+				//	else
+				//	{
+				//		isOpeningBracket = true;
+				//	}
+				//}
+
+				//if (!isOpeningBracket) //missing '('
+				//	throw std::invalid_argument("There is no opening bracket!");
+				//		//begPtr += 1;
+
+				tokens.comma();
+
+				if (funcStack.top().first.get()->type() == TokenType::maxFunction ||
+					funcStack.top().first.get()->type() == TokenType::minFunction)
+					funcStack.top().second += 1;
 			}
 			else if (isdigit(*tkn.begin()))
 			{
@@ -2005,88 +2150,92 @@ private:
 			else if (isalpha(*tkn.begin()))
 			{
 				if (tkn == "sin")
+				{
 					last_type_id = int(tokens.push_token(SinFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<SinFunction<T>>(), 1));
+				}
 				else if (tkn == "cos")
+				{
 					last_type_id = int(tokens.push_token(CosFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<CosFunction<T>>(), 1));
+				}
 				else if (tkn == "tg")
+				{
 					last_type_id = int(tokens.push_token(TgFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<TgFunction<T>>(), 1));
+				}
 				else if (tkn == "log10")
+				{
 					last_type_id = int(tokens.push_token(Log10Function<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<Log10Function<T>>(), 1));
+				}
 				else if (tkn == "ln")
+				{
 					last_type_id = int(tokens.push_token(LnFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<LnFunction<T>>(), 1));
+				}
 				else if (tkn == "log")
+				{
 					last_type_id = int(tokens.push_token(LogFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<LogFunction<T>>(), 2));
+				}
 				else if (tkn == "j0")
+				{
 					last_type_id = int(tokens.push_token(J0Function<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<J0Function<T>>(), 1));
+				}
 				else if (tkn == "j1")
+				{
 					last_type_id = int(tokens.push_token(J1Function<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<J1Function<T>>(), 1));
+				}
 				else if (tkn == "jn")
+				{
 					last_type_id = int(tokens.push_token(JnFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<JnFunction<T>>(), 2));
+				}
 				else if (tkn == "y0")
+				{
 					last_type_id = int(tokens.push_token(Y0Function<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<Y0Function<T>>(), 1));
+				}
 				else if (tkn == "y1")
+				{
 					last_type_id = int(tokens.push_token(Y1Function<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<Y1Function<T>>(), 1));
+				}
 				else if (tkn == "yn")
+				{
 					last_type_id = int(tokens.push_token(YnFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<YnFunction<T>>(), 2));
+				}
 				else if (tkn == "max")
+				{
 					last_type_id = int(tokens.push_token(MaxFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<MaxFunction<T>>(), 0));
+				}
 				else if (tkn == "min")
+				{
 					last_type_id = int(tokens.push_token(MinFunction<T>())->type());
+					funcStack.push(std::make_pair(std::make_shared<MinFunction<T>>(), 0));
+				}
 				else if (this->header.get_param_index(std::string(tkn.begin(), tkn.end())) >= 0)
 					last_type_id = int(tokens.push_token(Variable<T>(this->header, std::string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()))->type());
 			}
 			else if (tkn == ")")
 			{
-				/*
-				bool isOpeningBracket = false;
-						while (operationStack.size() != 0)
-						{
-							if (operationStack.top().get()->type() != TokenType::bracket)
-							{
-								if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
-								{
-									auto min = dynamic_cast<MinFunction<T>*>(operationStack.top().get());
-									auto max = dynamic_cast<MaxFunction<T>*>(operationStack.top().get());
-									if (min == nullptr)
-									{
-										if (max == nullptr)
-											throw std::invalid_argument("ERROR!");
-										else
-											(*max).paramsCount = paramCount;
-									}
-									else
-									{
-										(*min).paramsCount = paramCount;
-									}
-									paramCount = 1;
-								}//проверить, является ли фукнция мин макс, записать туда количество аргументов в поле paramsCount
-
-								body.push_back(operationStack.top());
-								operationStack.pop();
-							}
-							else
-							{
-								isOpeningBracket = true;
-								break;
-							}
-						}
-						if (!isOpeningBracket)
-							throw std::invalid_argument("There is no opening bracket!");
-						else
-							operationStack.pop();
-						begPtr += 1;
-				*/
 				tokens.pop_bracket();
+				if (funcStack.top().first.get()->type() == TokenType::maxFunction ||
+					funcStack.top().first.get()->type() == TokenType::minFunction)
+				{
+					//funcStack.top().first.get()->set_required_parameter_count(funcStack.top().second + 1);
+					tokens.get_top_operation().get()->set_required_parameter_count(funcStack.top().second + 1);
+				}
+
+				funcStack.pop();
 			}
 			else if (tkn == "(")
 			{
-				/*
-				if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
-							paramCount = 1;
-
-						operationStack.push(std::make_shared<Bracket<T>>());
-						begPtr += 1;
-				*/
 				last_type_id = int(tokens.push_token(Bracket<T>())->type());
 			}
 			else
