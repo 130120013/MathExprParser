@@ -11,21 +11,218 @@
 #ifndef PARSER_H
 #define PARSER_H
 
+constexpr bool iswhitespace(char ch) noexcept
+{
+	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\0'; //see also std::isspace
+}
+
+constexpr bool isdigit(char ch) noexcept
+{
+	return ch >= '0' && ch <= '9';
+};
+
+constexpr bool isalpha(char ch) noexcept
+{
+	return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
+};
+
+constexpr bool isalnum(char ch) noexcept
+{
+	return isdigit(ch) || isalpha(ch);
+}
+
+template <class Iterator>
+Iterator skipSpaces(Iterator pBegin, Iterator pEnd) noexcept
+{
+	auto pCurrent = pBegin;
+	while (iswhitespace(*pCurrent) && ++pCurrent < pEnd);
+	return pCurrent;
+}
+
+const char* skipSpaces(const char* input_string, std::size_t length) noexcept
+{
+	return skipSpaces(input_string, input_string + length);
+}
+
+const char* skipSpaces(const char* input_string) noexcept
+{
+	auto pCurrent = input_string;
+	while (iswhitespace(*pCurrent) && *pCurrent++ != 0);
+	return pCurrent;
+}
+
+inline char* skipSpaces(char* input_string, std::size_t length) noexcept
+{
+	return const_cast<char*>(skipSpaces(const_cast<const char*>(input_string), length));
+}
+
+inline char* skipSpaces(char* input_string) noexcept
+{
+	return const_cast<char*>(skipSpaces(const_cast<const char*>(input_string)));
+}
+
+struct token_string_entity
+{
+	token_string_entity() = default;
+	token_string_entity(const char* start_ptr, const char* end_ptr) :m_pStart(start_ptr), m_pEnd(end_ptr) {}
+
+	//return a negative if the token < pString, 0 - if token == pString, a positive if token > pString
+	int compare(const char* pString, std::size_t cbString) const noexcept
+	{
+		auto my_size = this->size();
+		auto min_length = my_size < cbString ? my_size : cbString;
+		for (std::size_t i = 0; i < min_length; ++i)
+		{
+			if (m_pStart[i] < pString[i])
+				return -1;
+			if (m_pStart[i] > pString[i])
+				return -1;
+		}
+		return my_size < cbString ? -1 : (my_size > cbString ? 1 : 0);
+	}
+	inline int compare(const token_string_entity& right) const noexcept
+	{
+		return this->compare(right.begin(), right.size());
+	}
+	inline int compare(const char* pszString) const noexcept
+	{
+		return this->compare(pszString, std::strlen(pszString));
+	}
+	template <std::size_t N>
+	inline auto compare(const char(&strArray)[N]) const noexcept -> std::enable_if_t<N == 0, int>
+	{
+		return this->size() == 0;
+	}
+	template <std::size_t N>
+	inline auto compare(const char(&strArray)[N]) const noexcept->std::enable_if_t<(N > 0), int>
+	{
+		return strArray[N - 1] == '\0' ?
+			compare(strArray, N - 1) ://null terminated string, like "sin"
+			compare(strArray, N); //generic array, like const char Array[] = {'s', 'i', 'n'}
+	}
+	inline const char* begin() const noexcept
+	{
+		return m_pStart;
+	}
+	inline const char* end() const noexcept
+	{
+		return m_pEnd;
+	}
+	inline std::size_t size() const noexcept
+	{
+		return std::size_t(this->end() - this->begin());
+	}
+private:
+	const char* m_pStart = nullptr, *m_pEnd = nullptr;
+};
+
+bool operator==(const token_string_entity& left, const token_string_entity& right) noexcept
+{
+	return left.compare(right) == 0;
+}
+
+bool operator==(const token_string_entity& left, const char* pszRight) noexcept
+{
+	return left.compare(pszRight) == 0;
+}
+
+template <std::size_t N>
+bool operator==(const token_string_entity& left, const char(&strArray)[N]) noexcept
+{
+	return left.compare(strArray) == 0;
+}
+
+bool operator!=(const token_string_entity& left, const token_string_entity& right) noexcept
+{
+	return left.compare(right) != 0;
+}
+
+bool operator!=(const token_string_entity& left, const char* pszRight) noexcept
+{
+	return left.compare(pszRight) != 0;
+}
+
+template <std::size_t N>
+bool operator!=(const token_string_entity& left, const char(&strArray)[N]) noexcept
+{
+	return left.compare(strArray) != 0;
+}
+
+
+bool operator==(const char* pszLeft, const token_string_entity& right) noexcept
+{
+	return right == pszLeft;
+}
+
+template <std::size_t N>
+bool operator==(const char(&strArray)[N], const token_string_entity& right) noexcept
+{
+	return right == strArray;
+}
+
+bool operator!=(const char* pszRight, const token_string_entity& right) noexcept
+{
+	return right != pszRight;
+}
+
+template <std::size_t N>
+bool operator!=(const char(&strArray)[N], const token_string_entity& right) noexcept
+{
+	return right != strArray;
+}
+
+//let's define token as a word.
+//One operator: = + - * / ^ ( ) ,
+//Or: something that only consists of digits and one comma
+//Or: something that starts with a letter and proceeds with letters or digits
+
+token_string_entity parse_string_token(const char* pExpression, std::size_t cbExpression)
+{
+	auto pStart = skipSpaces(pExpression, cbExpression);
+	if (pStart == pExpression + cbExpression)
+		return token_string_entity();
+	if (isdigit(*pStart) || *pStart == '.')
+	{
+		bool fFlPointFound = *pStart == '.';
+		const char* pEnd = pStart;
+		while (isdigit(*++pEnd) || (!fFlPointFound && *pEnd == '.')) continue;
+		return token_string_entity(pStart, pEnd);
+	}
+	if (isalpha(*pStart))
+	{
+		const char* pEnd = pStart;
+		while (isalnum(*++pEnd)) continue;
+		return token_string_entity(pStart, pEnd);
+	}
+	return token_string_entity(pStart, pStart + 1);
+}
+
 enum class TokenType
 {
-	operatorPlus,
-	operatorMinus,
+	UnaryPlus,
+	UnaryMinus,
+	BinaryPlus,
+	BinaryMinus,
 	operatorMul,
 	operatorDiv,
 	operatorPow,
 	sinFunction,
 	cosFunction,
 	tgFunction,
-	function,
+	log10Function,
+	lnFunction,
+	logFunction,
+	j0Function,
+	j1Function,
+	jnFunction,
+	y0Function,
+	y1Function,
+	ynFunction,
+	minFunction,
+	maxFunction,
 	bracket,
-	Operator,
 	number,
-	variable,
+	variable
 };
 
 enum class CudaParserErrorCodes
@@ -138,17 +335,81 @@ private:
 	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
 };
 
+__device__ constexpr bool IsOperatorTokenTypeId(TokenType id)
+{
+	return id == TokenType::BinaryPlus || id == TokenType::BinaryMinus
+		|| id == TokenType::operatorMul || id == TokenType::operatorDiv
+		|| id == TokenType::operatorPow;
+}
+
+template <class T, std::size_t N>
+class static_parameter_storage
+{
+	struct { T params[N]; } strg;
+	T* top = strg.params;
+public:
+	__device__ static_parameter_storage() = default;
+	__device__ static_parameter_storage(const static_parameter_storage& right)
+	{
+		*this = right;
+	}
+	__device__ static_parameter_storage(static_parameter_storage&& right)
+	{
+		*this = std::move(right);
+	}
+	__device__ static_parameter_storage& operator=(const static_parameter_storage& right)
+	{
+		strg = right.strg;
+		return *this;
+	}
+	__device__ static_parameter_storage& operator=(static_parameter_storage&& right)
+	{
+		strg = std::move(right.strg);
+		return *this;
+	}
+	__device__ const return_wrapper_t<T>& operator[](std::size_t index) const
+	{
+		if (index < N)
+			return return_wrapper_t<T>(strg.params[index]);
+		return return_wrapper_t<void>(CudaParserErrorCodes::InvalidArgument);
+	}
+	__device__ T& operator[](std::size_t index)
+	{
+		return const_cast<T&>(const_cast<const static_parameter_storage&>(*this)[index]);
+	}
+	template <class U>
+	__device__ return_wrapper_t<void> push_argument(U&& arg) -> std::enable_if_t<std::is_convertible<std::decay_t<U>, T>::value>
+	{
+		if (top - strg.params >= N)
+			return return_wrapper_t<void>(CudaParserErrorCodes::InvalidArgument);
+		*(top++) = std::forward<U>(arg);
+		return return_wrapper_t<void>();
+	}
+	__device__ bool is_ready() const
+	{
+		return top == &strg.params[N] && this->is_ready_from<0>();
+	}
+private:
+	template <std::size_t I, class = void>
+	__device__ auto is_ready_from() const -> std::enable_if_t<(I >= N), bool>
+	{
+		return true;
+	}
+	template <std::size_t I, class = void>
+	__device__ auto is_ready_from() const->std::enable_if_t<(I < N), bool>
+	{
+		return strg.params[I]->is_ready() && this->is_ready_from<I + 1>();
+	}
+};
+
 template <class T>
 class IToken
 {
 public:
-	__device__ virtual return_wrapper_t<T> operator()() const = 0; //All derived classes must implement the same method with the same return type
-	/*Push a required (as defined at runtime, perhaps erroneously which must be detected by implementations) number of arguments.
-	Push arguments from first to last. Then call the operator() above.
-	*/
+	__device__ virtual return_wrapper_t<T> operator()() const = 0;
 	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value) = 0;
 	__device__ virtual return_wrapper_t<std::shared_ptr<IToken<T>>> simplify() const = 0;
-	__device__ virtual std::size_t get_params_count() const = 0;
+	__device__ virtual std::size_t get_required_parameter_count() const = 0;
 	__device__ virtual bool is_ready() const = 0; //all parameters are specified
 	__device__ virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 	__device__ virtual TokenType type() = 0;
@@ -193,10 +454,6 @@ public:
 	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		return return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedCall);
-	}
-	__device__ virtual std::size_t get_params_count() const
-	{
-		return 0;
 	}
 	__device__ virtual TokenType type()
 	{
@@ -248,12 +505,11 @@ public:
 	{
 		return return_wrapper_t<std::shared_ptr<IToken<T>>>(std::make_shared<Variable<T>>(*this));
 	}
-
 	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		return return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedCall);
 	}
-	__device__ virtual std::size_t get_params_count() const
+	__device__ virtual std::size_t get_required_parameter_count() const
 	{
 		return 0;
 	}
@@ -265,14 +521,6 @@ public:
 	{
 		return true;
 	}
-	/*char* get_name() const
-	{
-		return name.get();
-	}*/
-	/*size_t get_name_length()
-	{
-		return name_length;
-	}*/
 	__device__ virtual TokenType type()
 	{
 		return TokenType::variable;
@@ -287,62 +535,206 @@ template <class T>
 class Operator : public IToken<T>
 {
 public:
-	__device__ virtual short getPriority()
+	//__device__ virtual short getPriority()
+	//{
+	//	return 0; //default priority, less code but more error prone
+	//}
+	//__device__ virtual TokenType type()
+	//{
+	//	return TokenType::Operator;
+	//}
+	__device__ return_wrapper_t<void> set_required_parameter_count(short value)
 	{
-		return 0; //default priority, less code but more error prone
-	}
-	__device__ virtual TokenType type()
-	{
-		return TokenType::Operator;
+		return return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedCall);
 	}
 };
 
 template <class T>
-class OperatorPlus : public Operator<T> //+-*/
+class UnaryPlus : public Operator<T> //+-*/
 {
-	std::shared_ptr<IToken<T>> ops[2], *top = ops;
+	/*This replacement is unnecessary, but the code would be more maintainable, if the storage of parameters
+	for functions (with fixed numbers of the parameters) will be managed in one place (static_parameter_storage). */
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 1> ops;
 
 public:
 	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
-		*top++ = value;
+		ops.push_argument(value);
+		return return_wrapper_t<void>();
 	}
 	__device__ virtual return_wrapper_t<T> operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
-			//throw std::exception("Insufficient number are given for the plus operator.");
-			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
+		if (!this->is_ready())
+			throw return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
 
-		//return (*ops[0])() + (*ops[1])();
-		return return_wrapper_t<T>(*(*ops[0])().get() + *(*ops[1])().get());
+		return return_wrapper_t<T>((*ops[0])());
 	}
 	__device__ virtual return_wrapper_t<std::shared_ptr<IToken<T>>> simplify() const
 	{
-		if (!is_ready())
-			return return_wrapper_t<T>(CudaParserErrorCodes::NotReady);
+		if (!this->is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+		return return_wrapper_t<T>(ops[0]->simplify()); //unary + does no do anything
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return ops.is_ready();
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::UnaryPlus;
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+};
+
+template <class T>
+class BinaryPlus : public Operator<T> //+-*/
+{
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+
+public:
+	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		ops.push_argument(value);
+		return return_wrapper_t<void>();
+	}
+	__device__ virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
+	{
+		if (!this->is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+
+		return return_wrapper_t<T>((*ops[0])() + (*ops[1])());
+	}
+	__device__ virtual return_wrapper_t<std::shared_ptr<IToken<T>>> simplify() const
+	{
+		if (!this->is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+
 		auto op0 = ops[0]->simplify();
 		auto op1 = ops[1]->simplify();
 
-		if ((op0.get())->get()->type() == TokenType::number && (op0.get())->get()->type() == TokenType::number)
-			return return_wrapper_t<std::shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(*((op0.get())->get())() + *((op0.get())->get())()));
-		auto op_new = std::make_shared<OperatorPlus<T>>();
-		op_new->push_argument(std::move(*(op0.get())));
-		op_new->push_argument(std::move(*(op1.get())));
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
+			return std::make_shared<Number<T>>((*op0)() + (*op1)());
+		auto op_new = std::make_shared<BinaryPlus<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
 		return return_wrapper_t<std::shared_ptr<IToken<T>>>(op_new);
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
-	__device__ virtual std::size_t get_params_count() const
+	__device__ virtual std::size_t get_required_parameter_count() const
 	{
 		return 2;
 	}
 	__device__ virtual TokenType type()
 	{
-		return TokenType::operatorPlus;
+		return TokenType::BinaryPlus;
+	}
+	__device__ virtual short getPriority()
+	{
+		return 2;
 	}
 };
+
+template <class T>
+class UnaryMinus : public Operator<T> //+-*/
+{
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 1> ops;
+
+public:
+	__device__ virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		ops.push_argument(value);
+	}
+	__device__ virtual return_wrapper_t<T> operator()() const/*Implementation of IToken<T>::operator()()*/
+	{
+		if (!this->is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+
+		return return_wrapper_t<T>(-(*ops[0])());
+	}
+	__device__ virtual return_wrapper_t<std::shared_ptr<IToken<T>>> simplify() const
+	{
+		if (!this->is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+		auto op0 = ops[0]->simplify();
+
+		if (op0->type() == TokenType::number)
+			return return_wrapper_t<std::shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(-(*dynamic_cast<Number<T>*>(op0.get()))()));
+		auto op_new = std::make_shared<UnaryMinus<T>>(*this);
+		op_new->push_argument(std::move(op0));
+		return return_wrapper_t<std::shared_ptr<IToken<T>>>(op_new);
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return ops.is_ready();
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::UnaryMinus;
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+};
+template <class T>
+class BinaryMinus : public Operator<T>
+{
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+
+public:
+	__device__ virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		ops.push_argument(value);
+	}
+	__device__ virtual T operator()() const/*Implementation of IToken<T>::operator()()*/
+	{
+		if (!this->is_ready())
+			throw std::exception("Invalid arguments of a binary minus operator.");
+
+		return  (*ops[1])() - (*ops[0])();
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return ops.is_ready();
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 2;
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::BinaryMinus;
+	}
+	__device__ virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
+			return std::make_shared<Number<T>>((*op1)() - (*op0)());
+		auto op_new = std::make_shared<BinaryMinus<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
+	}
+	__device__ virtual short getPriority()
+	{
+		return 2;
+	}
+};
+
 template <class T>
 class OperatorMinus : public Operator<T>
 {
@@ -536,45 +928,10 @@ public:
 template <class T>
 class Function : public IToken<T> //sin,cos...
 {
-	std::list<std::shared_ptr<IToken<T>>> m_parameters;
-	char* function_name;
 public:
-	__device__ virtual return_wrapper_t<T> operator()()
+	__device__ virtual return_wrapper_t<void> set_required_parameter_count(std::size_t value)
 	{
-		return return_wrapper_t<T>(*(m_parameters.front().get()->operator()().get()));
-	}
-	__device__ virtual bool is_ready() const
-	{
-		return true;
-	}
-	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
-	{
-		m_parameters.push_back(value);
-	}
-	__device__ virtual std::size_t get_params_count() const
-	{
-		return m_parameters.size();
-	}
-	__device__ virtual const char* get_function_name() const
-	{
-		return function_name;
-	}
-	__device__ virtual TokenType type()
-	{
-		return TokenType::function;
-	}
-	__device__ virtual short getPriority()
-	{
-		return 1;
-	}
-protected:
-	__device__ std::list<T>& parameter_queue()
-	{
-		return m_parameters;
-	}
-	__device__ const std::list<std::shared_ptr<IToken<T>>>& parameter_queue() const
-	{
-		return m_parameters;
+		return return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedCall);
 	}
 };
 
@@ -724,6 +1081,451 @@ public:
 		auto pNewTkn = std::make_shared<SinFunction<T>>();
 		pNewTkn->op = std::move(*(newarg.get()));
 		return return_wrapper_t<std::shared_ptr<IToken<T>>>(pNewTkn);
+	}
+};
+
+template <class T>
+class Log10Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+		return return_wrapper_t<void>();
+	}
+	__device__ virtual return_wrapper_t<T> operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+
+		return return_wrapper_t<T>(std::log10((*op)()));
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "log10";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::log10Function;
+	}
+	__device__ virtual return_wrapper_t<std::shared_ptr<IToken<T>>> simplify() const
+	{
+		if (!is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return return_wrapper_t<std::shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(std::log10((*newarg)())));
+		auto pNewTkn = std::make_shared<Log10Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return return_wrapper_t<std::shared_ptr<IToken<T>>>(pNewTkn);
+	}
+};
+template <class T>
+class LnFunction : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+		return return_wrapper_t<void>();
+	}
+	__device__ virtual return_wrapper_t<T> operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+
+		return return_wrapper_t<T>(std::log((*op)()));
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "ln";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::lnFunction;
+	}
+	__device__ virtual return_wrapper_t<std::shared_ptr<IToken<T>>> simplify() const
+	{
+		if (!is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return return_wrapper_t<std::shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(std::log((*newarg)())));
+		auto pNewTkn = std::make_shared<LnFunction<T>>();
+		pNewTkn->op = std::move(newarg);
+		return return_wrapper_t<std::shared_ptr<IToken<T>>>(pNewTkn);
+	}
+};
+template <class T>
+class LogFunction : public Function<T>
+{
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+public:
+	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		ops.push_argument(value);
+		return return_wrapper_t<void>();
+	}
+	__device__ virtual return_wrapper_t<T> operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!this->is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+
+		return return_wrapper_t<T>(std::log((*ops[1])()) / std::log((*ops[0])()));
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return ops.is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "log";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::logFunction;
+	}
+	__device__ virtual return_wrapper_t<std::shared_ptr<IToken<T>>> simplify() const
+	{
+		if (!is_ready())
+			return return_wrapper_t<void>(CudaParserErrorCodes::NotReady);
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
+			return return_wrapper_t<std::shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(std::pow((*op0)(), (*op1)())));
+		auto op_new = std::make_shared<OperatorPow<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return return_wrapper_t<std::shared_ptr<IToken<T>>>(op_new);
+	}
+};
+template <class T>
+class JnFunction : public Function<T>
+{
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+public:
+	__device__ virtual return_wrapper_t<void> push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		ops.push_argument(value);
+	}
+	__device__ virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!this->is_ready())
+			throw std::exception("I0nsufficient number are given for the plus operator.");
+
+		return _jn(int((*ops[0])()), (*ops[1])());
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return ops.is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "jn";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::logFunction;
+	}
+	__device__ virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_jn(int((*ops[0])()), (*ops[1])()));
+		auto op_new = std::make_shared<JnFunction<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
+	}
+};
+template <class T>
+class J0Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	__device__ virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	__device__ virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _j0((*op)());
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "j0";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::lnFunction;
+	}
+	__device__ virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_j0((*newarg)()));
+		auto pNewTkn = std::make_shared<J0Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class J1Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	__device__ virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	__device__ virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _j1((*op)());
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "j1";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::lnFunction;
+	}
+	__device__ virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_j1((*newarg)()));
+		auto pNewTkn = std::make_shared<J1Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class YnFunction : public Function<T>
+{
+	static_parameter_storage<std::shared_ptr<IToken<T>>, 2> ops;
+public:
+	__device__ virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		ops.push_argument(value);
+	}
+	__device__ virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!this->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _yn(int((*ops[0])()), (*ops[1])());
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return ops.is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "yn";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::logFunction;
+	}
+	__device__ virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto op0 = ops[0]->simplify();
+		auto op1 = ops[1]->simplify();
+
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_yn(int((*ops[0])()), (*ops[1])()));
+		auto op_new = std::make_shared<YnFunction<T>>();
+		op_new->push_argument(std::move(op0));
+		op_new->push_argument(std::move(op1));
+		return op_new;
+	}
+};
+template <class T>
+class Y0Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	__device__ virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	__device__ virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _y0((*op)());
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "y0";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::y0Function;
+	}
+	__device__ virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_y0((*newarg)()));
+		auto pNewTkn = std::make_shared<Y0Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
+	}
+};
+template <class T>
+class Y1Function : public Function<T>
+{
+	std::shared_ptr<IToken<T>> op;
+public:
+	__device__ virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
+	{
+		op = value;
+	}
+	__device__ virtual T operator()() const /*Implementation of IToken<T>::operator()()*/
+	{
+		if (!op->is_ready())
+			throw std::exception("Insufficient number are given for the plus operator.");
+
+		return _y1((*op)());
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return op->is_ready();
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__ virtual const char* get_function_name() const
+	{
+		return "y1";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::y1Function;
+	}
+	__device__ virtual std::shared_ptr<IToken<T>> simplify() const
+	{
+		if (!is_ready())
+			throw std::exception("Not ready to simplify an operator");
+		auto newarg = op->simplify();
+		if (newarg->type() == TokenType::number)
+			return std::make_shared<Number<T>>(_y1((*newarg)()));
+		auto pNewTkn = std::make_shared<Y1Function<T>>();
+		pNewTkn->op = std::move(newarg);
+		return pNewTkn;
 	}
 };
 

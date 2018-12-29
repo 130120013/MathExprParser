@@ -202,22 +202,6 @@ token_string_entity parse_string_token(const char* pExpression, std::size_t cbEx
 		return token_string_entity(pStart, pEnd);
 	}
 	return token_string_entity(pStart, pStart + 1);
-	/* check if necessary:
-	switch (*pStart)
-	{
-	case '=':
-	case '+':
-	case '-':
-	case '*':
-	case '/':
-	case '^':
-	case '(':
-	case ')':
-	case ',':
-		return token_string_entity(pStart, pStart + 1);
-	default:
-		
-	};*/
 }
 
 struct invalid_exception :std::exception
@@ -267,20 +251,6 @@ constexpr bool IsOperatorTokenTypeId(TokenType id)
 			|| id == TokenType::operatorPow;
 }
 
-/*
-Before this class was introduced function and operator tokens with fixed numbers
-of parameters used static arrays and a top pointer to store and address arguments.
-The top pointer required special copy-construction, copy-assignment, move-construction
-and move-assignment because implicitly generated counterparts copied the value of the top 
-pointers as well as the params vector. This resulted in the top pointer of a copy/move 
-constructed/assigned-to class to point to the params vector of the original class instance
-which was read from to create the copy. And this yielded incorrect behaviour of the program.
-
-To rectify this, the copy/move construction/assignment must be specially implemented for each
-class which would require a much of similar code in the classes.
-
-To reduce the ammount of this repeated code, the static_parameter_storage class is introduced. 
-*/
 template <class T, std::size_t N>
 class static_parameter_storage
 {
@@ -473,14 +443,6 @@ public:
 	{
 		return true;
 	}
-	/*char* get_name() const
-	{
-		return name.get();
-	}*/
-	/*size_t get_name_length()
-	{
-		return name_length;
-	}*/
 	virtual TokenType type()
 	{
 		return TokenType::variable;
@@ -1613,15 +1575,6 @@ class TokenStorage
 	std::list<std::shared_ptr<IToken<T>>> outputList;
 
 public:
-	//template <class TokenParamType>
-	//auto push_token(TokenParamType&& op) -> std::enable_if_t<
-	//	std::is_base_of<Bracket<T>, std::decay_t<TokenParamType>>::value
-	//>
-	//{
-
-	//	operationStack.push(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
-	//	return operationStack.top().get();
-	//}
 
 	template <class TokenParamType>
 	auto push_token(TokenParamType&& op) -> std::enable_if_t<
@@ -1695,7 +1648,7 @@ public:
 	{
 		return operationStack.top();
 	}
-	void comma()
+	void comma_parameter_replacement()
 	{
 		bool isOpeningBracket = false;
 
@@ -1715,19 +1668,6 @@ public:
 		if (!isOpeningBracket) //missing '('
 			throw std::invalid_argument("There is no opening bracket!");
 	}
-	/*std::stack<std::shared_ptr<IToken<T>>>& get_operation_stack()
-	{
-		return operationStack;
-	}
-
-	const std::list<std::shared_ptr<IToken<T>>>& get_output_list() const
-	{
-		return outputList;
-	}
-	std::list<std::shared_ptr<IToken<T>>>& get_output_list()
-	{
-		return outputList;
-	}*/
 };
 
 template <class T>
@@ -1735,8 +1675,6 @@ class Header
 {
 	std::map<std::string, T> m_arguments;
 	std::vector<std::string> m_parameters;
-	//std::unique_ptr<char[]> function_name;
-	//std::size_t function_name_length = 0;
 	std::string function_name;
 	bool isReady = false;
 public:
@@ -1805,12 +1743,9 @@ public:
 			m_parameters.emplace_back(std::move(param));
 		*endPtr = begPtr;
 	}
-	Header(const Header<T>& val) /*: function_name_length(val.get_name_length())*/
+	Header(const Header<T>& val) 
 	{
 		std::size_t size = val.get_name_length();
-		/*this->function_name = std::make_unique<char[]>(size + 1);
-		std::strncpy(this->function_name.get(), val.get_function_name(), size);
-		this->function_name[size] = 0;*/
 		this->function_name = val.function_name;
 		this->m_arguments = val.m_arguments;
 		this->m_parameters = val.m_parameters;
@@ -1939,26 +1874,7 @@ private:
 				last_type_id = int(tokens.push_token(OperatorPow<T>())->type());
 			else if (tkn == ",")
 			{
-				//bool isOpeningBracket = false;
-
-				//while (!isOpeningBracket || tokens.operationStack.size() != 0) //while an opening bracket is not found or an operation stack is not empty
-				//{
-				//	if (tokens.operationStack.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('
-				//	{
-				//		tokens.outputList.push_back(tokens.operationStack.top());
-				//		tokens.operationStack.pop();
-				//	}
-				//	else
-				//	{
-				//		isOpeningBracket = true;
-				//	}
-				//}
-
-				//if (!isOpeningBracket) //missing '('
-				//	throw std::invalid_argument("There is no opening bracket!");
-				//		//begPtr += 1;
-
-				tokens.comma();
+				tokens.comma_parameter_replacement();
 
 				if (funcStack.top().first.get()->type() == TokenType::maxFunction ||
 					funcStack.top().first.get()->type() == TokenType::minFunction)
@@ -2070,401 +1986,11 @@ private:
 				throw std::exception("Unexpected token");
 			cbRest -= tkn.end() - begPtr;
 			begPtr = (char*)tkn.end();
-
-
-			/////////////////////////
-/*
-			try
-			{
-				auto func = parse_token<T>(begPtr, &endPtr);
-				if (func == nullptr)
-					body.push_back(parse_text_token<T>(header, begPtr, &begPtr));
-				else
-				{
-					switch (func->type())
-					{
-					case operatorPlus:
-					default:
-						throw std::exception("Unexpected token type");
-					}
-					operationStack.push(func);
-				}
-				if (*begPtr >= '0' && *begPtr <= '9')
-				{
-					body.push_back(parse_token<T>(begPtr, &endPtr));
-
-					if (begPtr == endPtr)
-						throw std::invalid_argument("Cannot parse: " + *begPtr);
-					begPtr = endPtr;
-				}
-				else
-				{
-					if (*begPtr == ' ')
-					{
-						begPtr += 1;
-						continue;
-					}
-					if ((*begPtr >= 'A' && *begPtr <= 'Z') || (*begPtr >= 'a' && *begPtr <= 'z')) //if not sin, cos, tg, it is variable
-					{
-						
-						auto func = parse_token<T>(begPtr, &endPtr);
-						if (func != nullptr)
-							operationStack.push(func);
-						else
-							//If the parameter is not found, parse_text_token will throw via Variable c-tor, therefore there's no need for pre-check
-							//nor to create the token (var) twice.
-							
-							body.push_back(parse_text_token<T>(header, begPtr, &endPtr));
-						begPtr = endPtr;
-						continue;
-					}
-					if (*begPtr == '+')
-					{
-						skipSpaces(begPtr + 1, expr + length - begPtr - 1);
-						char tok = *(begPtr + 1);
-						if (*begPtr == '+' && (tok == '+' || tok == '-')) //unary +
-						{
-							body.push_back(parse_token<T>(begPtr, &endPtr));
-							begPtr = endPtr;
-						}
-						else //binary +
-						{
-							while (operationStack.size() != 0)
-							{
-								//auto plus = dynamic_cast<Operator<T>*>(operationStack.top().get());
-								auto plus = operationStack.top().get();
-								if (plus->type() > TokenType::function)
-								{
-								//	auto plus1 = dynamic_cast<Function<T>*>(operationStack.top().get());
-								//	if (plus1 == nullptr)
-										throw std::invalid_argument("Unexpected error at " + *begPtr);
-								//	else
-								//		prior = plus1->getPriority();
-								}
-								else
-								{
-									prior = plus->getPriority();
-								}
-								if (BinaryPlus<T>().getPriority() <= prior)
-								{
-									body.push_back(operationStack.top());
-									operationStack.pop();
-								}
-								else
-									break;
-							}
-							operationStack.push(parse_token<T>(begPtr, &endPtr));
-							begPtr += 1;
-						}
-					}else if (*begPtr == '-')
-					{
-						skipSpaces(begPtr + 1, expr + length - begPtr - 1);
-						char tok = *(begPtr + 1);
-						if (*begPtr == '-' && (tok == '+' || tok == '-')) //unary -
-						{
-							body.push_back(parse_token<T>(begPtr, &endPtr));
-							begPtr = endPtr;
-						}
-						else //binary -
-						{
-							while (operationStack.size() != 0)
-							{
-								auto minus = operationStack.top().get();
-								if (minus->type() > TokenType::function)
-								{
-									throw std::invalid_argument("Unexpected error at " + *begPtr);
-								}
-								else
-								{
-									prior = minus->getPriority();
-								}
-								if (BinaryMinus<T>().getPriority() <= prior)
-								{
-									body.push_back(operationStack.top());
-									operationStack.pop();
-								}
-								else
-									break;
-							}
-							operationStack.push(parse_token<T>(begPtr, &endPtr));
-							begPtr += 1;
-						}
-					}else if (*begPtr == '*')
-					{
-						while (operationStack.size() != 0)
-						{
-							auto mul = operationStack.top().get();
-							if (mul->type() > TokenType::function)
-							{
-								throw std::invalid_argument("Unexpected error at " + *begPtr);
-							}
-							else
-							{
-								prior = mul->getPriority();
-							}
-							if (OperatorMul<T>().getPriority() <= prior)
-							{
-								body.push_back(operationStack.top());
-								operationStack.pop();
-							}
-							else
-								break;
-						}
-						operationStack.push(parse_token<T>(begPtr, &endPtr));
-						begPtr += 1;
-					}else if (*begPtr == '/')
-					{
-						while (operationStack.size() != 0)
-						{
-							auto div = operationStack.top().get();
-							if (div->type() > TokenType::function)
-							{
-								throw std::invalid_argument("Unexpected error at " + *begPtr);
-							}
-							else
-							{
-								prior = div->getPriority();
-							}
-							if (OperatorDiv<T>().getPriority() <= prior)
-							{
-								body.push_back(operationStack.top());
-								operationStack.pop();
-							}
-							else
-								break;
-						}
-						operationStack.push(parse_token<T>(begPtr, &endPtr));
-						begPtr += 1;
-					}else if (*begPtr == '^')
-					{
-						while (operationStack.size() != 0)
-						{
-							auto pow = operationStack.top().get();
-							if (pow->type() > TokenType::function)
-							{
-								throw std::invalid_argument("Unexpected error at " + *begPtr);
-							}
-							else
-							{
-								prior = pow->getPriority();
-							}
-							if (OperatorDiv<T>().getPriority() <= prior)
-							{
-								body.push_back(operationStack.top());
-								operationStack.pop();
-							}
-							else
-								break;
-						}
-						operationStack.push(parse_token<T>(begPtr, &endPtr));
-						begPtr += 1;
-					}else if (*begPtr == ',')
-					{
-						bool isOpeningBracket = false;
-						while (!isOpeningBracket || operationStack.size() != 0) //while an opening bracket is not found or an operation stack is not empty
-						{
-							if (operationStack.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('  
-							{
-								if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
-									++paramCount;
-
-								body.push_back(operationStack.top());
-								operationStack.pop();
-							}
-							else
-							{
-								isOpeningBracket = true;
-							}
-						}
-						if (!isOpeningBracket) //missing '('
-							throw std::invalid_argument("There is no opening bracket!");
-						begPtr += 1;
-					}
-					if (*begPtr == '(')
-					{
-						if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
-							paramCount = 1;
-
-						operationStack.push(std::make_shared<Bracket<T>>());
-						begPtr += 1;
-					}
-					if (*begPtr == ')')
-					{
-						bool isOpeningBracket = false;
-						while (operationStack.size() != 0)
-						{
-							if (operationStack.top().get()->type() != TokenType::bracket)
-							{
-								if (operationStack.top().get()->type() == TokenType::maxFunction || operationStack.top().get()->type() == TokenType::minFunction)
-								{
-									auto min = dynamic_cast<MinFunction<T>*>(operationStack.top().get());
-									auto max = dynamic_cast<MaxFunction<T>*>(operationStack.top().get());
-									if (min == nullptr)
-									{
-										if (max == nullptr)
-											throw std::invalid_argument("ERROR!");
-										else
-											(*max).paramsCount = paramCount;
-									}
-									else
-									{
-										(*min).paramsCount = paramCount;
-									}
-									paramCount = 1;
-								}//проверить, является ли фукнция мин макс, записать туда количество аргументов в поле paramsCount
-
-								body.push_back(operationStack.top());
-								operationStack.pop();
-							}
-							else
-							{
-								isOpeningBracket = true;
-								break;
-							}
-						}
-						if (!isOpeningBracket)
-							throw std::invalid_argument("There is no opening bracket!");
-						else
-							operationStack.pop();
-						begPtr += 1;
-					}
-				}
-			if (begPtr - delta == 0)
-				throw std::invalid_argument("Invalid symbol at " + *begPtr);
-			}catch (std::exception e)
-			{
-				throw std::invalid_argument("ERROR!");
-			}*/
 		}
 		
 		body = std::move(tokens).finalize();
 	}
 };
-
-//template <class T>
-//std::shared_ptr<IToken<T>> parse_token(const char* input_string, char** endptr)
-//{
-//	auto tok = skipSpaces(input_string);
-//	if (*input_string == '+')
-//	{
-//		auto tok = skipSpaces(input_string);
-//		if (*tok == '-' || *tok == '+')
-//		{
-//			*endptr = (char*) tok;
-//			return std::make_shared<BinaryPlus<T>>();
-//		}
-//		//return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-//		return nullptr;
-//	} //TODO: Adjust other operators accordingly
-//
-//	if (*input_string == '-')
-//	{
-//		auto tok = skipSpaces(input_string);
-//		if (*tok == '-' || *tok == '+')
-//			return std::make_shared<BinaryMinus<T>>();
-//		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-//	}
-//
-//	if (*input_string == '*')
-//		return std::make_shared<OperatorMul<T>>();
-//	if (*input_string == '/')
-//		return std::make_shared<OperatorDiv<T>>();
-//	if (*input_string == '^')
-//		return std::make_shared<OperatorPow<T>>();
-//
-//	if (std::strncmp(input_string, "sin", 3) == 0 && !iswhitespace(input_string[3]))
-//	{
-//		*endptr = (char*) input_string + 3;
-//		return std::make_shared<SinFunction<T>>();
-//	}
-//	else if (std::strncmp(input_string, "cos", 3) == 0 && !iswhitespace(input_string[3]))
-//	{
-//		*endptr = (char*) input_string + 3;
-//		return std::make_shared<CosFunction<T>>();
-//	}
-//	else if (std::strncmp(input_string, "tg", 2) == 0 && !iswhitespace(input_string[2]))
-//	{
-//		*endptr = (char*) input_string + 2;
-//		return std::make_shared<TgFunction<T>>();
-//	}
-//	else if (std::strncmp(input_string, "log10", 3) == 0 && !iswhitespace(input_string[5]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<Log10Function<T>>();
-//	}
-//	else if (std::strncmp(input_string, "ln", 3) == 0 && !iswhitespace(input_string[2]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<LnFunction<T>>();
-//	}
-//	else if (std::strncmp(input_string, "log", 3) == 0 && !iswhitespace(input_string[3]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<LogFunction<T>>();
-//	}
-//	else if (std::strncmp(input_string, "j0", 3) == 0 && !iswhitespace(input_string[2]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<J0Function<T>>();
-//	}
-//	else if (std::strncmp(input_string, "j1", 3) == 0 && !iswhitespace(input_string[2]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<J1Function<T>>();
-//	}
-//	else if (std::strncmp(input_string, "jn", 3) == 0 && !iswhitespace(input_string[2]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<JnFunction<T>>();
-//	}
-//	else if (std::strncmp(input_string, "y0", 3) == 0 && !iswhitespace(input_string[2]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<Y0Function<T>>();
-//	}
-//	else if (std::strncmp(input_string, "y1", 3) == 0 && !iswhitespace(input_string[2]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<Y1Function<T>>();
-//	}
-//	else if (std::strncmp(input_string, "yn", 3) == 0 && !iswhitespace(input_string[2]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<YnFunction<T>>();
-//	}
-//	else if (std::strncmp(input_string, "max", 3) == 0 && !iswhitespace(input_string[3]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<CosFunction<T>>();
-//	}
-//	else if (std::strncmp(input_string, "min", 3) == 0 && !iswhitespace(input_string[3]))
-//	{
-//		*endptr = (char*)input_string + 3;
-//		return std::make_shared<CosFunction<T>>();
-//	}
-//	return nullptr;
-//}
-
-//template <class T>
-//std::shared_ptr<IToken<T>> parse_text_token(const Header<T>& header, const char* input_string, char** endptr)
-//{
-//	std::size_t name_size;
-//	char* endTokPtr = (char*)input_string;
-//	if (*input_string >= '0' && *input_string <= '9')
-//		return std::make_shared<Number<T>>(std::strtod(input_string, endptr));
-//	while ((*endTokPtr >= 'A' && *endTokPtr <= 'Z') || (*endTokPtr >= 'a' && *endTokPtr <= 'z') || (*endTokPtr >= '0' && *endTokPtr <= '9'))
-//	{
-//		endTokPtr += 1;
-//	}
-//
-//	name_size = endTokPtr - input_string;
-//	std::string name(input_string, input_string + name_size);
-//	char* tok_name = new char[name_size + 1];
-//	tok_name = (char*)(name.c_str());
-//	auto token = std::make_shared<Variable<T>>(header, tok_name, name_size);
-//	*(endptr) = endTokPtr;
-//	return token;
-//}
 
 template <class K>
 typename std::list<std::shared_ptr<IToken<K>>>::iterator simplify(std::list<std::shared_ptr<IToken<K>>>& body, typename std::list<std::shared_ptr<IToken<K>>>::iterator elem)
