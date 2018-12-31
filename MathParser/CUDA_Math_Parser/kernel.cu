@@ -21,6 +21,15 @@ int main()
     const int a[arraySize] = { 1, 2, 3, 4, 5 };
     const int b[arraySize] = { 10, 20, 30, 40, 50 };
     int c[arraySize] = { 0 };
+
+	std::string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
+	Mathexpr<double> mathexpr = { expression };
+	std::vector<double> v;
+	v.push_back(1);
+	v.push_back(10);
+	mathexpr.init_variables(v);
+	//std::cout << "Value: " << mathexpr.compute() << "\n";
+
 	//cuda_list<double> l;
 
     // Add vectors in parallel.
