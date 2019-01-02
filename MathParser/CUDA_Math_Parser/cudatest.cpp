@@ -1,3 +1,7 @@
+#define __device__ 
+
+#pragma warning(disable:4996)
+
 #include <stack>
 #include <cstdlib>
 #include <cstring>
@@ -63,7 +67,7 @@ __device__ inline char* skipSpaces(char* input_string) noexcept
 
 struct token_string_entity
 {
-	__device__ token_string_entity() = default;
+	token_string_entity() = default;
 	__device__ token_string_entity(const char* start_ptr, const char* end_ptr) :m_pStart(start_ptr), m_pEnd(end_ptr) {}
 
 	//return a negative if the token < pString, 0 - if token == pString, a positive if token > pString
@@ -2329,3 +2333,15 @@ __device__ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
 }
 
 #endif // !PARSER_H
+
+#include <iostream>
+int main()
+{
+	char expr[] = "f(x) = x";
+	Mathexpr<double> m(expr, sizeof(expr) - 1);
+	std::vector<double> v;
+	v.push_back(1);
+	m.init_variables(v);
+	std::cout << "Value: " << m.compute().value() << "\n";
+	return 0;
+}
