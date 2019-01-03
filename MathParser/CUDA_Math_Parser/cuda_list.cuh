@@ -15,6 +15,9 @@ class cuda_list
 		__host__ __device__ node(T&& data, node* next, node* prev): data(std::move(data)), next(next), prev(prev) {}
 	};
 public:
+	typedef node* iterator;
+	typedef node* const const_iterator;
+
 	__host__ __device__ cuda_list<T>& operator= (const cuda_list<T> &);
 	__host__ __device__ ~cuda_list();
 
@@ -26,9 +29,7 @@ public:
 	__host__ __device__ void pop_front();
 	__host__ __device__ void swap(cuda_list &x);
 	__host__ __device__ void clear();
-
-	typedef T* iterator;
-	typedef T* const const_iterator;
+	__device__ iterator erase(iterator pos);
 
 	__host__ __device__ const_iterator begin() const; 
 	__host__ __device__ iterator begin();
@@ -74,6 +75,7 @@ __host__ __device__ cuda_list<T>& cuda_list<T>::operator= (const cuda_list<T> & 
 	elements = that.elements;
 	head = that.head;
 	tail = that.tail;
+	return *this;
 }
 
 template <typename T>

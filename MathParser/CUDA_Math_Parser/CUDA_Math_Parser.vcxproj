@@ -91,10 +91,15 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <CudaCompile Include="kernel.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\MathParser\cuda_types.h" />
     <ClInclude Include="CudaParser.h" />
+    <ClInclude Include="cuda_iterator.cuh" />
     <ClInclude Include="cuda_list.cuh" />
+    <ClInclude Include="cuda_map.cuh" />
+    <ClInclude Include="cuda_memory.cuh" />
     <ClInclude Include="cuda_stack.cuh" />
+    <ClInclude Include="cuda_string.cuh" />
+    <ClInclude Include="cuda_vector.cuh" />
+    <ClInclude Include="impl_rb_tree.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

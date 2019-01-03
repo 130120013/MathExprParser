@@ -22,9 +22,9 @@ int main()
     const int b[arraySize] = { 10, 20, 30, 40, 50 };
     int c[arraySize] = { 0 };
 
-	std::string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
-	Mathexpr<double> mathexpr = { expression };
-	std::vector<double> v;
+	cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
+	Mathexpr<double> mathexpr(expression);
+	cuda_vector<double> v;
 	v.push_back(1);
 	v.push_back(10);
 	mathexpr.init_variables(v);

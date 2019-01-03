@@ -20,7 +20,8 @@ public:
 	__host__ __device__ void push(T&& data);
 	__host__ __device__ bool empty() const;
 	__host__ __device__ int size() const;
-	__host__ __device__ T top() const;
+	__host__ __device__ T& top() ;
+	__host__ __device__ const T& top() const;
 	__host__ __device__ void pop();
 
 private:
@@ -61,7 +62,12 @@ int cuda_stack<T>::size() const
 	return elements;
 }
 template<typename T>
-T cuda_stack<T>::top() const
+const T& cuda_stack<T>::top() const
+{
+	return root->data;
+}
+template<typename T>
+T& cuda_stack<T>::top() 
 {
 	return root->data;
 }
