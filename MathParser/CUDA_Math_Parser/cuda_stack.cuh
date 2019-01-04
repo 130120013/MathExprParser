@@ -40,7 +40,7 @@ cuda_stack<T>::~cuda_stack()
 	}
 }
 template<typename T>
-void cuda_stack<T>::push(T const& data)
+void cuda_stack<T>::push(const T& data)
 {
 	root = new node(data, root);
 	++elements;

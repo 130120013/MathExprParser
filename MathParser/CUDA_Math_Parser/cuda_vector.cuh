@@ -63,15 +63,38 @@ public:
 		return &m_buf.get()[m_size];
 	}
 
-	__device__ void push_back(const T& value);
-	__device__ void push_back(T&& value);
+	__device__ void push_back(const T& value)
+	{
+		if (m_size >= m_capacity)
+		{
+			reserve(m_size + 1);
+		}
+		this->m_buf.get()[m_size++] = value;
+	}
+	__device__ void push_back(T&& value)
+	{
+		if (m_size >= m_capacity)
+		{
+			reserve(m_size + 1);
+		}
+		this->m_buf.get()[m_size++] = std::move(value);
+	}
 
 	__device__ bool empty() const
 	{
 		return this->size() == 0;
 	}
 
-	__device__ void reserve(size_type size);
+	__device__ void reserve(size_type size)
+	{
+		T* newBuffer = new T[size];
+		auto newBuf = make_cuda_device_unique_ptr<value_type>(size);
+
+		for (auto i = 0; i < size; ++i)
+			newBuffer[i] = m_buf.get()[i];
+		this->m_capacity = size;
+		m_buf.reset(std::move(newBuffer));
+	}
 
 	template <class ... Args>
 	__device__ iterator emplace(const_iterator pos, Args&& ... args)
@@ -87,7 +110,6 @@ public:
 		m_buf.reset(m_new_buf.release());
 		m_size = m_size + 1;
 		return &m_new_buf.get()[idx];
-
 	}
 
 	template <class ... Args>
@@ -98,4 +120,5 @@ public:
 private:
 	cuda_device_unique_ptr<value_type> m_buf;
 	size_type m_size = 0;
+	size_type m_capacity = 0;
 };

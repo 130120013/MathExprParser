@@ -495,7 +495,7 @@ public:
 	}
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
-		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(*this)));
+		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(*this)));
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -573,7 +573,7 @@ public:
 	}
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
-		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Variable<T>>(*this));
+		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Variable<T>>(*this));
 	}
 	__device__ virtual return_wrapper_t<void> push_argument(const cuda_shared_ptr<IToken<T>>& value)
 	{
@@ -642,7 +642,7 @@ public:
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
 		if (!this->is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<UnaryPlus<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<UnaryPlus<T>>(), CudaParserErrorCodes::NotReady);
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>((ops[0].get())->get()->simplify()); //unary + does no do anything
 
 		//return return_wrapper_t<cuda_shared_ptr<IToken<T>>>((ops[0].get())->simplify()); //unary + does no do anything
@@ -692,8 +692,8 @@ public:
 		auto op1 = (ops[1].get())->get()->simplify();
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
-			return std::make_shared<Number<T>>(Number<T>(*((ops[0].get())->get()->operator()().get()) + *((ops[1].get())->get()->operator()().get())));
-		auto op_new = std::make_shared<BinaryPlus<T>>();
+			return make_cuda_shared<Number<T>>(Number<T>(*((ops[0].get())->get()->operator()().get()) + *((ops[1].get())->get()->operator()().get())));
+		auto op_new = make_cuda_shared<BinaryPlus<T>>();
 		op_new->push_argument(std::move(*op0.get()));
 		op_new->push_argument(std::move(*op1.get()));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(op_new);
@@ -741,8 +741,8 @@ public:
 		auto op0 = *((ops[0].get())->get()->simplify().get());
 
 		if (op0->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(*dynamic_cast<Number<T>*>(op0.get()))); ///////////NOT READY
-		auto op_new = std::make_shared<UnaryMinus<T>>(*this);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(*dynamic_cast<Number<T>*>(op0.get()))); ///////////NOT READY
+		auto op_new = make_cuda_shared<UnaryMinus<T>>(*this);
 		op_new->push_argument(std::move(op0));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(op_new);
 	}
@@ -801,8 +801,8 @@ public:
 		auto op1 = (ops[1].get())->get()->simplify();
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(*((ops[1].get())->get()->operator()().get()) - *((ops[0].get())->get()->operator()().get()))));
-		auto op_new = std::make_shared<BinaryMinus<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(*((ops[1].get())->get()->operator()().get()) - *((ops[0].get())->get()->operator()().get()))));
+		auto op_new = make_cuda_shared<BinaryMinus<T>>();
 		op_new->push_argument(std::move(*op0.get()));
 		op_new->push_argument(std::move(*op1.get()));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(op_new);
@@ -907,9 +907,9 @@ public:
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
 		{
 			auto result = (*op0.value())().value() + (*op1.value())().value();
-			return return_wrapper_t<my_token_sptr>(std::make_shared<Number<T>>(Number<T>(std::move(result))));
+			return return_wrapper_t<my_token_sptr>(make_cuda_shared<Number<T>>(Number<T>(std::move(result))));
 		}
-		auto op_new = std::make_shared<OperatorMul<T>>();
+		auto op_new = make_cuda_shared<OperatorMul<T>>();
 		op_new->push_argument(std::move(*(op0.get())));
 		op_new->push_argument(std::move(*(op1.get())));
 		return return_wrapper_t<my_token_sptr>(op_new);
@@ -953,7 +953,7 @@ public:
 	{
 		typedef cuda_shared_ptr<IToken<T>> my_token_sptr;
 		if (!is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<OperatorDiv<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<OperatorDiv<T>>(), CudaParserErrorCodes::NotReady);
 		auto op0 = ops[0]->simplify();
 		if (op0.return_code() != CudaParserErrorCodes::Success)
 			return return_wrapper_t<my_token_sptr>(op0.return_code());
@@ -962,8 +962,8 @@ public:
 			return return_wrapper_t<my_token_sptr>(op1.return_code());
 
 		if ((op0.get())->get()->type() == TokenType::number && (op0.get())->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>((*op1.value())().value() / (*op0.value())().value())));
-		auto op_new = std::make_shared<OperatorDiv<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>((*op1.value())().value() / (*op0.value())().value())));
+		auto op_new = make_cuda_shared<OperatorDiv<T>>();
 		op_new->push_argument(std::move(*(op0.get())));
 		op_new->push_argument(std::move(*(op1.get())));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(op_new);
@@ -1006,14 +1006,14 @@ public:
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
 		if (!is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<OperatorPow<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<OperatorPow<T>>(), CudaParserErrorCodes::NotReady);
 		auto op0 = ops[0]->simplify();
 		auto op1 = ops[1]->simplify();
 
 		if ((op0.get())->get()->type() == TokenType::number && (op0.get())->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(std::pow((*op1.value())().value(), (*op0.value())().value()))));
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(std::pow((*op1.value())().value(), (*op0.value())().value()))));
 		//auto op_new = std::make_shared<OperatorPlus<T>>();
-		auto op_new = std::make_shared<OperatorPow<T>>();
+		auto op_new = make_cuda_shared<OperatorPow<T>>();
 		op_new->push_argument(std::move(*(op0.get())));
 		op_new->push_argument(std::move(*(op1.get())));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(op_new);
@@ -1070,12 +1070,12 @@ public:
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
 		if (!is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<SinFunction<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<SinFunction<T>>(), CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if ((newarg.get())->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(std::sin((*newarg.value())().value()))));
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(std::sin((*newarg.value())().value()))));
 		//return std::make_shared<Number<T>>(std::sin((*newarg)()));
-		auto pNewTkn = std::make_shared<SinFunction<T>>();
+		auto pNewTkn = make_cuda_shared<SinFunction<T>>();
 		pNewTkn->op = std::move(*(newarg.get()));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1124,9 +1124,9 @@ public:
 			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if ((newarg.get())->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(std::cos((*newarg.value())().value()))));
-		//return std::make_shared<Number<T>>(std::sin((*newarg)()));
-		auto pNewTkn = std::make_shared<CosFunction<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(std::cos((*newarg.value())().value()))));
+		//return make_cuda_shared<Number<T>>(std::sin((*newarg)()));
+		auto pNewTkn = make_cuda_shared<CosFunction<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1174,9 +1174,9 @@ public:
 			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if ((newarg.get())->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(std::tan((*newarg.value())().value()))));
-		//return std::make_shared<Number<T>>(std::sin((*newarg)()));
-		auto pNewTkn = std::make_shared<TgFunction<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(std::tan((*newarg.value())().value()))));
+		//return make_cuda_shared<Number<T>>(std::sin((*newarg)()));
+		auto pNewTkn = make_cuda_shared<TgFunction<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1225,8 +1225,8 @@ public:
 			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if (newarg->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(std::log10((*newarg.value())().value()))));
-		auto pNewTkn = std::make_shared<Log10Function<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(std::log10((*newarg.value())().value()))));
+		auto pNewTkn = make_cuda_shared<Log10Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1274,8 +1274,8 @@ public:
 			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if (newarg->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(std::log((*newarg.value())().value()))));
-		auto pNewTkn = std::make_shared<LnFunction<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(std::log((*newarg.value())().value()))));
+		auto pNewTkn = make_cuda_shared<LnFunction<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1325,8 +1325,8 @@ public:
 		auto op1 = (ops[1].get())->get()->simplify();
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(std::pow((*op1.value())().value(), (*op0.value())().value()))));
-		auto op_new = std::make_shared<OperatorPow<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(std::pow((*op1.value())().value(), (*op0.value())().value()))));
+		auto op_new = make_cuda_shared<OperatorPow<T>>();
 		op_new->push_argument(std::move(*op0.get()));
 		op_new->push_argument(std::move(*op1.get()));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(op_new);
@@ -1372,13 +1372,13 @@ public:
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
 		if (!is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<JnFunction<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<JnFunction<T>>(), CudaParserErrorCodes::NotReady);
 		auto op0 = (ops[0].get())->get()->simplify();
 		auto op1 = (ops[1].get())->get()->simplify();
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(_jn(int((*ops[0].value())().value()), int((*ops[1].value())().value())))));
-		auto op_new = std::make_shared<JnFunction<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(_jn(int((*ops[0].value())().value()), int((*ops[1].value())().value())))));
+		auto op_new = make_cuda_shared<JnFunction<T>>();
 		op_new->push_argument(std::move(*op0.get()));
 		op_new->push_argument(std::move(*op1.get()));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(op_new);
@@ -1424,11 +1424,11 @@ public:
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
 		if (!is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<J0Function<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<J0Function<T>>(), CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if (newarg->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(_j0((*newarg.value())().value()))));
-		auto pNewTkn = std::make_shared<J0Function<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(_j0((*newarg.value())().value()))));
+		auto pNewTkn = make_cuda_shared<J0Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1476,8 +1476,8 @@ public:
 			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if (newarg->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(_j1(*((newarg.get()->get()->operator()()).get())))));
-		auto pNewTkn = std::make_shared<J1Function<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(_j1(*((newarg.get()->get()->operator()()).get())))));
+		auto pNewTkn = make_cuda_shared<J1Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1522,13 +1522,13 @@ public:
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
 		if (!is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<YnFunction<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<YnFunction<T>>(), CudaParserErrorCodes::NotReady);
 		auto op0 = (ops[0].get())->get()->simplify();
 		auto op1 = (ops[1].get())->get()->simplify();
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(_yn(int(*((ops[0].get()->get()->operator()()).get())), *((ops[1].get()->get()->operator()()).get())))));
-		auto op_new = std::make_shared<YnFunction<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(_yn(int(*((ops[0].get()->get()->operator()()).get())), *((ops[1].get()->get()->operator()()).get())))));
+		auto op_new = make_cuda_shared<YnFunction<T>>();
 		op_new->push_argument(std::move(*op0.get()));
 		op_new->push_argument(std::move(*op1.get()));
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(op_new);
@@ -1574,11 +1574,11 @@ public:
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
 		if (!is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Y0Function<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Y0Function<T>>(), CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if (newarg->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(_y0(*(newarg.get()->get()->operator()().get())))));
-		auto pNewTkn = std::make_shared<Y0Function<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(_y0(*(newarg.get()->get()->operator()().get())))));
+		auto pNewTkn = make_cuda_shared<Y0Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1623,14 +1623,14 @@ public:
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
 		if (!is_ready())
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Y1Function<T>>(), CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Y1Function<T>>(), CudaParserErrorCodes::NotReady);
 		auto newarg = op.get()->simplify(); // (ops[0].get())->get()->simplify()
 		if ((newarg.get())->get()->type() == TokenType::number)
 
 			//*(newarg.get()->get()->operator().get())
 			//(*op0.value())().value()
-			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(std::make_shared<Number<T>>(Number<T>(_y1((*newarg.value())().value()))));
-		auto pNewTkn = std::make_shared<Y1Function<T>>();
+			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(make_cuda_shared<Number<T>>(Number<T>(_y1((*newarg.value())().value()))));
+		auto pNewTkn = make_cuda_shared<Y1Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(pNewTkn);
 	}
@@ -1694,19 +1694,19 @@ public:
 		{
 			auto newarg = op->simplify();
 			if (newarg->get()->type() == TokenType::number)
-				newargs.push_back(std::make_shared<Number<T>>(Number<T>((*newarg.value())().value())));
+				newargs.push_back(make_cuda_shared<Number<T>>(Number<T>((*newarg.value())().value())));
 			else
-				newargsVar.push_back(newarg.value());
+				newargsVar.push_back((*newarg.value())().get());
 		}
 		if (newargsVar.empty())
 			return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(*std::min_element(newargs.begin(), newargs.end(), m_pred));
 
-		auto pNewTkn = std::make_shared<Implementation>();
+		auto pNewTkn = make_cuda_shared<Implementation>();
 		if (newargs.empty())
-			pNewTkn = std::make_shared<Implementation>(Implementation(newargsVar.size()));
+			pNewTkn = make_cuda_shared<Implementation>(Implementation(newargsVar.size()));
 		else
 		{
-			pNewTkn = std::make_shared<Implementation>(Implementation(newargsVar.size() + 1));
+			pNewTkn = make_cuda_shared<Implementation>(Implementation(newargsVar.size() + 1));
 			pNewTkn->push_argument(*std::min_element(newargs.begin(), newargs.end(), m_pred));
 		}
 		for (const auto& op : newargsVar)
@@ -1800,7 +1800,7 @@ public:
 	}
 	__device__ virtual return_wrapper_t<cuda_shared_ptr<IToken<T>>> simplify() const
 	{
-		//return std::make_shared<Bracket<T>>(nullptr);
+		//return make_cuda_shared<Bracket<T>>(nullptr);
 		//throw std::exception("Unexpected call");
 		return return_wrapper_t<cuda_shared_ptr<IToken<T>>>(CudaParserErrorCodes::UnexpectedCall);
 	}
@@ -1835,7 +1835,7 @@ public:
 			outputList.push_back(operationStack.top());
 			operationStack.pop();
 		}
-		operationStack.push(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
+		operationStack.push(make_cuda_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
 		return operationStack.top().get();
 	}
 
@@ -1847,7 +1847,7 @@ public:
 		IToken<T>*
 	>
 	{
-		outputList.push_back(std::make_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(value)));
+		outputList.push_back(make_cuda_shared<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(value)));
 		return outputList.back().get();
 	}
 
@@ -1988,7 +1988,7 @@ public:
 		}
 		m_parameters.reserve(params.size());
 		for (auto& param : params)
-			m_parameters.emplace_back(std::move(param.data));
+			m_parameters.push_back(std::move(param.data));
 		*endPtr = begPtr;
 	}
 	__device__ Header(const Header<T>& val)
@@ -2191,72 +2191,72 @@ private:
 				if (tkn == "sin")
 				{
 					last_type_id = int(tokens.push_token(SinFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<SinFunction<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<SinFunction<T>>(), 1));
 				}
 				else if (tkn == "cos")
 				{
 					last_type_id = int(tokens.push_token(CosFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<CosFunction<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<CosFunction<T>>(), 1));
 				}
 				else if (tkn == "tg")
 				{
 					last_type_id = int(tokens.push_token(TgFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<TgFunction<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<TgFunction<T>>(), 1));
 				}
 				else if (tkn == "log10")
 				{
 					last_type_id = int(tokens.push_token(Log10Function<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<Log10Function<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<Log10Function<T>>(), 1));
 				}
 				else if (tkn == "ln")
 				{
 					last_type_id = int(tokens.push_token(LnFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<LnFunction<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<LnFunction<T>>(), 1));
 				}
 				else if (tkn == "log")
 				{
 					last_type_id = int(tokens.push_token(LogFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<LogFunction<T>>(), 2));
+					funcStack.push(thrust::make_pair(make_cuda_shared<LogFunction<T>>(), 2));
 				}
 				else if (tkn == "j0")
 				{
 					last_type_id = int(tokens.push_token(J0Function<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<J0Function<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<J0Function<T>>(), 1));
 				}
 				else if (tkn == "j1")
 				{
 					last_type_id = int(tokens.push_token(J1Function<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<J1Function<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<J1Function<T>>(), 1));
 				}
 				else if (tkn == "jn")
 				{
 					last_type_id = int(tokens.push_token(JnFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<JnFunction<T>>(), 2));
+					funcStack.push(thrust::make_pair(make_cuda_shared<JnFunction<T>>(), 2));
 				}
 				else if (tkn == "y0")
 				{
 					last_type_id = int(tokens.push_token(Y0Function<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<Y0Function<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<Y0Function<T>>(), 1));
 				}
 				else if (tkn == "y1")
 				{
 					last_type_id = int(tokens.push_token(Y1Function<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<Y1Function<T>>(), 1));
+					funcStack.push(thrust::make_pair(make_cuda_shared<Y1Function<T>>(), 1));
 				}
 				else if (tkn == "yn")
 				{
 					last_type_id = int(tokens.push_token(YnFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<YnFunction<T>>(), 2));
+					funcStack.push(thrust::make_pair(make_cuda_shared<YnFunction<T>>(), 2));
 				}
 				else if (tkn == "max")
 				{
 					last_type_id = int(tokens.push_token(MaxFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<MaxFunction<T>>(), 0));
+					funcStack.push(thrust::make_pair(make_cuda_shared<MaxFunction<T>>(), 0));
 				}
 				else if (tkn == "min")
 				{
 					last_type_id = int(tokens.push_token(MinFunction<T>())->type());
-					funcStack.push(thrust::make_pair(std::make_shared<MinFunction<T>>(), 0));
+					funcStack.push(thrust::make_pair(make_cuda_shared<MinFunction<T>>(), 0));
 				}
 				else if (this->header.get_param_index(cuda_string(tkn.begin(), tkn.end())).value() >= 0)
 					last_type_id = int(tokens.push_token(Variable<T>(this->header, cuda_string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()))->type());

@@ -425,7 +425,14 @@ public:
 template <class T>
 class cuda_shared_ptr
 {
+public:
+	__device__ T* get() const;
+	T& operator*() const;
+	T* operator->() const;
 
 };
+
+template< class T, class... Args >
+cuda_shared_ptr<T> make_cuda_shared(Args&&... args);
 
 #endif //CUDA_MEMORY_H
