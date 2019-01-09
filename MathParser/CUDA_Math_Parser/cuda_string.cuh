@@ -8,12 +8,88 @@
 #ifndef CUDA_STRING_H_
 #define CUDA_STRING_H_
 
-__device__ std::size_t strlen(const char* psz);
-__device__ std::size_t wcslen(const wchar_t* psz);
-__device__ char* strcat(char *str1, const char *str2);
-__device__ char* strcpy(char* dest, const char* src);
-__device__ int strcmp(const char* str1, const char* str2);
-__device__ int memcmp(const void* str1, const void* str2, std::size_t size);
+namespace cu
+{
+
+namespace _Implementation
+{
+	template <class T>
+	constexpr T numeric_limits_max = std::numeric_limits<T>::max();
+	template <class T>
+	constexpr T numeric_limits_min = std::numeric_limits<T>::min();
+}
+
+template <class T>
+struct cuda_numeric_limits
+{
+	__device__ static constexpr T max()
+	{
+		return _Implementation::numeric_limits_max<T>;
+	}
+	__device__ static constexpr T min()
+	{
+		return _Implementation::numeric_limits_min<T>;
+	}
+};
+
+__device__ std::size_t strlen(const char* psz)
+{
+	std::size_t i;
+	for (i = 0; psz[i]; ++i);
+	return i;
+}
+
+__device__ std::size_t wcslen(const wchar_t* psz)
+{
+	std::size_t i;
+	for (i = 0; psz[i]; ++i);
+	return i;
+}
+
+__device__ char* strcpy(char* dest, const char* src)
+{
+	for (char *p = dest; (*p++ = *src++););
+	return dest;
+}
+
+__device__ char* strcat(char *str1, const char *str2)
+{
+	char* begin = str1;
+	while (*str1)
+		str1++;
+
+	while (*str1++ = *str2++)
+		;
+
+	*str1 = '\0';
+	return begin;
+}
+
+__device__ int strcmp(const char* str1, const char* str2)
+{
+	std::size_t i = 0;
+	for(; true; ++i)
+	{
+		if(str1[i] != str2[i])
+			break;
+		if (str1[i] == 0)
+			return 0;
+	}
+	return ((unsigned char) str1[i] > (unsigned char) str2[i]) ? 1 : -1;
+}
+
+__device__ int memcmp(const void* str1, const void* str2, std::size_t size)
+{
+	unsigned char* s1 = (unsigned char*) str1;
+	unsigned char* s2 = (unsigned char*) str2;
+	std::size_t i = 0;
+	for(; i < size; ++i)
+	{
+		if(s1[i] != s2[i])
+			return (s1[i] > s2[i]) ? 1 : -1;
+	}
+	return 0;
+}
 
 __host__ __device__ constexpr bool isdigit(const char ch) noexcept
 {
@@ -32,14 +108,114 @@ __host__ __device__ constexpr bool isalnum(const char ch) noexcept
 
 __host__ __device__ constexpr bool isspace(const char ch) noexcept
 {
-	return (ch == ' ');
+	return (ch == ' ' || ch == '\t');
 }
 
-__device__ unsigned long long strtoull(const char *str, char **str_end, int base);
+__device__ unsigned long long strtoull_n(const char *str, std::size_t cbMax, char **str_end, int base)
+{
+	unsigned long long result = 0;
+	std::size_t i;
+	if (base != 10)
+		return cuda_numeric_limits<unsigned long long>::max(); //cuda_abort_with_error(CHSVERROR_INVALID_PARAMETER);
+	if (cbMax == 0)
+		*str_end = (char*) str;
+	else
+	{
+		for (i = (str[0] == '-' || str[0] == '+') ? 1 : 0; i < cbMax && isdigit(str[i]); ++i)
+		{
+			auto result_new = result * 10 + (str[i++] - 48);
+			if (result > result_new)
+			{
+				result = (str[0] == '-') ? -cuda_numeric_limits<unsigned long long>::max() : cuda_numeric_limits<unsigned long long>::max();
+				break;
+			}
+		}
+		*str_end = (char*)&str[i];
+		result = (str[0] == '-') ? (cuda_numeric_limits<unsigned long long>::max() - result) + 1 : result;
+	}
+	return result;
+}
 
-__device__ long long strtoll(const char *str, char **str_end, int base);
+__device__ unsigned long long strtoull(const char *str, char **str_end, int base)
+{
+	return strtoull_n(str, (std::size_t) -1, str_end, base);
+}
 
-__device__ double strtod(const char* str, char** str_end);
+__device__ long long strtoll_n(const char *str, std::size_t cbMax, char **str_end, int base)
+{
+	long long result = 0;
+	std::size_t i;
+	if (base != 10)
+		return cuda_numeric_limits<long long>::max(); //cuda_abort_with_error(CHSVERROR_INVALID_PARAMETER);
+
+	if (cbMax == 0)
+		*str_end = (char*) str;
+	else
+	{
+		for (i = (str[0] == '-' || str[0] == '+') ? 1 : 0; i < cbMax && isdigit(str[i]); ++i)
+		{
+			auto result_new = result * 10 + (str[i] - 48);
+			if (result > result_new)
+			{
+				result = (str[0] == '-') ? cuda_numeric_limits<long long>::min() : cuda_numeric_limits<long long>::max();
+				break;
+			}
+		}
+		*str_end = (char*) &str[i];// (str + i)
+		result = (str[0] == '-') ? -result : result;
+	}
+	return result;
+}
+
+__device__ long long strtoll(const char *str, char **str_end, int base)
+{
+	return strtoll_n(str, (std::size_t) -1, str_end, base);
+}
+
+__device__ double strtod_n(const char* str, std::size_t cbMax, char** str_end)
+{
+#ifndef __CUDA_ARCH__
+	using std::pow;
+#endif
+	double result = 0;
+
+	if (cbMax == 0)
+		*str_end = (char*) str;
+	else
+	{
+		const char* p = &str[0];
+		const char *p1, *p2, *p3;
+
+		int intPart = 0, realPart = 0, expPart = 0;
+		std::size_t cbRest = cbMax;
+		intPart = strtoll_n(p, cbRest, (char**) &p1, 10);
+		result = intPart;
+		cbRest -= p1 - p;
+
+		if (cbRest > 0 && *p1 == '.' || *p1 == ',')
+		{
+			std::size_t cbFractialPart;
+			realPart = strtoll_n(p1 + 1, cbRest, (char**) &p2, 10);
+			cbFractialPart = (std::size_t) (p2 - p1);
+			result += double(realPart) * pow((double)10, -(double) cbFractialPart);
+			cbRest -= cbFractialPart;
+			p1 = p2;
+		}
+		if (*p1 == 'E')
+		{
+			expPart = strtoll_n(p2 + 1, cbRest, const_cast<char**>(&p3), 10);
+			result *= pow((double)10, (double)expPart);
+			p1 = p3;
+		}
+		*str_end = const_cast<char*>(p1);
+	}
+	return result;
+}
+
+__device__ double strtod(const char* str, char** str_end)
+{
+	return strtod_n(str, (std::size_t) -1, str_end);
+}
 
 
 //#ifdef CUDA_UTILS_CPP
@@ -182,7 +358,15 @@ public:
 		return it;
 	}
 };
-__device__ double stod(const cuda_string& str, std::size_t* pos = 0);
+__device__ double stod(const cuda_string& str, std::size_t* pos = 0)
+{
+	char *p;
+	double result = strtod(str.c_str(), const_cast<char**>(&p));
+
+	if (pos != 0)
+		*pos = p - str.c_str();
+	return result;
+}
 
 
 __device__ inline bool operator==(const cuda_string& str1, const cuda_string& str2)
@@ -241,5 +425,7 @@ __device__ cuda_string to_cuda_string(T val)
 
 	return cuda_string(&buf[0], &buf[bufSize]);
 }
+
+} //cu
 
 #endif //CUDA_STRING_H_

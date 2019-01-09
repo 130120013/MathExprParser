@@ -29,14 +29,19 @@ private:
 			cudaFree(ptr);
 		}
 	private:
-#if __CUDA_ARCH__ >= 350
 		template <class T>
-		__device__ static auto deconstruct(T* ptr) -> typename std::enable_if<std::is_destructible<T>::value>::type
+#if __CUDA_ARCH__ >= 350
+		__device__ __host__
+#endif
+		static auto deconstruct(T* ptr) -> typename std::enable_if<std::is_destructible<T>::value>::type
 		{
 			ptr->~T();
 		}
-		__device__ static auto deconstruct(...) -> void {}
+		__device__ 
+#if __CUDA_ARCH__ >= 350
+		__device__ __host__
 #endif
+			static auto deconstruct(...) -> void {}
 	};
 public:
 	typedef Deleter deleter_type;
@@ -139,19 +144,6 @@ namespace _Implementation
 	};
 };
 
-//template <class elemType>
-//class cuda_unique_ptr_2:public std::unique_ptr<elemType, _Implementation::Deleter<elemType>>
-//{
-//	typedef std::unique_ptr<elemType, _Implementation::Deleter<elemType>> my_base;
-//public:
-//	typedef typename my_base::pointer pointer;
-//	typedef typename my_base::element_type element_type;
-//	typedef typename my_base::deleter_type deleter_type;
-//	//c-tors here (do not inherit constructors)
-//	//move-assignment here
-//	//public methods are inherited from std::unique_ptr
-//};
-
 template <class T>
 #if __CUDA_ARCH__ >= 350
 	__device__ __host__ 
@@ -166,7 +158,8 @@ inline cuda_unique_ptr<void> make_cuda_unique_ptr<void>(std::size_t cb)
 {
 	void* ptr;
 	auto err = cudaMalloc(&ptr, cb);
-	if (err)
+	if (err != cudaSuccess)
+		return cuda_unique_ptr<void>();
 //#if defined(__CUDA_ARCH__)
 //		cuda_abort_with_error(CHSVERROR_OUTOFMEMORY);
 ////#else

@@ -1,150 +1,65 @@
+//#define __device__
+//#define __global__
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "cuda_list.cuh"
-#include "cuda_stack.cuh"
+#include "cuda_string.cuh"
+//#include "cuda_list.cuh"
+//#include "cuda_stack.cuh"
 #include <stdio.h>
-#include "CudaParser.h"
+//#include "CudaParser.h"
 
-cudaError_t addWithCuda(int *c, const int *a, const int *b,  unsigned int size);
-
-__global__ void addKernel(int *c, const int *a, const int *b)
+__global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::size_t cbStr)
 {
-    int i = threadIdx.x;
-	//l->push_back(a[i] + b[i]);
-    c[i] = a[i] + b[i];
+	auto i = threadIdx.x * blockIdx.x * blockDim.x;
+	if (i < n)
+		vec[i] = cu::stod(cu::cuda_string(pStr, pStr + cbStr));
 }
 
 int main()
 {
-    const int arraySize = 5;
-    const int a[arraySize] = { 1, 2, 3, 4, 5 };
-    const int b[arraySize] = { 10, 20, 30, 40, 50 };
-    int c[arraySize] = { 0 };
+	cudaError_t cudaStatus;
+	const char pStr[] = "3.14";
+	double V[1000];
 
-	cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
+	auto pStr_d = make_cuda_unique_ptr<char>(sizeof(pStr));
+	auto V_d = make_cuda_unique_ptr<double>(sizeof(V) / sizeof(double));
+
+	cudaStatus = cudaMemcpy(pStr_d.get(), pStr, sizeof(pStr) - 1, cudaMemcpyHostToDevice);
+	if (cudaStatus != cudaSuccess)
+		return -1;
+	memset_expr<<<2, 500>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
+
+	/*cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
 	Mathexpr<double> mathexpr(expression);
 	cuda_vector<double> v;
 	v.push_back(1);
 	v.push_back(10);
-	mathexpr.init_variables(v);
+	mathexpr.init_variables(v);*/
 	//std::cout << "Value: " << mathexpr.compute() << "\n";
 
 	//cuda_list<double> l;
 
-    // Add vectors in parallel.
-    cudaError_t cudaStatus = addWithCuda(c, a, b, arraySize);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addWithCuda failed!");
-        return 1;
-    }
+	cudaStatus = cudaDeviceSynchronize();
+	if (cudaStatus != cudaSuccess) 
+	{
+		fprintf(stderr, "cudaDeviceSynchronize failed!");
+		return -2;
+	}
 
-    printf("{1,2,3,4,5} + {10,20,30,40,50} = {%d,%d,%d,%d,%d}\n",
-        c[0], c[1], c[2], c[3], c[4]);
+	cudaStatus = cudaMemcpy(V, V_d.get(), sizeof(V), cudaMemcpyDeviceToHost);
+	if (cudaStatus != cudaSuccess)
+		return -3;
 
 	//printf("%d", l.front());
 
-    // cudaDeviceReset must be called before exiting in order for profiling and
-    // tracing tools such as Nsight and Visual Profiler to show complete traces.
-    cudaStatus = cudaDeviceReset();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceReset failed!");
-        return 1;
-    }
+	// cudaDeviceReset must be called before exiting in order for profiling and
+	// tracing tools such as Nsight and Visual Profiler to show complete traces.
+	cudaStatus = cudaDeviceReset();
+	if (cudaStatus != cudaSuccess) {
+		fprintf(stderr, "cudaDeviceReset failed!");
+		return -4;
+	}
 
-    return 0;
-}
-
-// Helper function for using CUDA to add vectors in parallel.
-cudaError_t addWithCuda(int *c, const int *a, const int *b, unsigned int size)
-{
-    int *dev_a = 0;
-    int *dev_b = 0;
-    int *dev_c = 0;
-	//cuda_list<double>* dlist = 0;
-    cudaError_t cudaStatus;
-
-    // Choose which GPU to run on, change this on a multi-GPU system.
-    cudaStatus = cudaSetDevice(0);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?");
-        goto Error;
-    }
-
-    // Allocate GPU buffers for three vectors (two input, one output)    .
-    cudaStatus = cudaMalloc((void**)&dev_c, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMalloc((void**)&dev_a, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMalloc((void**)&dev_b, size * sizeof(int));
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMalloc failed!");
-        goto Error;
-    }
-
-	//cudaStatus = cudaMalloc((void**)&dlist, size * sizeof(cuda_list<double>));
-	//if (cudaStatus != cudaSuccess) {
-	//	fprintf(stderr, "cudaMalloc failed!");
-	//	goto Error;
-	//}
-
-    // Copy input vectors from host memory to GPU buffers.
-    cudaStatus = cudaMemcpy(dev_a, a, size * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-    cudaStatus = cudaMemcpy(dev_b, b, size * sizeof(int), cudaMemcpyHostToDevice);
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaMemcpy failed!");
-        goto Error;
-    }
-
-    // Launch a kernel on the GPU with one thread for each element.
-    addKernel<<<1, size>>>(dev_c, dev_a, dev_b);
-
-    // Check for any errors launching the kernel
-    cudaStatus = cudaGetLastError();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "addKernel launch failed: %s\n", cudaGetErrorString(cudaStatus));
-        goto Error;
-    }
-    
-    // cudaDeviceSynchronize waits for the kernel to finish, and returns
-    // any errors encountered during the launch.
-    cudaStatus = cudaDeviceSynchronize();
-    if (cudaStatus != cudaSuccess) {
-        fprintf(stderr, "cudaDeviceSynchronize returned error code %d after launching addKernel!\n", cudaStatus);
-        goto Error;
-    }
-
-    // Copy output vector from GPU buffer to host memory.
-    //cudaStatus = cudaMemcpy(c, dev_c, size * sizeof(int), cudaMemcpyDeviceToHost);
-    //if (cudaStatus != cudaSuccess) {
-    //    fprintf(stderr, "cudaMemcpy failed!");
-    //    goto Error;
-    //}
-	//size * sizeof(double) + sizeof(cuda_list<double>)
-	//cudaStatus = cudaMemcpy(hlist, dlist, size * sizeof(cuda_list<double>), cudaMemcpyDeviceToHost);
-	//if (cudaStatus != cudaSuccess) {
-	//	fprintf(stderr, "cudaMemcpy failed!");
-	//	goto Error;
-	//}
-
-Error:
-    cudaFree(dev_c);
-    cudaFree(dev_a);
-    cudaFree(dev_b);
-	//cudaFree(dlist);
-    
-    return cudaStatus;
+	return 0;
 }
