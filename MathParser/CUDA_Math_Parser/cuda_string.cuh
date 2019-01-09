@@ -129,6 +129,7 @@ __device__ unsigned long long strtoull_n(const char *str, std::size_t cbMax, cha
 				result = (str[0] == '-') ? -cuda_numeric_limits<unsigned long long>::max() : cuda_numeric_limits<unsigned long long>::max();
 				break;
 			}
+			result = result_new;
 		}
 		*str_end = (char*)&str[i];
 		result = (str[0] == '-') ? (cuda_numeric_limits<unsigned long long>::max() - result) + 1 : result;
@@ -160,6 +161,7 @@ __device__ long long strtoll_n(const char *str, std::size_t cbMax, char **str_en
 				result = (str[0] == '-') ? cuda_numeric_limits<long long>::min() : cuda_numeric_limits<long long>::max();
 				break;
 			}
+			result = result_new;
 		}
 		*str_end = (char*) &str[i];// (str + i)
 		result = (str[0] == '-') ? -result : result;
@@ -196,7 +198,7 @@ __device__ double strtod_n(const char* str, std::size_t cbMax, char** str_end)
 		{
 			std::size_t cbFractialPart;
 			realPart = strtoll_n(p1 + 1, cbRest, (char**) &p2, 10);
-			cbFractialPart = (std::size_t) (p2 - p1);
+			cbFractialPart = (std::size_t) (p2 - p1 - 1);
 			result += double(realPart) * pow((double)10, -(double) cbFractialPart);
 			cbRest -= cbFractialPart;
 			p1 = p2;
@@ -248,16 +250,16 @@ public:
 	}
 	__device__ inline cuda_string(const char* str) : strSize(strlen(str)) 
 	{
-		pStr.reset(static_cast<char*>(malloc(strSize+1)));
+		pStr = make_cuda_device_unique_ptr<char>(strSize + 1);
 		memcpy(pStr.get(), str, strSize + 1);
 	}
-	__device__ cuda_string(std::size_t size, char ch);
+	//__device__ cuda_string(std::size_t size, char ch);
 	template <class Iterator>
 	__device__ cuda_string(Iterator b, Iterator e)
 	{
 		auto size = e - b;
 		std::size_t i = 0;
-		pStr.reset(static_cast<char*>(malloc(size + 1))); 
+		pStr = make_cuda_device_unique_ptr<char>(size + 1);
 		for(Iterator it = b; it != e; ++it)
 			pStr.get()[i++] = *it;
 
@@ -275,10 +277,39 @@ public:
 	{
 		return c_str();
 	}
-	__device__ cuda_string& operator=(const cuda_string& str);
+	__device__ cuda_string& operator=(const cuda_string& str)
+	{
+		if(this->size() >= str.size())
+		{
+			memcpy(this->pStr.get(), str.c_str(), str.size() + 1);
+			this->strSize = str.size();
+		}
+		else
+		{
+			auto tmp = make_cuda_device_unique_ptr<char>(str.size() + 1);
+			if((bool)tmp)
+			{
+				memcpy(tmp.get(), str.c_str(), str.size() + 1);
+				this->pStr = std::move(tmp);
+				this->strSize = str.size();
+			}
+		}
+		return *this;
+	}
 	__device__ cuda_string& operator=(cuda_string&& str) = default;
 
-	__device__ cuda_string& operator+=(const cuda_string& str);
+	__device__ cuda_string& operator+=(const cuda_string& str)
+	{
+		auto tmp = make_cuda_device_unique_ptr<char>(this->size() + str.size() + 1);
+		if(bool(tmp))
+		{
+			memcpy(tmp.get(), this->c_str(), this->size());
+			memcpy(tmp.get() + this->size(), str.c_str(), str.size() + 1);
+			this->pStr = std::move(tmp);
+			this->strSize = this->size() + str.size();
+		}
+		return *this;
+	}
 	__device__ inline cuda_string operator+(const cuda_string& str) const
 	{
 		cuda_string temp(*this);

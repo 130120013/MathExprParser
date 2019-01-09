@@ -16,6 +16,7 @@
 
 #ifndef PARSER_H
 #define PARSER_H
+namespace cu {
 __device__ constexpr bool iswhitespace(char ch) noexcept
 {
 	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\0'; //see also std::isspace
@@ -91,7 +92,7 @@ struct token_string_entity
 	}
 	__device__ inline int compare(const char* pszString) const noexcept
 	{
-		return this->compare(pszString, std::strlen(pszString));
+		return this->compare(pszString, cu::strlen(pszString));
 	}
 	template <std::size_t N>
 	__device__ inline auto compare(const char(&strArray)[N]) const noexcept -> std::enable_if_t<N == 0, int>
@@ -1949,7 +1950,7 @@ public:
 					if (!isOpeningBracket)
 						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 					auto param_name = cuda_string(begPtr, l_endptr);
-					if (!m_arguments.emplace(param_name, T()).second)
+					if (!m_arguments.insert(thrust::pair<cuda_string, T>(param_name, T())).second)
 						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
 					params.push_back(std::move(param_name));
 				}
@@ -1991,15 +1992,19 @@ public:
 			m_parameters.push_back(std::move(param.data));
 		*endPtr = begPtr;
 	}
-	__device__ Header(const Header<T>& val)
+	Header(const Header<T>&) = delete;
+	Header& operator=(const Header<T>&) = delete;
+	__device__ Header(Header&&) = default;
+	__device__ Header& operator=(Header&&) = default;
+	/*__device__ Header(const Header<T>& val)
 	{
 		std::size_t size = val.get_name_length();
 		this->function_name = val.function_name;
 		this->m_arguments = val.m_arguments;
 		this->m_parameters = val.m_parameters;
 		construction_success_code = val.construction_success_code;
-		//		isReady = true;
-	}
+	}*/
+
 	__device__ virtual bool is_ready() const
 	{
 		return true;
@@ -2025,16 +2030,6 @@ public:
 		}
 		return return_wrapper_t<const T&>(it->second, CudaParserErrorCodes::Success);
 	}
-	//__device__ return_wrapper_t<T&> get_argument(const char* parameter_name, std::size_t parameter_name_size) //call this from Variable::operator()().
-	//{
-	//	auto it = m_arguments.find(std::string(parameter_name, parameter_name + parameter_name_size));
-	//	if (it == m_arguments.end())
-	//	{
-	//		this->construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotFound);
-	//		return return_wrapper_t<T&>(CudaParserErrorCodes::ParameterIsNotFound);
-	//	}
-	//	return return_wrapper_t<T&>(it->second, CudaParserErrorCodes::Success);
-	//}
 	__device__ auto get_argument(const char* parameter_name, std::size_t parameter_name_size) //call this from Variable::operator()().
 	{
 		auto carg = const_cast<const Header<T>*>(this)->get_argument(parameter_name, parameter_name_size);
@@ -2046,10 +2041,6 @@ public:
 	{
 		return this->get_argument(m_parameters[index].c_str(), m_parameters[index].size());
 	}
-	//__device__ T& get_argument_by_index(std::size_t index) //call this from Variable::operator()().
-	//{
-	//	return this->get_argument(m_parameters[index].c_str(), m_parameters[index].size());
-	//}
 	__device__ std::size_t get_required_parameter_count() const
 	{
 		return m_parameters.size();
@@ -2071,40 +2062,7 @@ public:
 		}
 		return return_wrapper_t<std::size_t>(CudaParserErrorCodes::ParameterIsNotFound);
 	}
-	__device__ Header(Header&&) = default;
-	__device__ Header& operator=(Header&&) = default;
 };
-//
-//template <class T>
-//class Mathexpr
-//{
-//public:
-//	__device__ Mathexpr(const char* sMathExpr, std::size_t cbMathExpr);
-//	__device__ Mathexpr(const char* szMathExpr):Mathexpr(szMathExpr, std::strlen(szMathExpr)) {}
-//	template <class Traits, class Alloc>
-//	__device__ Mathexpr(const std::basic_string<char, Traits, Alloc>& strMathExpr):Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
-//	__device__ return_wrapper_t<T> compute() const
-//	{
-//		auto result = body;
-//		simplify_body(result);
-//		if (result.size() != 1)
-//			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidExpression);
-//		return return_wrapper_t<T>((*result.front())().get());
-//	}
-//	__device__ return_wrapper_t<void> init_variables(const std::vector<T>& parameters)
-//	{
-//		if (parameters.size() < header.get_params_count())
-//			return return_wrapper_t<void>(CudaParserErrorCodes::InsufficientNumberParams);
-//
-//		for (std::size_t iArg = 0; iArg < header.get_params_count(); ++iArg)
-//			header.get_argument_by_index(iArg) = parameters[iArg];
-//	}
-//	//void clear_variables(); With the map referencing approach this method is not necessary anymore because if we need to reuse the expression
-//	//with different arguments, we just reassign them with init_variables
-//private:
-//	Header<T> header;
-//	std::list<cuda_shared_ptr<IToken<T>>> body;
-//};
 
 template <class T>
 class Mathexpr
@@ -2332,6 +2290,8 @@ __device__ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
 	++endptr;
 	lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
 	simplify_body(body);
+}
+
 }
 
 #endif // !PARSER_H

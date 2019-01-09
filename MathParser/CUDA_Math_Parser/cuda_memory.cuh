@@ -195,11 +195,11 @@ private:
 		}
 	private:
 		template <class T>
-		__device__ static auto deconstruct(T* ptr) -> typename std::enable_if<std::is_destructible<T>::value>::type
+		__device__ static auto deconstruct(T* ptr) ->void //typename std::enable_if<std::is_destructible<T>::value>::type
 		{
 			ptr->~T();
 		}
-		__device__ static auto deconstruct(...) -> void {}
+		//__device__ static auto deconstruct(...) -> void {}
 	};
 public:
 	typedef DeviceDeleter deleter_type;

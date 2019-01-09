@@ -1,9 +1,12 @@
 #include "cuda_iterator.cuh"
-#include "impl_rb_tree.h"
 #include <thrust/pair.h>
+#include "impl_rb_tree.h"
 
 #ifndef CUDAMAP_CUH
 #define CUDAMAP_CUH
+
+namespace cu
+{
 
 template <class Key, class Tp>
 class cuda_map_value_compare
@@ -70,8 +73,6 @@ public:
     }
 };
 
-template <class _Key, class _Tp, class _Compare>
-class cuda_map;
 template <class _TreeIterator> class cuda_map_const_iterator;
 
 template <class _TreeIterator>
@@ -176,7 +177,7 @@ public:
 };
 
 
-template <class Key, class T, class Compare = typename  cuda_map_value_compare<Key, T>::key_compare>
+template <class Key, class T, class Compare>
 class cuda_map
 {
 public:
@@ -542,5 +543,7 @@ __device__ _Tp& cuda_map<_Key, _Tp, _Compare>::operator[](const key_type& key)
     }
     return r->value.second;
 }
+
+} //cu
 
 #endif //CUDAMAP_CUH

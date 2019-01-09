@@ -22,6 +22,10 @@ public:
 	{
 		return m_size;
 	}
+	__device__ size_type capacity() const
+	{
+		return m_capacity;
+	}
 
 	__device__ reference operator[] (size_type i)
 	{
@@ -66,17 +70,13 @@ public:
 	__device__ void push_back(const T& value)
 	{
 		if (m_size >= m_capacity)
-		{
-			reserve(m_size + 1);
-		}
+			this->reserve(m_size + 1);
 		this->m_buf.get()[m_size++] = value;
 	}
 	__device__ void push_back(T&& value)
 	{
 		if (m_size >= m_capacity)
-		{
-			reserve(m_size + 1);
-		}
+			this->reserve(m_size + 1);
 		this->m_buf.get()[m_size++] = std::move(value);
 	}
 
@@ -85,38 +85,48 @@ public:
 		return this->size() == 0;
 	}
 
-	__device__ void reserve(size_type size)
+	__device__ void reserve(size_type new_size)
 	{
-		T* newBuffer = new T[size];
-		auto newBuf = make_cuda_device_unique_ptr<value_type>(size);
-
-		for (auto i = 0; i < size; ++i)
-			newBuffer[i] = m_buf.get()[i];
-		this->m_capacity = size;
-		m_buf.reset(std::move(newBuffer));
+		if (new_size > this->capacity())
+		{
+			auto buf = make_cuda_device_unique_ptr<value_type>(new_size);
+			if (bool(buf))
+			{
+				if (bool(m_buf))
+				{
+					memcpy(buf.get(), m_buf.get(), this->size());
+				}
+				this->m_capacity = new_size;
+				m_buf = std::move(buf);
+			}
+		}
 	}
-
-	template <class ... Args>
-	__device__ iterator emplace(const_iterator pos, Args&& ... args)
+	__device__ void shrink_to_fit()
 	{
-		auto m_new_buf = make_cuda_device_unique_ptr<value_type>(m_size + 1);
-		auto idx = pos - this->begin();
-		if (idx != 0)
-			memcpy(m_new_buf.get(), m_buf.get(), sizeof(value_type) * idx);
-		new (&m_new_buf.get()[idx]) T(std::forward<Args>(args)...);
-
-		if (idx != m_size)
-			memcpy(m_new_buf.get(), m_buf.get(), sizeof(value_type) * (m_size - idx));
-		m_buf.reset(m_new_buf.release());
-		m_size = m_size + 1;
-		return &m_new_buf.get()[idx];
+		//TODO: implement
 	}
-
-	template <class ... Args>
-	__device__ reference emplace_back(Args&& ... args)
+	__device__ cuda_vector() = default;
+	__device__ cuda_vector(const cuda_vector& right)
 	{
-		return *emplace(this->end(), std::forward<Args>(args)...);
+		*this = right;
 	}
+	__device__ cuda_vector(cuda_vector&&) = default;
+	__device__ cuda_vector& operator=(const cuda_vector& right)
+	{
+		if (this != &right)
+		{
+			auto buf = cuda_device_unique_ptr<value_type>(right.size());
+			if (bool(buf))
+			{
+				memcpy(buf.get(), right.data(), right.size());
+				m_buf = std::move(buf);
+				m_size = m_capacity = right.size();
+			}
+		}
+		return *this;
+	}
+	__device__ cuda_vector& operator=(cuda_vector&&) = default;
+
 private:
 	cuda_device_unique_ptr<value_type> m_buf;
 	size_type m_size = 0;

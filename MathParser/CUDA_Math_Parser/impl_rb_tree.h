@@ -11,15 +11,20 @@
 #ifndef CUDAREDBLACKTREE_H
 #define CUDAREDBLACKTREE_H
 
+namespace cu
+{
+
 	template <class Tp, class _Compare> class tree;
 		template <class Tp, class NodePtr, class DiffType>
 		class tree_iterator;
 		template <class Tp, class _ConstNodePtr, class DiffType>
 		class tree_const_iterator;
-		template <class Key, class Tp, class _Compare>
+		template <class Key, class Tp>
+		class cuda_map_value_compare;
+		template <class Key, class Tp, class _Compare = typename  cuda_map_value_compare<Key, Tp>::key_compare>
 		class cuda_map;
-		template <class Key, class _Compare>
-		class cuda_set;
+		/* template <class Key, class _Compare= typename  cuda_set_value_compare<Key, T>::key_compare>
+		class cuda_set;*/
 
 		/*
 
@@ -1755,5 +1760,7 @@
 		{
 			x.swap(y);
 		}
+
+} //namespace cu
 
 #endif //CUDAREDBLACKTREE_H
