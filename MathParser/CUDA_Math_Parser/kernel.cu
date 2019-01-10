@@ -4,7 +4,7 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include "cuda_string.cuh"
-//#include "cuda_list.cuh"
+#include "cuda_list.cuh"
 //#include "cuda_stack.cuh"
 #include <stdio.h>
 #include "CudaParser.h"
@@ -148,11 +148,26 @@ namespace cu
 __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::size_t cbStr)
 {
 	char* endptr;
-	auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
-	//header.push_argument("x", 1, 12);
-	auto someptr = make_cuda_device_unique_ptr<cu::cuda_string>();
-	*someptr = cu::cuda_string("abc");
-	auto someotherptr = std::move(someptr);
+	//auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
+	////header.push_argument("x", 1, 12);
+	//auto someptr = make_cuda_device_unique_ptr<cu::cuda_string>();
+	//*someptr = cu::cuda_string("abc");
+	//auto someotherptr = std::move(someptr);
+
+	/*auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
+	header.push_argument("x", 1, 12);*/
+	cuda_list<cu::cuda_string> lst;
+	lst.push_back("1");
+	lst.push_front("000daa");
+	auto b = lst.back();
+	auto f = lst.front();
+	auto beg = lst.begin();
+	auto end = lst.end();
+	lst.erase(beg);
+	//lst.pop_back();
+	//lst.pop_front(); //not needed
+	
+>>>>>>> Stashed changes
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i < n)
 	{

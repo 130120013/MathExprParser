@@ -2,7 +2,8 @@
 #define CUDA_LIST_CUH
 
 #include <iostream>
-#include <stdexcept>
+//#include <stdexcept>
+#include "cuda_memory.cuh"
 
 template <typename T>
 class cuda_list 
@@ -25,11 +26,11 @@ public:
 	__host__ __device__ void push_back(T const& data);
 	__host__ __device__ void push_front(T&& data);
 	__host__ __device__ void push_front(T const& data);
-	__host__ __device__ void pop_back();
-	__host__ __device__ void pop_front();
+	//__host__ __device__ void pop_back();
+	//__host__ __device__ void pop_front();
 	__host__ __device__ void swap(cuda_list &x);
 	__host__ __device__ void clear();
-	//__device__ iterator erase(iterator pos);
+	__device__ iterator erase(iterator pos);
 
 	__host__ __device__ const_iterator begin() const; 
 	__host__ __device__ iterator begin();
@@ -51,12 +52,6 @@ public:
 
 	__host__ __device__ T& back();
 	__host__ __device__ T const& back() const;
-
-	__host__ __device__ T& at(T const indx);
-	__host__ __device__ T const& at(T const indx) const;
-
-	__host__ __device__ T& operator[] (T const indx);
-	__host__ __device__ T const& operator[] (T const indx) const;
 
 private:
 	int elements = 0;
@@ -121,6 +116,38 @@ __host__ __device__ void cuda_list<T>::push_back(T const& data) {
 	++elements;
 }
 
+template <typename T>
+__device__ typename::cuda_list<T>::iterator cuda_list<T>::erase(typename::cuda_list<T>::iterator pos)
+{
+	if(this->size() == 0)
+		return nullptr;
+
+	auto tmp = cuda_device_unique_ptr<node>(pos);
+
+	if(tmp.get() == this->begin())
+	{
+		this->head = tmp->next;
+		tmp->next->prev = nullptr;
+	}
+	else
+	{
+		if(tmp.get() != this->end())
+		{
+			this->tail = tmp->prev;
+			tmp->prev->next = nullptr;
+		}
+		else
+		{
+			pos->next->prev = tmp->prev;
+			pos->prev->next = tmp->next;
+		}
+	}
+	
+	--elements;
+	//node* nxt = tmp->next;
+	//delete tmp;
+	return tmp->next;
+}
 //template <typename T>
 //__host__ __device__ void cuda_list<T>::push_back(T&& data)
 //{
@@ -155,27 +182,39 @@ __host__ __device__ void cuda_list<T>::push_front(T&& data) {
 	++elements;
 }
 
-template <typename T>
-__host__ __device__ void cuda_list<T>::pop_front() {
-
-	node *tmp = head;
-	head = head->next;
-	if (head != nullptr)
-		head->prev = nullptr;
-	--elements;
-	delete tmp;
-}
-
-template <typename T>
-__host__ __device__ void cuda_list<T>::pop_back() {
-
-	node *tmp = tail;
-	tail = tail->prev;
-	if (tail != nullptr)
-		tail->next = nullptr;
-	--elements;
-	delete tmp;
-}
+//template <typename T>
+//__host__ __device__ void cuda_list<T>::pop_front() 
+//{
+//	node *tmp = head;
+//	if(this->size() == 1)
+//	{
+//		head = tail = nullptr;
+//	}
+//	else
+//	{
+//		head = head->next;
+//		head->prev = nullptr;
+//	}
+//	--elements;
+//	delete tmp;
+//}
+//
+//template <typename T>
+//__host__ __device__ void cuda_list<T>::pop_back() {
+//
+//	node *tmp = tail;
+//	if(this->size() == 1)
+//	{
+//		head = tail = nullptr;
+//	}
+//	else
+//	{
+//		tail = tail->prev;
+//		tail->next = nullptr;
+//	}
+//	--elements;
+//	delete tmp;
+//}
 
 template <typename T>
 __host__ __device__ bool cuda_list<T>::empty() const {
@@ -185,56 +224,6 @@ __host__ __device__ bool cuda_list<T>::empty() const {
 template <typename T>
 __host__ __device__ size_t cuda_list<T>::size() const {
 	return elements;
-}
-
-template <typename T>
-__host__ __device__ T& cuda_list<T>::operator[] (T const indx) {
-	int cont = 0;
-	node *curr = head;
-	while (curr) {
-		if (cont == indx)
-			return curr->data;
-		curr = curr->next;
-		++cont;
-	}
-	return nullptr;
-}
-
-template <typename T>
-__host__ __device__ T const& cuda_list<T>::operator[] (T const indx) const {
-	int cont = 0;
-	node *curr = head;
-	while (curr) {
-		if (cont == indx)
-			return curr->data;
-		curr = curr->next;
-		++cont;
-	}
-	return nullptr;
-}
-
-template <typename T>
-__host__ __device__ T& cuda_list<T>::at(T const indx) {
-	int cont = 0;
-	node *curr = head;
-	while (curr) {
-		if (cont == indx)
-			return curr->data;
-		curr = curr->next;
-	}
-	return nullptr;
-}
-
-template <typename T>
-__host__ __device__ T const& cuda_list<T>::at(T const indx) const {
-	int cont = 0;
-	node *curr = head;
-	while (curr) {
-		if (cont == indx)
-			return curr->data;
-		curr = curr->next;
-	}
-	return nullptr;
 }
 
 template <typename T>
