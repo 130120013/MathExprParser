@@ -69,14 +69,12 @@ public:
 
 	__device__ void push_back(const T& value)
 	{
-		if (m_size >= m_capacity)
-			this->reserve(m_size + 1);
+		this->reserve(m_size + 1);
 		this->m_buf.get()[m_size++] = value;
 	}
 	__device__ void push_back(T&& value)
 	{
-		if (m_size >= m_capacity)
-			this->reserve(m_size + 1);
+		this->reserve(m_size + 1);
 		this->m_buf.get()[m_size++] = std::move(value);
 	}
 
@@ -93,9 +91,7 @@ public:
 			if (bool(buf))
 			{
 				if (bool(m_buf))
-				{
-					memcpy(buf.get(), m_buf.get(), this->size());
-				}
+					memcpy(buf.get(), m_buf.get(), this->size() * sizeof(value_type));
 				this->m_capacity = new_size;
 				m_buf = std::move(buf);
 			}
@@ -118,7 +114,7 @@ public:
 			auto buf = cuda_device_unique_ptr<value_type>(right.size());
 			if (bool(buf))
 			{
-				memcpy(buf.get(), right.data(), right.size());
+				memcpy(buf.get(), right.data(), right.size() * sizeof(value_type));
 				m_buf = std::move(buf);
 				m_size = m_capacity = right.size();
 			}

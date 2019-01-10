@@ -43,7 +43,7 @@ namespace cu
 						if (!isOpeningBracket)
 							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 						auto param_name = cuda_string(begPtr, l_endptr);
-						//if (!m_arguments.insert(thrust::pair<cuda_string, T>(param_name, T())).second)
+						if (!m_arguments.insert(thrust::pair<cuda_string, T>(param_name, T())).second)
 							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
 						params.push_back(std::move(param_name));
 					}
@@ -80,7 +80,7 @@ namespace cu
 					begPtr += 1;
 				}
 			}
-			//m_parameters.reserve(params.size());
+			m_parameters.reserve(params.size());
 			for (auto& param : params)
 				m_parameters.push_back(std::move(param.data));
 			*endPtr = begPtr;
@@ -89,6 +89,59 @@ namespace cu
 		TestHeader& operator=(const TestHeader<T>&) = delete;
 		__device__ TestHeader(TestHeader&&) = default;
 		__device__ TestHeader& operator=(TestHeader&&) = default;
+		__device__ return_wrapper_t<void> push_argument(const char* name, std::size_t parameter_name_size, const T& value)
+		{
+			auto it = m_arguments.find(cuda_string(name, name + parameter_name_size));
+			if (it == m_arguments.end())
+			{
+				construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotFound);
+				return construction_success_code;
+			}
+			it->second = value;
+			return construction_success_code;
+		}
+		__device__ return_wrapper_t<const T&> get_argument(const char* parameter_name, std::size_t parameter_name_size) const //call this from Variable::operator()().
+		{
+			auto it = m_arguments.find(cuda_string(parameter_name, parameter_name + parameter_name_size));
+			if (it == m_arguments.end())
+			{
+				this->construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotFound);
+				return return_wrapper_t<const T&>(CudaParserErrorCodes::ParameterIsNotFound);
+			}
+			return return_wrapper_t<const T&>(it->second, CudaParserErrorCodes::Success);
+		}
+		__device__ auto get_argument(const char* parameter_name, std::size_t parameter_name_size) //call this from Variable::operator()().
+		{
+			auto carg = const_cast<const TestHeader<T>*>(this)->get_argument(parameter_name, parameter_name_size);
+			if (carg.return_code() != CudaParserErrorCodes::Success)
+				return return_wrapper_t<T&>(carg.return_code());
+			return return_wrapper_t<T&>(const_cast<T&>(carg.value()), carg.return_code());
+		}
+		__device__ return_wrapper_t<T&> get_argument_by_index(std::size_t index)  //call this from Variable::operator()().
+		{
+			return this->get_argument(m_parameters[index].c_str(), m_parameters[index].size());
+		}
+		__device__ std::size_t get_required_parameter_count() const
+		{
+			return m_parameters.size();
+		}
+		__device__ const char* get_function_name() const
+		{
+			return function_name.c_str();
+		}
+		__device__ size_t get_name_length() const
+		{
+			return function_name.size();
+		}
+		__device__ return_wrapper_t<std::size_t> get_param_index(const cuda_string& param_name)
+		{
+			for (std::size_t i = 0; i < this->m_parameters.size(); ++i)
+			{
+				if (this->m_parameters[i] == param_name)
+					return return_wrapper_t<std::size_t>(i);
+			}
+			return return_wrapper_t<std::size_t>(CudaParserErrorCodes::ParameterIsNotFound);
+		}
 	};
 }
 
@@ -96,16 +149,13 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 {
 	char* endptr;
 	auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
-	//header.push_argument("x", 1, 12);
-	auto someptr = make_cuda_device_unique_ptr<cu::cuda_string>();
-	*someptr = cu::cuda_string("abc");
-	auto someotherptr = std::move(someptr);
+	header.push_argument("x", 1, 12);
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i < n)
 	{
-		auto rw = cu::return_wrapper_t<double>(123);// = header.get_argument("x", 1);
+		auto rw = cu::return_wrapper_t<double>(0, cu::CudaParserErrorCodes::Success);// header.get_argument("x", 1);
 		if (rw.get() != nullptr)
-			vec[i] = cu::stod(cu::cuda_string(pStr, pStr + cbStr));// + rw.value();
+			vec[i] = cu::stod(cu::cuda_string(pStr, pStr + cbStr)) + rw.value();
 	}
 }
 

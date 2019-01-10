@@ -29,7 +29,7 @@ public:
 	__host__ __device__ void pop_front();
 	__host__ __device__ void swap(cuda_list &x);
 	__host__ __device__ void clear();
-	__device__ iterator erase(iterator pos);
+	//__device__ iterator erase(iterator pos);
 
 	__host__ __device__ const_iterator begin() const; 
 	__host__ __device__ iterator begin();

@@ -239,7 +239,10 @@ public:
 	typedef const char* const_iterator;
 	typedef cuda_reverse_iterator<iterator> reverse_iterator;
 	typedef cuda_reverse_iterator<const_iterator> const_reverse_iterator;
-	__device__ inline cuda_string() : strSize(0) {}
+	__device__ inline cuda_string() : strSize(0) 
+	{
+		pStr = cuda_device_unique_ptr<char>();
+	}
 	__device__ inline cuda_string(const cuda_string& str)
 	{
 		*this = str;
@@ -248,6 +251,18 @@ public:
 	{
 		*this = std::move(str);
 	}
+	__device__ cuda_string& operator=(const cuda_string& str)
+	{
+		auto tmp = make_cuda_device_unique_ptr<char>(str.size() + 1);
+		if(bool(tmp))
+		{
+			memcpy(tmp.get(), str.c_str(), str.size() + 1);
+			this->pStr = std::move(tmp);
+			this->strSize = str.size();
+		}
+		return *this;
+	}
+	__device__ cuda_string& operator=(cuda_string&& str) = default;
 	__device__ inline cuda_string(const char* str) : strSize(strlen(str)) 
 	{
 		pStr = make_cuda_device_unique_ptr<char>(strSize + 1);
@@ -277,26 +292,6 @@ public:
 	{
 		return c_str();
 	}
-	__device__ cuda_string& operator=(const cuda_string& str)
-	{
-		if(this->size() >= str.size())
-		{
-			memcpy(this->pStr.get(), str.c_str(), str.size() + 1);
-			this->strSize = str.size();
-		}
-		else
-		{
-			auto tmp = make_cuda_device_unique_ptr<char>(str.size() + 1);
-			if((bool)tmp)
-			{
-				memcpy(tmp.get(), str.c_str(), str.size() + 1);
-				this->pStr = std::move(tmp);
-				this->strSize = str.size();
-			}
-		}
-		return *this;
-	}
-	__device__ cuda_string& operator=(cuda_string&& str) = default;
 
 	__device__ cuda_string& operator+=(const cuda_string& str)
 	{

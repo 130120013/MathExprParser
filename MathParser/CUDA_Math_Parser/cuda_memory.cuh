@@ -195,7 +195,7 @@ private:
 		}
 	private:
 		template <class T>
-		__device__ static auto deconstruct(T* ptr) ->void //typename std::enable_if<std::is_destructible<T>::value>::type
+		__device__ static auto deconstruct(T* ptr) -> void //typename std::enable_if<std::is_destructible<T>::value>::type
 		{
 			ptr->~T();
 		}
@@ -250,7 +250,7 @@ public:
 	{
 		return ptr;
 	}
-	__device__ operator bool()
+	__device__ explicit operator bool()
 	{
 		return(ptr != nullptr);
 	}
