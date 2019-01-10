@@ -40,11 +40,11 @@ namespace cu
 						this->function_name = cuda_string(begPtr, l_endptr);
 					else
 					{
-						//if (!isOpeningBracket)
-						//	construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
+						if (!isOpeningBracket)
+							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 						auto param_name = cuda_string(begPtr, l_endptr);
-						//if (!m_arguments.insert(thrust::pair<cuda_string, T>(param_name, T())).second)
-						//	construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
+						if (!m_arguments.insert(thrust::pair<cuda_string, T>(param_name, T())).second)
+							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
 						params.push_back(std::move(param_name));
 					}
 					begPtr = l_endptr;
@@ -147,27 +147,14 @@ namespace cu
 
 __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::size_t cbStr)
 {
-	char* endptr;
-	//auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
-	////header.push_argument("x", 1, 12);
-	//auto someptr = make_cuda_device_unique_ptr<cu::cuda_string>();
-	//*someptr = cu::cuda_string("abc");
-	//auto someotherptr = std::move(someptr);
+	auto someptr = make_cuda_device_unique_ptr<cu::cuda_string>();
+	*someptr = cu::cuda_string("abc");
+	auto somecopy = *someptr;
+	auto someotherptr = std::move(someptr);
 
-	/*auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
-	header.push_argument("x", 1, 12);*/
-	cuda_list<cu::cuda_string> lst;
-	lst.push_back("1");
-	lst.push_front("000daa");
-	auto b = lst.back();
-	auto f = lst.front();
-	auto beg = lst.begin();
-	auto end = lst.end();
-	lst.erase(beg);
-	//lst.pop_back();
-	//lst.pop_front(); //not needed
-	
->>>>>>> Stashed changes
+	char* endptr;
+	auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
+	header.push_argument("x", 1, 12);
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i < n)
 	{
@@ -175,6 +162,19 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 		if (rw.get() != nullptr)
 			vec[i] = cu::stod(cu::cuda_string(pStr, pStr + cbStr)) + rw.value();
 	}
+
+	/*auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
+	header.push_argument("x", 1, 12);*/
+	//cuda_list<cu::cuda_string> lst;
+	/*lst.push_back("1");
+	lst.push_front("000daa");
+	auto b = lst.back();
+	auto f = lst.front();
+	auto beg = lst.begin();
+	auto end = lst.end();
+	lst.erase(beg);*/
+	//lst.pop_back();
+	//lst.pop_front(); //not needed
 }
 
 int main()

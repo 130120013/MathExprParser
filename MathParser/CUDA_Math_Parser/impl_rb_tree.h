@@ -511,8 +511,11 @@ namespace cu
 			//rebind<tree_node_base<VoidPtr> >::other
 			//>
 		{
-			__device__ tree_node(const tree_node&);
-			__device__ tree_node& operator=(const tree_node&);
+			__device__ tree_node(const tree_node&) = default;
+			__device__ tree_node& operator=(const tree_node&) = default;
+			
+			__device__ tree_node(tree_node&&) = default;
+			__device__ tree_node& operator=(tree_node&&) = default;
 		public:
 			typedef typename std::pointer_traits<VoidPtr>::template
 				rebind<tree_node>
