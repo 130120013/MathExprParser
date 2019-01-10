@@ -268,7 +268,7 @@ struct return_wrapper_t
 	__device__ ~return_wrapper_t()
 	{
 		if (m_pVal)
-			destroy_val(m_pVal);
+			m_pVal->~T();
 	}
 	__device__ T* get()
 	{

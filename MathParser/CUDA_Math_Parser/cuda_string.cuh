@@ -232,7 +232,7 @@ __device__ double strtod(const char* str, char** str_end)
 
 class cuda_string
 {
-	cuda_device_unique_ptr<char> pStr;
+	cuda_device_unique_ptr<char[]> pStr;
 	std::size_t strSize;
 public:
 	typedef char* iterator;
@@ -241,7 +241,7 @@ public:
 	typedef cuda_reverse_iterator<const_iterator> const_reverse_iterator;
 	__device__ inline cuda_string() : strSize(0) 
 	{
-		pStr = cuda_device_unique_ptr<char>();
+		pStr = cuda_device_unique_ptr<char[]>();
 	}
 	__device__ inline cuda_string(const cuda_string& str)
 	{
@@ -253,7 +253,7 @@ public:
 	}
 	__device__ cuda_string& operator=(const cuda_string& str)
 	{
-		auto tmp = make_cuda_device_unique_ptr<char>(str.size() + 1);
+		auto tmp = make_cuda_device_unique_ptr<char[]>(str.size() + 1);
 		if(bool(tmp))
 		{
 			memcpy(tmp.get(), str.c_str(), str.size() + 1);
@@ -265,7 +265,7 @@ public:
 	__device__ cuda_string& operator=(cuda_string&& str) = default;
 	__device__ inline cuda_string(const char* str) : strSize(strlen(str)) 
 	{
-		pStr = make_cuda_device_unique_ptr<char>(strSize + 1);
+		pStr = make_cuda_device_unique_ptr<char[]>(strSize + 1);
 		memcpy(pStr.get(), str, strSize + 1);
 	}
 	//__device__ cuda_string(std::size_t size, char ch);
@@ -274,7 +274,7 @@ public:
 	{
 		auto size = e - b;
 		std::size_t i = 0;
-		pStr = make_cuda_device_unique_ptr<char>(size + 1);
+		pStr = make_cuda_device_unique_ptr<char[]>(size + 1);
 		for(Iterator it = b; it != e; ++it)
 			pStr.get()[i++] = *it;
 
@@ -295,7 +295,7 @@ public:
 
 	__device__ cuda_string& operator+=(const cuda_string& str)
 	{
-		auto tmp = make_cuda_device_unique_ptr<char>(this->size() + str.size() + 1);
+		auto tmp = make_cuda_device_unique_ptr<char[]>(this->size() + str.size() + 1);
 		if(bool(tmp))
 		{
 			memcpy(tmp.get(), this->c_str(), this->size());

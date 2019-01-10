@@ -1,5 +1,6 @@
 #include <memory>
 #include <atomic>
+#include <type_traits>
 //#include <chsvlib/chsverr.h>
 //#include <cuda/config.h>
 //#include <cuda/except.cuh>
@@ -177,111 +178,242 @@ cuda_unique_ptr<T> make_cuda_unique_ptr(std::size_t c)
 	return cuda_unique_ptr<T>(static_cast<T*>(make_cuda_unique_ptr<void>(c * sizeof(T)).release()));
 }
 
-template <class elemType>
-class cuda_device_unique_ptr
+template <class T>
+struct impl_cuda_device_unique_ptr_base
 {
-	template <class U>
-	friend class cuda_device_unique_ptr;
-public:
-	typedef elemType* pointer;
-	typedef elemType element_type;
-private:
-	struct DeviceDeleter
+	typedef T *pointer;
+protected:
+	__device__ impl_cuda_device_unique_ptr_base() = default;
+	__device__ explicit impl_cuda_device_unique_ptr_base(T* ptr):m_ptr(ptr) {}
+	__device__ impl_cuda_device_unique_ptr_base(const impl_cuda_device_unique_ptr_base&) = delete;
+	__device__ impl_cuda_device_unique_ptr_base operator=(const impl_cuda_device_unique_ptr_base&) = delete;
+	__device__ impl_cuda_device_unique_ptr_base(impl_cuda_device_unique_ptr_base&& right):m_ptr(right.m_ptr)
 	{
-		__device__ void operator()(pointer ptr) const
-		{
-			deconstruct(ptr);
-			free(ptr);
-		}
-	private:
-		template <class T>
-		__device__ static auto deconstruct(T* ptr) -> void //typename std::enable_if<std::is_destructible<T>::value>::type
-		{
-			ptr->~T();
-		}
-		//__device__ static auto deconstruct(...) -> void {}
-	};
-public:
-	typedef DeviceDeleter deleter_type;
-
-	__device__ cuda_device_unique_ptr() = default;
-	__device__ cuda_device_unique_ptr(cuda_device_unique_ptr&& right) :ptr(right.ptr)
-	{
-		right.ptr = nullptr;
+		right.m_ptr = nullptr;
 	}
 	template <class U, class = typename std::enable_if<std::is_convertible<U*, pointer>::value>::type>
-	__device__ cuda_device_unique_ptr(cuda_device_unique_ptr<U>&& right) : ptr(right.ptr)
+	__device__ impl_cuda_device_unique_ptr_base(impl_cuda_device_unique_ptr_base<U>&& right) : m_ptr(right.m_ptr)
 	{
-		right.ptr = nullptr;
+		right.m_ptr = nullptr;
 	}
+	__device__ impl_cuda_device_unique_ptr_base& operator=(impl_cuda_device_unique_ptr_base&& right)
+	{
+		m_ptr = right.m_ptr;
+		right.m_ptr = nullptr;
+		return *this;
+	}
+	__device__ constexpr const pointer& ptr() const
+	{
+		return m_ptr;
+	}
+	__device__ pointer& ptr()
+	{
+		return m_ptr;
+	}
+private:
+	pointer m_ptr = pointer();
+};
+
+template <class T>
+struct impl_cuda_device_unique_ptr_spec:impl_cuda_device_unique_ptr_base<T>
+{
+	typedef T element_type;
+	typedef typename impl_cuda_device_unique_ptr_base::pointer pointer;
+protected:
+	struct resource_mgr
+	{
+		template <class ... Params>
+		__device__ static pointer acquire(Params&& ... args)
+		{
+			return new element_type(std::forward<Params>(params)...);
+		}
+		__device__ static void release(pointer ptr)
+		{
+			delete ptr;
+		}
+	};
+public:
+	using impl_cuda_device_unique_ptr_base::impl_cuda_device_unique_ptr_base;
+	__device__ pointer operator->() const
+	{
+		return this->ptr();
+	}
+	__device__ element_type& operator*() const
+	{
+		return *this->ptr();
+	}
+};
+
+template <class T>
+struct impl_cuda_device_unique_ptr_spec<T[]>:impl_cuda_device_unique_ptr_base<T>
+{
+	typedef T element_type;
+	typedef typename impl_cuda_device_unique_ptr_base::pointer pointer;
+protected:
+	struct resource_mgr
+	{
+		__device__ static pointer acquire(std::size_t cHowMany)
+		{
+			return new element_type[cHowMany];
+		}
+		__device__ static void release(pointer ptr)
+		{
+			delete [] ptr;
+		}
+	};
+public:
+	using impl_cuda_device_unique_ptr_base::impl_cuda_device_unique_ptr_base;
+	__device__ pointer operator->() const
+	{
+		return this->ptr();
+	}
+	__device__ element_type& operator*() const
+	{
+		return *this->ptr();
+	}
+	__device__ element_type& operator[](std::size_t i) const
+	{
+		return this->ptr()[i];
+	}
+};
+
+template<>
+struct impl_cuda_device_unique_ptr_spec<void>:impl_cuda_device_unique_ptr_base<void> 
+{
+	typedef std::uint8_t element_type;
+	typedef typename impl_cuda_device_unique_ptr_base::pointer pointer;
+protected:
+	struct resource_mgr
+	{
+		__device__ static pointer acquire(std::size_t cHowMany)
+		{
+			return new element_type[cHowMany];
+		}
+		__device__ static void release(pointer ptr)
+		{
+			delete [] static_cast<std::uint8_t*>(ptr);
+		}
+	};
+public:
+	using impl_cuda_device_unique_ptr_base::impl_cuda_device_unique_ptr_base;
+	__device__ element_type& operator[](std::size_t i) const
+	{
+		return reinterpret_cast<element_type*>(this->ptr())[i];
+	}
+};
+
+template <>
+struct impl_cuda_device_unique_ptr_spec<const void>:impl_cuda_device_unique_ptr_base<const void> 
+{
+	typedef const std::uint8_t element_type;
+	typedef typename impl_cuda_device_unique_ptr_base::pointer pointer;
+protected:
+	struct resource_mgr
+	{
+		__device__ static pointer acquire(std::size_t cHowMany)
+		{
+			return new element_type[cHowMany];
+		}
+		__device__ static void release(pointer ptr)
+		{
+			delete [] static_cast<std::uint8_t*>(const_cast<void*>(ptr));
+		}
+	};
+public:
+	using impl_cuda_device_unique_ptr_base::impl_cuda_device_unique_ptr_base;
+	__device__ element_type& operator[](std::size_t i) const
+	{
+		return reinterpret_cast<element_type*>(this->ptr())[i];
+	}
+};
+
+template <class T>
+struct cuda_device_unique_ptr;
+
+template <class T, class ... Args>
+__device__ cuda_device_unique_ptr<T> make_cuda_device_unique_ptr(Args&& ... args);
+
+template <class T>
+struct cuda_device_unique_ptr:impl_cuda_device_unique_ptr_spec<T>
+{
+	typedef typename impl_cuda_device_unique_ptr_spec::pointer pointer;
+private:
+	typedef typename impl_cuda_device_unique_ptr_spec::resource_mgr resource_mgr;
+	template <class T, class ... Args>
+	friend __device__ cuda_device_unique_ptr<T> make_cuda_device_unique_ptr(Args&& ... args);
+public:
+	__device__ cuda_device_unique_ptr() = default;
+	__device__ cuda_device_unique_ptr(cuda_device_unique_ptr&&) = default;
+	template <class U, class = typename std::enable_if<std::is_convertible<U*, pointer>::value>::type>
+	__device__ cuda_device_unique_ptr(cuda_device_unique_ptr<U>&& right)
+		:impl_cuda_device_unique_ptr_spec<T>(std::move(right)) {}
 	__device__ cuda_device_unique_ptr& operator=(cuda_device_unique_ptr&& right)
 	{
 		if (this != &right)
 		{
-			if (ptr != nullptr)
-				del(ptr);
-			ptr = right.ptr;
-			right.ptr = nullptr;
+			if (this->ptr() != nullptr)
+				resource_mgr::release(this->ptr());
+			static_cast<impl_cuda_device_unique_ptr_spec<T>&>(*this) = std::move(right);
 		}
 		return *this;
 	}
-	__device__ explicit cuda_device_unique_ptr(pointer p) :ptr(p) {};
+	__device__ explicit cuda_device_unique_ptr(pointer p) :impl_cuda_device_unique_ptr_spec<T>(p) {};
 	__device__ ~cuda_device_unique_ptr()
 	{
-		if (ptr != nullptr)
-			del(ptr);
+		if (this->ptr() != nullptr)
+			resource_mgr::release(this->ptr());
 	};
 	__device__ pointer release()
 	{
-		pointer p = ptr;
-		ptr = nullptr;
+		pointer p = this->ptr();
+		this->ptr() = nullptr;
 		return p;
 	}
 
 	__device__ void reset(pointer p = pointer())
 	{
-		if (ptr == p)
+		if (this->ptr() == p)
 			return;
-		if (ptr != nullptr)
-			del(ptr);
-		ptr = p;
+		if (this->ptr() != nullptr)
+			resource_mgr::release(this->ptr());
+		this->ptr() = p;
 	}
 	__device__ pointer get() const
 	{
-		return ptr;
+		return this->ptr();
 	}
 	__device__ explicit operator bool()
 	{
-		return(ptr != nullptr);
+		return this->ptr() != nullptr;
 	}
 
-	__device__ pointer operator->() const
+
+private:
+	struct deleter
 	{
-		return ptr;
-	}
-	template <class U = element_type, class = typename std::enable_if<!std::is_void<U>::value>::type>
-	__device__ U& operator*() const
-	{
-		return *ptr;
-	}
-	__device__ deleter_type get_deleter()
+		__device__ void operator()(pointer ptr) const
+		{
+			resource_mgr::release(ptr);
+		}
+	};
+	deleter m_del;
+public:
+	typedef deleter deleter_type;
+
+	__device__ deleter_type& get_deleter()
 	{
 		return del;
 	}
-private:
-	pointer ptr = pointer();
-	DeviceDeleter del;
+	__device__ const deleter_type& get_deleter() const
+	{
+		return del;
+	}
 };
 
-template <class T>
-__device__ cuda_device_unique_ptr<T> make_cuda_device_unique_ptr(std::size_t c = 1)
+template <class T, class ... Args>
+__device__ cuda_device_unique_ptr<T> make_cuda_device_unique_ptr(Args&& ... args)
 {
-	T* ptr;
-	std::size_t cb = c * (std::is_void<T>::value?1:sizeof(T));
-	ptr = (T*) malloc(cb);
-	//if (!ptr)
-	//	cuda_abort_with_error(CHSVERROR_OUTOFMEMORY);
-	return cuda_device_unique_ptr<T>(ptr);
+	return cuda_device_unique_ptr<T>(cuda_device_unique_ptr<T>::resource_mgr::acquire(std::forward<Args>(args)...));
 }
 
 class cuda_stream

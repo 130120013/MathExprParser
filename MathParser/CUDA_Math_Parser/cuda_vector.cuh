@@ -87,7 +87,7 @@ public:
 	{
 		if (new_size > this->capacity())
 		{
-			auto buf = make_cuda_device_unique_ptr<value_type>(new_size);
+			auto buf = make_cuda_device_unique_ptr<value_type[]>(new_size);
 			if (bool(buf))
 			{
 				if (bool(m_buf))
@@ -111,7 +111,7 @@ public:
 	{
 		if (this != &right)
 		{
-			auto buf = cuda_device_unique_ptr<value_type>(right.size());
+			auto buf = cuda_device_unique_ptr<value_type[]>(right.size());
 			if (bool(buf))
 			{
 				memcpy(buf.get(), right.data(), right.size() * sizeof(value_type));
@@ -124,7 +124,7 @@ public:
 	__device__ cuda_vector& operator=(cuda_vector&&) = default;
 
 private:
-	cuda_device_unique_ptr<value_type> m_buf;
+	cuda_device_unique_ptr<value_type[]> m_buf;
 	size_type m_size = 0;
 	size_type m_capacity = 0;
 };
