@@ -1346,7 +1346,7 @@ namespace cu
 				r = h.release();
 				inserted = true;
 			}
-			return cu::cuda_pair<iterator, bool>(iterator(r), inserted);
+			return cu::cuda_pair<iterator, bool>{iterator(r), inserted};
 		}
 
 		template <class Tp, class Compare>
