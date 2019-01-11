@@ -13,6 +13,7 @@
 #include "cuda_stack.cuh"
 #include "cuda_map.cuh"
 #include "cuda_vector.cuh"
+#include "cuda_pair.cuh"
 
 #ifndef PARSER_H
 #define PARSER_H
@@ -1921,16 +1922,16 @@ public:
 template <class T>
 class Header
 {
-	cuda_map<cuda_string, T> m_arguments;
-	cuda_vector<cuda_string> m_parameters;
-	cuda_string function_name;
+	cuda_map<cu::cuda_string, T> m_arguments;
+	cuda_vector<cu::cuda_string> m_parameters;
+	cu::cuda_string function_name;
 	mutable return_wrapper_t<void> construction_success_code;
 public:
 	__device__ Header() = default;
 	__device__ Header(const char* expression, std::size_t expression_len, char** endPtr)
 	{
 		char* begPtr = (char*)(expression);
-		cuda_list<cuda_string> params;
+		cuda_list<cu::cuda_string> params;
 		construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::Success);
 
 		bool isOpeningBracket = false;
@@ -1944,13 +1945,13 @@ public:
 				auto l_endptr = begPtr + 1;
 				for (; isalnum(*l_endptr); ++l_endptr);
 				if (this->function_name.empty())
-					this->function_name = cuda_string(begPtr, l_endptr);
+					this->function_name = cu::cuda_string(begPtr, l_endptr);
 				else
 				{
 					if (!isOpeningBracket)
 						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
-					auto param_name = cuda_string(begPtr, l_endptr);
-					if (!m_arguments.insert(thrust::pair<cuda_string, T>(param_name, T())).second)
+					auto param_name = cu::cuda_string(begPtr, l_endptr);
+					if (!m_arguments.insert(cu::make_cuda_pair<const cu::cuda_string, T>(param_name, T())).second)
 						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
 					params.push_back(std::move(param_name));
 				}
@@ -2073,12 +2074,12 @@ public:
 	__device__ Mathexpr(const cuda_string& strMathExpr) : Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
 	__device__ return_wrapper_t<T> compute() const
 	{
-		auto result = body;
-		simplify_body(result);
-		if (result.size() != 1)
+		//auto result = body;
+	//	simplify_body(result);
+	//	if (result.size() != 1)
 			//throw std::exception("Invalid expression");
-			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidExpression);
-		return (*result.front())();
+	//		return return_wrapper_t<T>(CudaParserErrorCodes::InvalidExpression);
+		return (*body)();
 	}
 	__device__ return_wrapper_t<void> init_variables(const cuda_vector<T>& parameters)
 	{
@@ -2093,15 +2094,15 @@ public:
 
 private:
 	Header<T> header;
-	cuda_list<cuda_shared_ptr<IToken<T>>> body;
+	cuda_shared_ptr<IToken<T>> body;
 
 	template <class T>
-	__device__ return_wrapper_t<void> lexBody(const char* expr, std::size_t length)
+	__device__ return_wrapper_t<cuda_list<cuda_shared_ptr<IToken<T>>>> lexBody(const char* expr, std::size_t length)
 	{
 		char* begPtr = (char*)expr;
 		std::size_t cbRest = length;
 		TokenStorage<T> tokens;
-		cuda_stack <thrust::pair<cuda_shared_ptr<Function<T>>, std::size_t>> funcStack;
+		cuda_stack <cu::cuda_pair<cuda_shared_ptr<Function<T>>, std::size_t>> funcStack;
 		int last_type_id = -1;
 
 		while (cbRest > 0)
@@ -2141,7 +2142,7 @@ private:
 				static_assert(std::is_same<T, double>::value, "The following line is only applicable to double");
 				auto value = std::strtod(tkn.begin(), (char**)&conversion_end);
 				if (conversion_end != tkn.end())
-					return return_wrapper_t<void>(CudaParserErrorCodes::InvalidExpression);
+					return return_wrapper_t<cuda_list<cuda_shared_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
 				last_type_id = int(tokens.push_token(Number<T>(value))->type());
 			}
 			else if (isalpha(*tkn.begin()))
@@ -2238,13 +2239,13 @@ private:
 				last_type_id = int(tokens.push_token(Bracket<T>())->type());
 			}
 			else
-				return return_wrapper_t<void>(CudaParserErrorCodes::InvalidExpression);
+				return return_wrapper_t<cuda_list<cuda_shared_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
 			cbRest -= tkn.end() - begPtr;
 			begPtr = (char*)tkn.end();
 		}
 
-		body = std::move(tokens).finalize().value();
-		return return_wrapper_t<void>();
+		auto formula = std::move(tokens).finalize();
+		return formula;//return_wrapper_t<cuda_list<cuda_shared_ptr<IToken<T>>>>();
 	}
 };
 
@@ -2267,11 +2268,12 @@ __device__ typename cuda_list<cuda_shared_ptr<IToken<K>>>::iterator simplify(cud
 }
 
 template <class T>
-__device__ void simplify_body(cuda_list<cuda_shared_ptr<IToken<T>>>& body)
+__device__ auto simplify_body(cuda_list<cuda_shared_ptr<IToken<T>>>&& body)
 {
 	auto it = body.begin();
 	while (body.size() > 1)
 		it = simplify(body, it);
+	return body.front();
 	//When everything goes right, you are left with only one element within the list - the root of the tree.
 }
 
@@ -2288,8 +2290,12 @@ __device__ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
 	const char* endptr;
 	header = Header<T>(sMathExpr, cbMathExpr, (char**)&endptr);
 	++endptr;
-	lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
-	simplify_body(body);
+	//lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
+	//simplify_body(body);
+
+	auto formula = std::move(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value());
+	this->body = simplify_body(std::move(formula));
+
 }
 
 }

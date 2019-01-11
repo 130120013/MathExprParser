@@ -1820,11 +1820,11 @@ public:
 	Mathexpr(const std::basic_string<char, Traits, Alloc>& strMathExpr):Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
 	T compute() const
 	{
-		auto result = body;
-		simplify_body(result);
-		if (result.size() != 1)
-			throw std::exception("Invalid expression");
-		return (*result.front())();
+		//auto result = body;
+		//simplify_body(result);
+		//if (result.size() != 1)
+		//	throw std::exception("Invalid expression");
+		return (*body)();
 	}
 	void init_variables(const std::vector<T>& parameters)
 	{
@@ -1837,10 +1837,10 @@ public:
 	//with different arguments, we just reassign them with init_variables
 private:
 	Header<T> header;
-	std::list<std::shared_ptr<IToken<T>>> body;
+	std::shared_ptr<IToken<T>> body;
 
 	template <class T>
-	void lexBody(const char* expr, std::size_t length)
+	std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t length)
 	{
 		char* begPtr = (char*)expr;
 		std::size_t cbRest = length;
@@ -1848,6 +1848,7 @@ private:
 		IToken<T> *pLastToken = nullptr;
 		std::stack <std::pair<std::shared_ptr<Function<T>>, std::size_t>> funcStack;
 		int last_type_id = -1;
+		std::list<std::shared_ptr<IToken<T>>> formula;
 
 		while (cbRest > 0)
 		{
@@ -1988,7 +1989,9 @@ private:
 			begPtr = (char*)tkn.end();
 		}
 		
-		body = std::move(tokens).finalize();
+		//body = std::move(tokens).finalize();
+		formula = std::move(tokens).finalize();
+		return formula;
 	}
 };
 
@@ -2017,11 +2020,13 @@ typename std::list<std::shared_ptr<IToken<K>>>::iterator simplify(std::list<std:
 }
 
 template <class T>
-void simplify_body(std::list<std::shared_ptr<IToken<T>>>& body)
+auto simplify_body(std::list<std::shared_ptr<IToken<T>>>&& body)
 {
 	auto it = body.begin();
 	while (body.size() > 1 )
 		it = simplify(body, it);
+	//auto val = it;
+	return body.front();
 	//When everything goes right, you are left with only one element within the list - the root of the tree.
 }
 
@@ -2038,8 +2043,9 @@ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
 	const char* endptr;
 	header = Header<T>(sMathExpr, cbMathExpr, (char**) &endptr);
 	++endptr;
-	lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
-	simplify_body(body);
+	//lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
+	auto formula = std::move(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)));
+	this->body = simplify_body(std::move(formula));
 }
 
 #endif // !PARSER_H

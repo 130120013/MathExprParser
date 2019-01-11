@@ -106,6 +106,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="cuda_list.cuh" />
     <ClInclude Include="cuda_map.cuh" />
     <ClInclude Include="cuda_memory.cuh" />
+    <ClInclude Include="cuda_pair.cuh" />
     <ClInclude Include="cuda_stack.cuh" />
     <ClInclude Include="cuda_string.cuh" />
     <ClInclude Include="cuda_vector.cuh" />

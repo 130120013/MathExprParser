@@ -39,6 +39,9 @@
     <ClInclude Include="cuda_vector.cuh">
       <Filter>Header</Filter>
     </ClInclude>
+    <ClInclude Include="cuda_pair.cuh">
+      <Filter>Header</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="kernel.cu">
