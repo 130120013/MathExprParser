@@ -225,7 +225,7 @@ protected:
 		template <class ... Params>
 		__device__ static pointer acquire(Params&& ... args)
 		{
-			return new element_type(std::forward<Params>(params)...);
+			return new element_type(std::forward<Params>(args)...);
 		}
 		__device__ static void release(pointer ptr)
 		{
