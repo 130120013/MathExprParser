@@ -1346,7 +1346,7 @@ namespace cu
 				r = h.release();
 				inserted = true;
 			}
-			return cu::cuda_pair<iterator, bool>{iterator(r), inserted};
+			return cu::cuda_pair<iterator, bool>(iterator(r), inserted);
 		}
 
 		template <class Tp, class Compare>
@@ -1584,7 +1584,7 @@ namespace cu
 		{
 			while (root != 0)
 			{
-				if (this->value_comp()(root->value, v))
+				if (!this->value_comp()(root->value, v))
 				{
 					result = root;
 					root = static_cast<node_const_pointer>(root->left);

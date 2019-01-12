@@ -75,7 +75,8 @@ __device__ int strcmp(const char* str1, const char* str2)
 		if (str1[i] == 0)
 			return 0;
 	}
-	return ((unsigned char) str1[i] > (unsigned char) str2[i]) ? 1 : -1;
+	//return ((unsigned char) str1[i] > (unsigned char) str2[i]) ? 1 : -1;
+	return ((unsigned char)str1[i] - (unsigned char)str2[i]);
 }
 
 __device__ int memcmp(const void* str1, const void* str2, std::size_t size)

@@ -43,7 +43,8 @@ namespace cu
 						if (!isOpeningBracket)
 							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 						auto param_name = cu::cuda_string(begPtr, l_endptr);
-						if (!m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(param_name, T())).second)
+						auto res = m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(param_name, T()));
+						if (!res.second)
 							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
 						params.push_back(std::move(param_name));
 					}
@@ -147,10 +148,10 @@ namespace cu
 
 __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::size_t cbStr)
 {
-	auto someptr = make_cuda_device_unique_ptr<cu::cuda_string>();
-	*someptr = cu::cuda_string("abc");
-	auto somecopy = *someptr;
-	auto someotherptr = std::move(someptr);
+	//auto someptr = make_cuda_device_unique_ptr<cu::cuda_string>();
+	//*someptr = cu::cuda_string("abc");
+	//auto somecopy = *someptr;
+	//auto someotherptr = std::move(someptr);
 
 	char* endptr;
 	auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
@@ -158,9 +159,12 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i < n)
 	{
-		auto rw = cu::return_wrapper_t<double>(0, cu::CudaParserErrorCodes::Success);// header.get_argument("x", 1);
+		auto rw = header.get_argument("x", 1);
+		auto k = rw.value();
 		if (rw.get() != nullptr)
-			vec[i] = cu::stod(cu::cuda_string(pStr, pStr + cbStr)) + rw.value();
+			vec[i] = rw.value();
+
+			//vec[i] = cu::stod(cu::cuda_string(pStr, pStr + cbStr)) + rw.value();
 	}
 
 	/*auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
