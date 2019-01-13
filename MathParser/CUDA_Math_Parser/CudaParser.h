@@ -1991,7 +1991,7 @@ public:
 		}
 		m_parameters.reserve(params.size());
 		for (auto& param : params)
-			m_parameters.push_back(std::move(param.data));
+			m_parameters.push_back(std::move(param));
 		*endPtr = begPtr;
 	}
 	Header(const Header<T>&) = delete;
