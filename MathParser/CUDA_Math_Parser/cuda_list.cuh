@@ -9,19 +9,88 @@
 // std::is_same<typename std::iterator_traits<typename cuda_list<T>::iterator>::value_type, T>::value
 // is true
 
+template <class T>
+struct node
+{
+	T data;
+	node *next, *prev;
+	__host__ __device__ node(T const& data, node* next, node* prev) : data(data), next(next), prev(prev) {}
+	__host__ __device__ node(T&& data, node* next, node* prev) : data(std::move(data)), next(next), prev(prev) {}
+};
+
+template <class T>
+class cuda_list_iterator
+{
+	node<T> it_value;
+public:
+	typedef node<T> value_type;
+	typedef value_type& reference_type;
+
+	T& operator*() const 
+	{
+		return it_value.data;
+	}
+	reference_type operator++()  
+	{
+		return it_value.next;
+	}
+	cuda_list_iterator<T> operator++(int) 
+	{
+		return it_value.next;
+	}
+	reference_type operator--() 
+	{
+		return it_value.prev;
+	}
+	cuda_list_iterator<T> operator--(int) 
+	{
+		return it_value.prev;
+	}
+};
+
+template <class T>
+class cuda_list_const_iterator
+{
+	node<T> it_value;
+public:
+	typedef const node<T> value_type;
+	typedef value_type& reference_type;
+
+	T& operator*() const
+	{
+		return it_value.data;
+	}
+	reference_type operator++()
+	{
+		return it_value.next;
+	}
+	cuda_list_iterator<T> operator++(int)
+	{
+		return it_value.next;
+	}
+	reference_type operator--()
+	{
+		return it_value.prev;
+	}
+	cuda_list_iterator<T> operator--(int)
+	{
+		return it_value.prev;
+	}
+};
+
 template <typename T>
 class cuda_list 
 {
-	struct node 
+	/*struct node 
 	{
 		T data;
 		node *next, *prev;
 		__host__ __device__ node(T const& data, node* next, node* prev): data(data), next(next), prev(prev) {}
 		__host__ __device__ node(T&& data, node* next, node* prev): data(std::move(data)), next(next), prev(prev) {}
-	};
+	};*/
 public:
-	typedef node* iterator;
-	typedef node* const const_iterator;
+	typedef cuda_list_iterator<node<T>> iterator;
+	typedef cuda_list_const_iterator<node<T>> const const_iterator;
 
 	__host__ __device__ cuda_list<T>& operator= (const cuda_list<T> &);
 	__host__ __device__ ~cuda_list();
@@ -59,13 +128,13 @@ public:
 
 private:
 	int elements = 0;
-	node *head = nullptr;
-	node *tail = nullptr;
+	node<T> *head = nullptr;
+	node<T> *tail = nullptr;
 };
 
 template <typename T>
 __host__ __device__ cuda_list<T>& cuda_list<T>::operator= (const cuda_list<T> & that) {
-	node* tmp = head;
+	node<T>* tmp = head;
 	while (head) {
 		tmp = head;
 		head = head->next;
@@ -79,7 +148,7 @@ __host__ __device__ cuda_list<T>& cuda_list<T>::operator= (const cuda_list<T> & 
 
 template <typename T>
 __host__ __device__ cuda_list <T>::~cuda_list() {
-	node* tmp;
+	node<T>* tmp;
 	while (head) {
 		tmp = head;
 		head = head->next;
@@ -111,7 +180,7 @@ __host__ __device__ T const& cuda_list<T>::back() const {
 
 template <typename T>
 __host__ __device__ void cuda_list<T>::push_back(T const& data) {
-	node* newNode = new node(data, nullptr, tail);
+	node<T>* newNode = new node<T>(data, nullptr, tail);
 	if (head == nullptr)
 		head = newNode;
 	if (tail != nullptr)
@@ -126,7 +195,7 @@ __device__ typename::cuda_list<T>::iterator cuda_list<T>::erase(typename::cuda_l
 	if(this->size() == 0)
 		return nullptr;
 
-	auto tmp = cuda_device_unique_ptr<node>(pos);
+	auto tmp = cuda_device_unique_ptr<node<T>>(pos);
 
 	if(tmp.get() == this->begin())
 	{
@@ -166,7 +235,7 @@ __device__ typename::cuda_list<T>::iterator cuda_list<T>::erase(typename::cuda_l
 
 template <typename T>
 __host__ __device__ void cuda_list<T>::push_front(T const& data) {
-	node* newNode = new node(data, head, nullptr);
+	node<T>* newNode = new node<T>(data, head, nullptr);
 	if (tail == nullptr)
 		tail = newNode;
 	if (head != nullptr)
@@ -177,7 +246,7 @@ __host__ __device__ void cuda_list<T>::push_front(T const& data) {
 
 template <typename T>
 __host__ __device__ void cuda_list<T>::push_front(T&& data) {
-	node* newNode = new node(data, head, nullptr);
+	node<T>* newNode = new node<T>(data, head, nullptr);
 	if (tail == nullptr)
 		tail = newNode;
 	if (head != nullptr)
@@ -232,7 +301,7 @@ __host__ __device__ size_t cuda_list<T>::size() const {
 
 template <typename T>
 __host__ __device__ typename cuda_list<T>::const_iterator cuda_list<T>::begin() const {
-	return head;
+	return cuda_list<T>::const_iterator(head);
 }
 
 template <typename T>
@@ -277,7 +346,7 @@ __host__ __device__ void cuda_list<T>::swap(cuda_list &that) {
 
 template <typename T>
 __host__ __device__ void cuda_list<T>::clear() {
-	node* curr = head;
+	node<T>* curr = head;
 	while (head) {
 		curr = head;
 		head = head->next;
