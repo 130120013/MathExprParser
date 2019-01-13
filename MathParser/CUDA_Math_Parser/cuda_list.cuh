@@ -5,6 +5,10 @@
 //#include <stdexcept>
 #include "cuda_memory.cuh"
 
+//TODO: make cuda_list iterator for which:
+// std::is_same<typename std::iterator_traits<typename cuda_list<T>::iterator>::value_type, T>::value
+// is true
+
 template <typename T>
 class cuda_list 
 {

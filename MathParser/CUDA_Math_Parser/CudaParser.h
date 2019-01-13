@@ -1951,8 +1951,8 @@ public:
 					if (!isOpeningBracket)
 						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 					auto param_name = cu::cuda_string(begPtr, l_endptr);
-					auto res = m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(param_name, T()));
-					if (!res.second)
+					//auto res = m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(param_name, T()));
+					if (!m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(param_name, T())).second)
 						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
 					params.push_back(std::move(param_name));
 				}
