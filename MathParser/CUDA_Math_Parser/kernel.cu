@@ -158,7 +158,7 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 	header.push_argument("x", 1, 12);
 	header.push_argument("y", 1, 10);
 
-	//cu::Mathexpr<double> math("f(x) = x", 8);
+	cu::Mathexpr<double> math("f(x) = x", 8);
 
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i < n)

@@ -67,11 +67,11 @@ public:
 		return &m_buf.get()[m_size];
 	}
 
-	__device__ void push_back(const T& value)
-	{
-		this->reserve(m_size + 1);
-		this->m_buf.get()[m_size++] = value;
-	}
+	//__device__ void push_back(const T& value)
+	//{
+	//	this->reserve(m_size + 1);
+	//	this->m_buf.get()[m_size++] = value;
+	//}
 	__device__ void push_back(T&& value)
 	{
 		this->reserve(m_size + 1);

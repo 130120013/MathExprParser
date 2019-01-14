@@ -192,7 +192,7 @@ protected:
 		right.m_ptr = nullptr;
 	}
 	template <class U, class = typename std::enable_if<std::is_convertible<U*, pointer>::value>::type>
-	__device__ impl_cuda_device_unique_ptr_base(impl_cuda_device_unique_ptr_base<U>&& right) : m_ptr(right.m_ptr)
+	__device__ impl_cuda_device_unique_ptr_base(impl_cuda_device_unique_ptr_base<U>&& right) : m_ptr(right.ptr())
 	{
 		right.m_ptr = nullptr;
 	}

@@ -20,9 +20,9 @@ namespace cu
 	};
 
 	template <class T1, class T2>
-	__device__ cuda_pair<T1, T2> make_cuda_pair(T1 t, T2 u)
+	__device__ cuda_pair<T1, T2> make_cuda_pair(T1&& t, T2&& u)
 	{
-		return cuda_pair<T1, T2>{t, u};
+		return cuda_pair<T1, T2>{std::move(t), std::move(u)};
 	}
 
 	

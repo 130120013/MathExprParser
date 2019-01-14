@@ -72,7 +72,7 @@ struct node
 	typedef T value_type;
 	T data;
 	node *next, *prev;
-	__host__ __device__ node(T const& data, node* next, node* prev) : data(data), next(next), prev(prev) {}
+	//__host__ __device__ node(T const& data, node* next, node* prev) : data(data), next(next), prev(prev) {}
 	__host__ __device__ node(T&& data, node* next, node* prev) : data(std::move(data)), next(next), prev(prev) {}
 };
 
@@ -112,7 +112,7 @@ public:
 	__host__ __device__ ~cuda_list();
 
 	//__host__ __device__ void push_back(T&& data);
-	__host__ __device__ void push_back(T const& data);
+	__host__ __device__ void push_back(T&& data);
 	__host__ __device__ void push_front(T&& data);
 	__host__ __device__ void push_front(T const& data);
 	//__host__ __device__ void pop_back();
@@ -195,8 +195,8 @@ __host__ __device__ T const& cuda_list<T>::back() const {
 }
 
 template <typename T>
-__host__ __device__ void cuda_list<T>::push_back(T const& data) {
-	node<T>* newNode = new node<T>(data, nullptr, tail);
+__host__ __device__ void cuda_list<T>::push_back(T&& data) {
+	node<T>* newNode = new node<T>(std::move(data), nullptr, tail);
 	if (head == nullptr)
 		head = newNode;
 	if (tail != nullptr)
@@ -211,31 +211,43 @@ __device__ typename::cuda_list<T>::iterator cuda_list<T>::erase(typename::cuda_l
 	if(this->size() == 0)
 		return nullptr;
 
-	auto tmp = cuda_device_unique_ptr<node<T>>(pos);
+	auto tmp = std::move(pos);
 
-	if(tmp.get() == this->begin())
+	if(tmp == this->begin())
 	{
-		this->head = tmp->next;
-		tmp->next->prev = nullptr;
+		this->head = ++tmp;
+		//tmp->next->prev = nullptr;
+		--tmp = cuda_list<T>::iterator();
 	}
 	else
 	{
-		if(tmp.get() != this->end())
+		if(tmp != this->end())
 		{
-			this->tail = tmp->prev;
-			tmp->prev->next = nullptr;
+			this->tail = --tmp;
+			//tmp->prev->next = nullptr;
+			++tmp = cuda_list<T>::iterator();
 		}
 		else
 		{
-			pos->next->prev = tmp->prev;
-			pos->prev->next = tmp->next;
+			//pos->next->prev = tmp->prev;
+			++pos;
+			--pos = --tmp;
+
+			//pos->prev->next = tmp->next;
+			--pos;
+			--pos;
+			++tmp;
+			++pos = ++tmp;
+
+
 		}
 	}
 	
 	--elements;
 	//node* nxt = tmp->next;
 	//delete tmp;
-	return tmp->next;
+	++tmp;
+	return tmp;
 }
 //template <typename T>
 //__host__ __device__ void cuda_list<T>::push_back(T&& data)
