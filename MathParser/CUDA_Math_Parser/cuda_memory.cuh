@@ -182,6 +182,8 @@ template <class T>
 struct impl_cuda_device_unique_ptr_base
 {
 	typedef T *pointer;
+	template <class U>
+	friend struct impl_cuda_device_unique_ptr_base;
 protected:
 	__device__ impl_cuda_device_unique_ptr_base() = default;
 	__device__ explicit impl_cuda_device_unique_ptr_base(T* ptr):m_ptr(ptr) {}

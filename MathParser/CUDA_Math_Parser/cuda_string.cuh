@@ -52,6 +52,13 @@ __device__ char* strcpy(char* dest, const char* src)
 	return dest;
 }
 
+__device__ char* strncpy(char* dest, const char* src, std::size_t count)
+{
+	for (; count; count--)
+		*dest++ = *src++;	
+	return dest;
+}
+
 __device__ char* strcat(char *str1, const char *str2)
 {
 	char* begin = str1;
