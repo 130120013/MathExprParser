@@ -259,6 +259,9 @@ public:
     __device__ cu::cuda_pair<iterator, bool>
         insert(const value_type& val) {return tree.insert_unique(val);}
 
+	__device__ cu::cuda_pair<iterator, bool>
+		insert(value_type&& val) { return tree.insert_unique(std::move(val)); }
+
     __device__ iterator
         insert(const_iterator itWhere, const value_type& val)
             {return tree.insert_unique(itWhere.m_itTree, val);}

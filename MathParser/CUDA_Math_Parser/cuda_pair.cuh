@@ -24,7 +24,6 @@ namespace cu
 	{
 		return cuda_pair<T1, T2>{std::move(t), std::move(u)};
 	}
-
 	
 }
 #endif //CUDA_PAIR

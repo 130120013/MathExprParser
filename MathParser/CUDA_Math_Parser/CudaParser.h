@@ -1986,7 +1986,7 @@ public:
 						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 					auto param_name = cu::cuda_string(begPtr, l_endptr);
 					auto argObj = make_cuda_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()));
-					auto res = m_arguments.insert(argObj);
+					auto res = m_arguments.insert(std::move(argObj));
 					//if (!m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()))).second)
 					if(!res.second)
 						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);

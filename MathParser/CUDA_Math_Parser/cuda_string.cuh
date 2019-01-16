@@ -247,9 +247,9 @@ public:
 	typedef const char* const_iterator;
 	typedef cuda_reverse_iterator<iterator> reverse_iterator;
 	typedef cuda_reverse_iterator<const_iterator> const_reverse_iterator;
-	__device__ inline cuda_string() : strSize(0) 
+	__device__ inline cuda_string() : strSize(0), pStr(cuda_device_unique_ptr<char[]>())
 	{
-		pStr = cuda_device_unique_ptr<char[]>();
+		//pStr = cuda_device_unique_ptr<char[]>();
 	}
 	__device__ inline cuda_string(const cuda_string& str)
 	{
@@ -270,7 +270,21 @@ public:
 		}
 		return *this;
 	}
-	__device__ cuda_string& operator=(cuda_string&& str) = default;
+	__device__ cuda_string& operator=(cuda_string&& str)
+	{
+		auto tmp = make_cuda_device_unique_ptr<char[]>(str.size() + 1);
+		if (bool(tmp))
+		{
+			if (str.c_str() != nullptr) //If either dest or src is a null pointer, the behavior is undefined, even if count is zero.
+				memcpy(tmp.get(), str.c_str(), str.size() + 1);
+			else
+				this->pStr.reset(nullptr);
+			this->pStr = std::move(tmp);
+			this->strSize = str.size();
+		}
+		return *this;
+	}
+	//__device__ cuda_string& operator=(cuda_string&& str) = default;
 	__device__ inline cuda_string(const char* str) : strSize(strlen(str)) 
 	{
 		pStr = make_cuda_device_unique_ptr<char[]>(strSize + 1);

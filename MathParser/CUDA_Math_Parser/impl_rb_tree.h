@@ -796,6 +796,7 @@ namespace cu
 			__device__ void swap(cuda_red_black_tree&  t);
 
 			__device__ cu::cuda_pair<iterator, bool> insert_unique(const value_type& v);
+			__device__ cu::cuda_pair<iterator, bool> insert_unique(value_type&& v);
 			__device__ iterator insert_unique(const_iterator p, const value_type& v);
 			__device__ iterator insert_multi(const value_type& v);
 			__device__ iterator insert_multi(const_iterator p, const value_type& v);
@@ -1342,6 +1343,25 @@ namespace cu
 			if (child == 0)
 			{
 				node_holder h = construct_node(v);
+				insert_node_at(parent, child, h.get());
+				r = h.release();
+				inserted = true;
+			}
+			return cu::cuda_pair<iterator, bool>(iterator(r), inserted);
+		}
+
+
+		template <class Tp, class Compare>
+		__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bool>
+			cuda_red_black_tree<Tp, Compare>::insert_unique(value_type&& v)
+		{
+			node_pointer parent;
+			node_pointer& child = find_equal(parent, std::move(v));
+			node_pointer r = child;
+			bool inserted = false;
+			if (child == 0)
+			{
+				node_holder h = construct_node(std::move(v));
 				insert_node_at(parent, child, h.get());
 				r = h.release();
 				inserted = true;
