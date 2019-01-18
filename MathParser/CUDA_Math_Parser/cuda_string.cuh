@@ -264,7 +264,8 @@ public:
 		auto tmp = make_cuda_device_unique_ptr<char[]>(str.size() + 1);
 		if(bool(tmp))
 		{
-			memcpy(tmp.get(), str.c_str(), str.size() + 1);
+			if(str.c_str() != nullptr && tmp.get() != nullptr)
+				memcpy(tmp.get(), str.c_str(), str.size() + 1);
 			this->pStr = std::move(tmp);
 			this->strSize = str.size();
 		}
@@ -275,7 +276,7 @@ public:
 		auto tmp = make_cuda_device_unique_ptr<char[]>(str.size() + 1);
 		if (bool(tmp))
 		{
-			if (str.c_str() != nullptr) //If either dest or src is a null pointer, the behavior is undefined, even if count is zero.
+			if (str.c_str() != nullptr && tmp.get() != nullptr) //If either dest or src is a null pointer, the behavior is undefined, even if count is zero.
 				memcpy(tmp.get(), str.c_str(), str.size() + 1);
 			else
 				this->pStr.reset(nullptr);
@@ -288,7 +289,8 @@ public:
 	__device__ inline cuda_string(const char* str) : strSize(strlen(str)) 
 	{
 		pStr = make_cuda_device_unique_ptr<char[]>(strSize + 1);
-		memcpy(pStr.get(), str, strSize + 1);
+		if(str != nullptr && pStr.get() != nullptr)
+			memcpy(pStr.get(), str, strSize + 1);
 	}
 	//__device__ cuda_string(std::size_t size, char ch);
 	template <class Iterator>
@@ -320,8 +322,11 @@ public:
 		auto tmp = make_cuda_device_unique_ptr<char[]>(this->size() + str.size() + 1);
 		if(bool(tmp))
 		{
-			memcpy(tmp.get(), this->c_str(), this->size());
-			memcpy(tmp.get() + this->size(), str.c_str(), str.size() + 1);
+			if (str.c_str() != nullptr && tmp.get() != nullptr)
+			{
+				memcpy(tmp.get(), this->c_str(), this->size());
+				memcpy(tmp.get() + this->size(), str.c_str(), str.size() + 1);
+			}
 			this->pStr = std::move(tmp);
 			this->strSize = this->size() + str.size();
 		}

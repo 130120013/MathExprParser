@@ -158,7 +158,7 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 	header.push_argument("x", 1, 12);
 	header.push_argument("y", 1, 10);
 
-	cu::Mathexpr<double> math("f(x) = x", 8);
+	////cu::Mathexpr<double> math("f(x) = x", 8);
 
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i < n)
@@ -219,10 +219,18 @@ int main()
 		fprintf(stderr, "cudaDeviceSynchronize failed!");
 		return -2;
 	}
+	else
+	{
+		fprintf(stderr, "cudaDeviceSynchronize fine!");
+	}
 
 	cudaStatus = cudaMemcpy(V, V_d.get(), sizeof(V), cudaMemcpyDeviceToHost);
 	if (cudaStatus != cudaSuccess)
 		return -3;
+	else
+	{
+		fprintf(stderr, "cudaMemcpy fine!");
+	}
 
 	//printf("%d", l.front());
 
@@ -232,6 +240,10 @@ int main()
 	if (cudaStatus != cudaSuccess) {
 		fprintf(stderr, "cudaDeviceReset failed!");
 		return -4;
+	}
+	else
+	{
+		fprintf(stderr, "cudaDeviceReset fine!");
 	}
 
 	return 0;
