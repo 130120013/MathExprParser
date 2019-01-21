@@ -96,7 +96,7 @@ class cuda_list_const_iterator :public cuda_list_iterator_base<cuda_list_const_i
 {
 	friend class cuda_list<T>;
 public:
-	using cuda_list_iterator_base<cuda_list_const_iterator<T>, node<T>>::cuda_list_iterator_base;
+	using cuda_list_iterator_base<cuda_list_const_iterator<T>, const node<T>>::cuda_list_iterator_base;
 	__device__ cuda_list_const_iterator(const cuda_list_iterator<T>& right) :cuda_list_iterator_base(right) {}
 };
 
@@ -175,33 +175,27 @@ template <typename T>
 __host__ __device__ cuda_list<T>& cuda_list<T>::operator= (const cuda_list<T> & that) {
 	if (this != &that)
 	{
-		this->elements = that.elements;
-		if (this->elements != 0 && that.elements != 0)
+		
+		if (this->size() != 0 && that.size() != 0)
 		{
-			node<T>* tmp = head;
 			if (this->elements <= that.elements)
 			{
-				cuda_list_iterator<T> that_it = that.head;
-				for (cuda_list_iterator<T> it = head; it != nullptr; ++it)
-				{
-					*it = *that_it;
-					++that_it;
-				}
-				for (; that_it != nullptr; ++that_it)
+				auto that_it = that.begin();
+				for (auto& this_elem:*this)
+					this_elem = *(that_it++);
+				for (; that_it != that.end(); ++that_it)
 					this->push_back(*that_it);
 			}
 			else
 			{
-				cuda_list_iterator<T> this_it = this->head;
-				for (cuda_list_iterator<T> it = that.head; it != nullptr; ++it)
-				{
-					*this_it = *it;
-					++this_it;
-				}
-				for (; this_it != nullptr; ++this_it)
+				cuda_list_iterator<T> this_it = this->begin();
+				for (const auto& that_elem:that)
+					*(this_it++) = that_elem;
+				for (; this_it != this->end(); ++this_it)
 					this->erase(this_it);
 			}
 		}
+		this->elements = that.elements;
 	}
 	return *this;
 }
