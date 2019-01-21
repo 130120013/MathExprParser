@@ -81,8 +81,8 @@ struct node
 	typedef T value_type;
 	T data;
 	node *next, *prev;
-	//__host__ __device__ node(T const& data, node* next, node* prev) : data(data), next(next), prev(prev) {}
-	__host__ __device__ node(T&& data, node* next, node* prev) : data(std::move(data)), next(next), prev(prev) {}
+	template <class U, class = std::enable_if_t<std::is_constructible<T, U&&>::value>>
+	__host__ __device__ node(U&& data, node* next, node* prev) : data(std::forward<U>(data)), next(next), prev(prev) {}
 };
 
 template <typename T>
@@ -121,12 +121,21 @@ class cuda_list
 public:
 	typedef cuda_list_iterator<T> iterator;
 	typedef cuda_list_const_iterator<T> const_iterator;
-
+	__host__ __device__ cuda_list() = default;
+	__host__ __device__ cuda_list(const cuda_list& right)
+	{
+		*this = right;
+	}
+	__host__ __device__ cuda_list(cuda_list&& right)
+	{
+		*this = std::move(right);
+	}
 	__host__ __device__ cuda_list<T>& operator= (const cuda_list<T> &);
+	__host__ __device__ cuda_list<T>& operator= (cuda_list<T> &&);
 	__host__ __device__ ~cuda_list();
 
-	//__host__ __device__ void push_back(T&& data);
-	__host__ __device__ void push_back(T&& data);
+	template <class U>
+	__host__ __device__ void push_back(U&& data);
 	__host__ __device__ void push_front(T&& data);
 	__host__ __device__ void push_front(T const& data);
 	//__host__ __device__ void pop_back();
@@ -164,15 +173,18 @@ private:
 
 template <typename T>
 __host__ __device__ cuda_list<T>& cuda_list<T>::operator= (const cuda_list<T> & that) {
-	node<T>* tmp = head;
-	while (head) {
-		tmp = head;
-		head = head->next;
-		delete tmp;
+	if (this != &that)
+	{
+		node<T>* tmp = head;
+		while (head) {
+			tmp = head;
+			head = head->next;
+			delete tmp;
+		}
+		elements = that.elements;
+		head = that.head;
+		tail = that.tail;
 	}
-	elements = that.elements;
-	head = that.head;
-	tail = that.tail;
 	return *this;
 }
 
@@ -208,9 +220,9 @@ __host__ __device__ T const& cuda_list<T>::back() const {
 	return tail->data;
 }
 
-template <typename T>
-__host__ __device__ void cuda_list<T>::push_back(T&& data) {
-	node<T>* newNode = new node<T>(std::move(data), nullptr, tail);
+template <typename T> template <class U>
+__host__ __device__ void cuda_list<T>::push_back(U&& data) {
+	node<T>* newNode = new node<T>(std::forward<U>(data), nullptr, tail);
 	if (head == nullptr)
 		head = newNode;
 	if (tail != nullptr)
