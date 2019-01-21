@@ -249,28 +249,30 @@ namespace cu {
 	};
 
 	template <class T>
-	struct return_wrapper_t
+	class impl_base_return_wrapper
 	{
+	protected:
+		CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
+		T* m_pVal = nullptr;
+		alignas(T) char val_buf[sizeof(T)];
+		__device__ T* get_buf_ptr()
+		{
+			return reinterpret_cast<T*>(val_buf);
+		}
+		__device__ const T* get_buf_ptr() const
+		{
+			return reinterpret_cast<const T*>(val_buf);
+		}
+	public:
+		typedef T value_type;
+		__device__ impl_base_return_wrapper() = default;
 		template <class U, class = std::enable_if_t<std::is_constructible<T, U&&>::value>>
-		__device__ return_wrapper_t(U&& value, CudaParserErrorCodes exit_code = CudaParserErrorCodes::Success) :m_code(exit_code)
+		__device__ impl_base_return_wrapper(U&& value, CudaParserErrorCodes exit_code = CudaParserErrorCodes::Success) :m_code(exit_code)
 		{
 			m_pVal = std::move(this->get_buf_ptr());
 			new (m_pVal) T(std::forward<U>(value));
 		}
-		__device__ return_wrapper_t(const return_wrapper_t& rw) : m_code(rw.m_code), m_pVal((T*)rw.get_buf_ptr())
-		{
-			//m_pVal = rw.get_buf_ptr();
-			memcpy(val_buf, rw.val_buf, sizeof(T));
-		}
-		__device__ return_wrapper_t& operator= (const return_wrapper_t& rw)
-		{
-			this->m_code = rw.m_code;
-			this->m_pVal = this->get_buf_ptr();
-			memcpy(val_buf, rw.val_buf, sizeof(T));
-			return *this;
-		}
-		__device__ explicit return_wrapper_t(CudaParserErrorCodes exit_code) :m_pVal(nullptr), m_code(exit_code) {}
-		__device__ ~return_wrapper_t()
+		__device__ ~impl_base_return_wrapper()
 		{
 			if (m_pVal)
 				m_pVal->~T();
@@ -311,25 +313,141 @@ namespace cu {
 		{
 			return m_code;
 		}
+	};
+
+	template <class LeftReturnWrapper, class RightReturnWrapper>
+	auto impl_assign_return_wrapper(LeftReturnWrapper& left, RightReturnWrapper&& right)
+		-> std::enable_if_t <
+		std::is_convertible<typename std::decay<RightReturnWrapper>::type::value_type, typename LeftReturnWrapper::value_type>::value,
+		LeftReturnWrapper&
+		>
+	{
+		this->m_code = rw.return_code();
+		if (rw.get() == nullptr)
+		{
+			if (m_pVal != nullptr)
+			{
+				m_pVal->~T();
+				m_pVal = nullptr;
+			}
+		}
+		else
+		{
+			if (m_pVal == nullptr)
+				m_pVal = this->get_buf_ptr();
+			new (m_pVal) T(std::forward<U>(rw).value());
+		}
+		return *this;
+	}
+
+	template <class Derived, class T>
+	struct impl_move_assignable_return_wrapper
+	{
+		impl_move_assignable_return_wrapper& operator=(impl_move_assignable_return_wrapper&& right)
+		{
+		}
 	private:
-		CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
-		T* m_pVal = nullptr;
-		alignas(T) char val_buf[sizeof(T)];
-		__device__ T* get_buf_ptr()
+		Derived& get_this()
 		{
-			return reinterpret_cast<T*>(val_buf);
+			return static_cast<Derived&>(*this);
 		}
-		__device__ const T* get_buf_ptr() const
+		const Derived& get_this() const
 		{
-			return reinterpret_cast<const T*>(val_buf);
+			return static_cast<Derived&>(*this);
 		}
-		template <class U = T, class = std::enable_if_t<std::is_destructible<U>::value>>
-		__device__ static void destroy_val(U* pVal)
+	protected:
+		template <class U>
+		__device__ auto assign_value(U&& val) -> std::enable_if_t <
+			std::is_constructible<impl_movable_return_wrapper<T>, U&&>::value
+			&& std::is_convertible<typename std::decay<U>::type::value_type, T>::value
+		>
 		{
-			pVal->~T();
+			this->m_code = rw.return_code();
+			if (rw.get() == nullptr)
+			{
+				if (m_pVal != nullptr)
+				{
+					m_pVal->~T();
+					m_pVal = nullptr;
+				}
+			}
+			else
+			{
+				if (m_pVal == nullptr)
+					m_pVal = this->get_buf_ptr();
+				new (m_pVal) T(std::forward<U>(rw).value());
+			}
+			return *this;
 		}
-		//template <class U = T, class = std::enable_if_t<!std::is_destructible<U>::value>>
-		//static void destroy_val(U*) {}
+
+	};
+
+	template <class T>
+	struct return_wrapper_t
+	{
+		
+		__device__ return_wrapper_t(const return_wrapper_t& rw) : m_code(rw.m_code)
+		{
+			if (rw.m_pVal == nullptr)
+				m_pVal = nullptr;
+			else
+			{
+				m_pVal = this->get_buf_ptr();
+				new (m_pVal) T(rw.value());
+			}
+		}
+		__device__ return_wrapper_t& operator= (const return_wrapper_t& rw)
+		{
+			this->m_code = rw.m_code;
+			if (rw.m_pVal == nullptr)
+			{
+				if (m_pVal != nullptr)
+				{
+					m_pVal->~T();
+					m_pVal = nullptr;
+				}
+			}
+			else
+			{
+				if (m_pVal == nullptr)
+					this->m_pVal = this->get_buf_ptr();
+				new (m_pVal) T(rw.value());
+			}
+			return *this;
+		}
+		__device__ return_wrapper_t(return_wrapper_t&& rw) : m_code(rw.m_code)
+		{
+			if (rw.m_pVal == nullptr)
+				m_pVal = nullptr;
+			else
+			{
+				m_pVal = this->get_buf_ptr();
+				new (m_pVal) T(std::move(rw).value());
+			}
+		}
+		__device__ return_wrapper_t& operator= (return_wrapper_t&& rw)
+		{
+			this->m_code = rw.m_code;
+			if (rw.m_pVal == nullptr)
+			{
+				if (m_pVal != nullptr)
+				{
+					m_pVal->~T();
+					m_pVal = nullptr;
+				}
+			}
+			else
+			{
+				if (m_pVal == nullptr)
+					this->m_pVal = this->get_buf_ptr();
+				new (m_pVal) T(std::move(rw).value());
+			}
+			return *this;
+		}
+		__device__ explicit return_wrapper_t(CudaParserErrorCodes exit_code) :m_pVal(nullptr), m_code(exit_code) {}
+		
+		
+		
 	};
 
 	template <class T>
@@ -2304,9 +2422,7 @@ namespace cu {
 
 		auto formula = std::move(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value());
 		this->body = std::move(*simplify_body(std::move(formula)));
-
 	}
-
 }
 
 #endif // !PARSER_H

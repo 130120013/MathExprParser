@@ -175,27 +175,63 @@ template <typename T>
 __host__ __device__ cuda_list<T>& cuda_list<T>::operator= (const cuda_list<T> & that) {
 	if (this != &that)
 	{
-		node<T>* tmp = head;
-		while (head) {
-			tmp = head;
-			head = head->next;
-			delete tmp;
+		this->elements = that.elements;
+		if (this->elements != 0 && that.elements != 0)
+		{
+			node<T>* tmp = head;
+			if (this->elements <= that.elements)
+			{
+				cuda_list_iterator<T> that_it = that.head;
+				for (cuda_list_iterator<T> it = head; it != nullptr; ++it)
+				{
+					*it = *that_it;
+					++that_it;
+				}
+				for (; that_it != nullptr; ++that_it)
+					this->push_back(*that_it);
+			}
+			else
+			{
+				cuda_list_iterator<T> this_it = this->head;
+				for (cuda_list_iterator<T> it = that.head; it != nullptr; ++it)
+				{
+					*this_it = *it;
+					++this_it;
+				}
+				for (; this_it != nullptr; ++this_it)
+					this->erase(this_it);
+			}
 		}
-		elements = that.elements;
-		head = that.head;
-		tail = that.tail;
 	}
 	return *this;
 }
 
 template <typename T>
-__host__ __device__ cuda_list <T>::~cuda_list() {
-	node<T>* tmp;
-	while (head) {
-		tmp = head;
-		head = head->next;
-		delete tmp;
-	}
+__host__ __device__ cuda_list<T>& cuda_list<T>::operator= (cuda_list<T> && that) {
+	node<T>* tmp = head;
+	this->clear();
+	this->elements = that.elements;
+	that.elements = 0;
+
+	this->head = that.head;
+	that.head = nullptr;
+	this->tail = that.tail;
+	that.tail = nullptr;
+	return *this;
+}
+
+template <typename T>
+__host__ __device__ cuda_list <T>::~cuda_list() 
+{
+	//node<T>* tmp;
+	//while (head)
+	//{
+	//	tmp = head;
+	//	head = head->next;
+	//	delete tmp;
+	//}
+	//tail = nullptr;
+	this->clear();
 }
 
 template <typename T>

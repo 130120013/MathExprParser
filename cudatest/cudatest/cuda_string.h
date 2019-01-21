@@ -191,16 +191,15 @@ namespace cu
 			const char* p = &str[0];
 			const char *p1 = nullptr, *p2 = nullptr, *p3 = nullptr;
 
-			int intPart = 0, realPart = 0, expPart = 0;
 			std::size_t cbRest = cbMax;
-			intPart = strtoll_n(p, cbRest, (char**)&p1, 10);
-			result = intPart;
+			auto intPart = strtoll_n(p, cbRest, (char**)&p1, 10);
+			result = (double) intPart;
 			cbRest -= p1 - p;
 
 			if (cbRest > 0 && *p1 == '.' || *p1 == ',')
 			{
 				std::size_t cbFractialPart;
-				realPart = strtoll_n(p1 + 1, cbRest, (char**)&p2, 10);
+				auto realPart = strtoll_n(p1 + 1, cbRest, (char**)&p2, 10);
 				cbFractialPart = (std::size_t) (p2 - p1 - 1);
 				result += double(realPart) * pow((double)10, -(double)cbFractialPart);
 				cbRest -= cbFractialPart;
@@ -208,7 +207,7 @@ namespace cu
 			}
 			if (*p1 == 'E')
 			{
-				expPart = strtoll_n(p2 + 1, cbRest, const_cast<char**>(&p3), 10);
+				auto expPart = strtoll_n(p2 + 1, cbRest, const_cast<char**>(&p3), 10);
 				result *= pow((double)10, (double)expPart);
 				p1 = p3;
 			}

@@ -100,32 +100,32 @@ public:
 //	return static_cast<const std::reverse_iterator<Iterator>&>(left) - static_cast<const std::reverse_iterator<Iterator>&>(right);
 //}
 
-#pragma hd_warning_disable
-#pragma nv_exec_check_disable
+//#pragma hd_warning_disable
+//#pragma nv_exec_check_disable
 template <class It>
 __host__ __device__ It next_it(It it)
 {
 	return ++it;
 }
 
-#pragma hd_warning_disable
-#pragma nv_exec_check_disable
+//#pragma hd_warning_disable
+//#pragma nv_exec_check_disable
 template <class It>
 __host__ __device__ It prev_it(It it)
 {
 	return --it;
 }
 
-#pragma hd_warning_disable
-#pragma nv_exec_check_disable
+//#pragma hd_warning_disable
+//#pragma nv_exec_check_disable
 template <class Container>
 __host__ __device__ auto begin_it(Container&& cont)
 {
 	return std::forward<Container>(cont).begin();
 }
 
-#pragma hd_warning_disable
-#pragma nv_exec_check_disable
+//#pragma hd_warning_disable
+//#pragma nv_exec_check_disable
 template <class Container>
 __host__ __device__ auto end_it(Container&& cont)
 {
