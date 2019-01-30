@@ -288,6 +288,7 @@ namespace cu {
 			left.value_ptr() = left.get_buf_ptr();
 			new (left.value_ptr()) value_type(right.value());
 		}
+		return left;
 	}
 
 	template <class Derived, class T, class = void>
