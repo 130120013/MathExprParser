@@ -161,9 +161,8 @@ __device__ __host__
 #endif //__CUDA_ARCH__
 inline cuda_unique_ptr<void> make_cuda_unique_ptr<void>(std::size_t cb)
 {
-	void* ptr;
-	auto err = malloc(cb);
-	if (err != 0)
+	auto ptr = malloc(cb);
+	if (ptr != 0)
 		return cuda_unique_ptr<void>();
 	//#if defined(__CUDA_ARCH__)
 	//		cuda_abort_with_error(CHSVERROR_OUTOFMEMORY);
@@ -434,11 +433,11 @@ public:
 		//cuda_runtime_call(cudaStreamCreate, &m_str);
 	}
 	inline explicit cuda_stream(cudaStream_t str) :m_str(str) {};
-	inline cuda_stream(cuda_stream&& right) :m_str(right.m_str)
+	inline cuda_stream(cuda_stream&& right) noexcept :m_str(right.m_str)
 	{
 		right.m_str = nullptr;
 	}
-	inline cuda_stream& operator=(cuda_stream&& right)
+	inline cuda_stream& operator=(cuda_stream&& right) noexcept
 	{
 		if (this != &right)
 		{
@@ -490,7 +489,7 @@ class shared_cuda_stream
 public:
 	inline shared_cuda_stream()
 	{
-		m_pBuf = new shared_cuda_stream_holder;
+		m_pBuf = new shared_cuda_stream_holder();
 		//	cuda_runtime_call(cudaStreamCreate, &m_pBuf->stream);
 		m_pBuf->cRefs.store(1, std::memory_order_relaxed);
 	}

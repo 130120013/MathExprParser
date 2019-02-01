@@ -235,7 +235,7 @@ namespace cu
 	class cuda_string
 	{
 		cuda_device_unique_ptr<char[]> pStr;
-		std::size_t strSize;
+		std::size_t strSize = 0;
 	public:
 		typedef char* iterator;
 		typedef const char* const_iterator;
@@ -249,7 +249,7 @@ namespace cu
 		{
 			*this = str;
 		}
-		__device__ inline cuda_string(cuda_string&& str)
+		__device__ inline cuda_string(cuda_string&& str) noexcept
 		{
 			*this = std::move(str);
 		}
@@ -285,14 +285,14 @@ namespace cu
 			pStr.get()[size] = 0;
 			strSize = size;
 		}
-		__device__ inline std::size_t size() const { return strSize; }
-		__device__ inline const char* c_str() const
+		__device__ inline std::size_t size() const noexcept { return strSize; }
+		__device__ inline const char* c_str() const noexcept
 		{
 			if (strSize)
 				return pStr.get();
 			return 0;
 		}
-		__device__ inline const char* data() const
+		__device__ inline const char* data() const noexcept
 		{
 			return c_str();
 		}
