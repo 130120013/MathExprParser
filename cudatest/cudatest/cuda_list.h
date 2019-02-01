@@ -330,7 +330,33 @@ private:
 };
 
 template <class T, bool /*ignore*/, class derived_class = cuda_list_proxy<T>>
-struct cuda_list_proxy_move_assign:cuda_list_proxy_move_constr<T, true, derived_class> {};
+struct cuda_list_proxy_move_assign
+{
+	cuda_list_proxy_move_assign() = default;
+	cuda_list_proxy_move_assign(const cuda_list_proxy_move_assign&) = default;
+	cuda_list_proxy_move_assign(cuda_list_proxy_move_assign&& right)
+	{
+		*this = std::move(right);
+	}
+	cuda_list_proxy_move_assign& operator=(const cuda_list_proxy_move_assign&) = default;
+	cuda_list_proxy_move_assign& operator=(cuda_list_proxy_move_assign&& right)
+	{
+		if (this != &right)
+		{
+			this->derived().head = right.derived().head;
+			this->derived().tail = right.derived().tail;
+			this->derived().elements = right.derived().elements;
+
+			right.derived().head = nullptr;
+			right.derived().tail = nullptr;
+			right.derived().elements = 0;
+		}
+		return *this;
+	}
+private:
+	const derived_class& derived() const noexcept {return static_cast<const derived_class&>(*this);}
+	derived_class& derived() noexcept {return static_cast<derived_class&>(*this);}
+};
 
 template <class T, bool is_copy_constr, class derived_class = cuda_list_proxy<T>> struct cuda_list_proxy_copy_constr
 {

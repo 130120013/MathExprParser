@@ -2468,8 +2468,9 @@ namespace cu {
 
 		//auto rv = lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
 		//auto rvf = rv;// .value();
-		auto formula = cuda_list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value());
-		this->body = std::move(*simplify_body(std::move(formula)));
+		auto formula = cuda_list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value()); //TODO: empty formula
+		auto res = std::move((*simplify_body(std::move(formula))).get());
+		this->body.reset(res);
 	}
 }
 
