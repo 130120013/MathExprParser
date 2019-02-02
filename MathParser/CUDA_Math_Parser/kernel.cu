@@ -7,7 +7,7 @@
 #include "cuda_list.cuh"
 //#include "cuda_stack.cuh"
 #include <stdio.h>
-#include "CudaParser.h"
+#include "CudaParser.cuh"
 
 namespace cu
 {
@@ -146,53 +146,27 @@ namespace cu
 	};
 }
 
+__device__ cu::Mathexpr<double>* g_pExpr;
+
 __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::size_t cbStr)
 {
-	//auto someptr = make_cuda_device_unique_ptr<cu::cuda_string>();
-	//*someptr = cu::cuda_string("abc");
-	//auto somecopy = *someptr;
-	//auto someotherptr = std::move(someptr);
-
-	char* endptr;
-	auto header = cu::Header<double>("f(x, y) = x + y", 8, &endptr);
-	header.push_argument("x", 1, 12);
-	header.push_argument("y", 1, 10);
-
-	////cu::Mathexpr<double> math("f(x) = x", 8);
-
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i < n)
 	{
-		auto rw1 = header.get_argument("x", 1);
-		auto rw2 = header.get_argument("y", 1);
-		if (rw1.get() != nullptr || rw2.get() != nullptr)
-		{
-			auto x = rw1.value();
-			auto y = rw2.value();
-			vec[i] = x + y;
-		}
-
-			//vec[i] = cu::stod(cu::cuda_string(pStr, pStr + cbStr)) + rw.value();
+		if (i == 0)
+			g_pExpr = new cu::Mathexpr<double>(pStr, cbStr);
+		__syncthreads();
+		cuda_vector<double> v;
+		v.push_back(2);
+		g_pExpr->init_variables(v);
+		vec[i] = g_pExpr->compute().value();
 	}
-
-	/*auto header = cu::TestHeader<double>("f(x) = x", 8, &endptr);
-	header.push_argument("x", 1, 12);*/
-	//cuda_list<cu::cuda_string> lst;
-	/*lst.push_back("1");
-	lst.push_front("000daa");
-	auto b = lst.back();
-	auto f = lst.front();
-	auto beg = lst.begin();
-	auto end = lst.end();
-	lst.erase(beg);*/
-	//lst.pop_back();
-	//lst.pop_front(); //not needed
 }
 
 int main()
 {
 	cudaError_t cudaStatus;
-	const char pStr[] = "3.14";
+	const char pStr[] = "f(x) = x^2";
 	double V[1000];
 
 	auto pStr_d = make_cuda_unique_ptr<char>(sizeof(pStr));
@@ -201,7 +175,7 @@ int main()
 	cudaStatus = cudaMemcpy(pStr_d.get(), pStr, sizeof(pStr) - 1, cudaMemcpyHostToDevice);
 	if (cudaStatus != cudaSuccess)
 		return -1;
-	memset_expr<<<1, 1>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
+	memset_expr<<<1, 1000>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
 
 	/*cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
 	Mathexpr<double> mathexpr(expression);

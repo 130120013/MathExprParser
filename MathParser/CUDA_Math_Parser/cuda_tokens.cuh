@@ -1,224 +1,12 @@
-#include <stack>
-#include <cstdlib>
-#include <cstring>
-#include <memory>
-#include <list>
-#include <algorithm>
-#include <memory>
-#include <map>
-#include <vector>
-#include <list>
-#include "cuda_string.cuh"
-#include "cuda_list.cuh"
-#include "cuda_stack.cuh"
-#include "cuda_map.cuh"
+#include "cuda_config.cuh"
+#include "cuda_return_wrapper.cuh"
+#include "cuda_memory.cuh"
 #include "cuda_vector.cuh"
-#include "cuda_pair.cuh"
-#include <thrust/extrema.h>
-#include <thrust/execution_policy.h>
 
-#ifndef PARSER_H
-#define PARSER_H
-namespace cu {
-__device__ constexpr bool iswhitespace(char ch) noexcept
-{
-	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\0'; //see also std::isspace
-}
-//
-//__device__ constexpr bool isdigit(char ch) noexcept
-//{
-//	return ch >= '0' && ch <= '9';
-//};
-//
-//__device__ constexpr bool isalpha(char ch) noexcept
-//{
-//	return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
-//};
-//
-//__device__ constexpr bool isalnum(char ch) noexcept
-//{
-//	return isdigit(ch) || isalpha(ch);
-//}
+#ifndef CUDA_TOKENS_H
+#define CUDA_TOKENS_H
 
-template <class Iterator>
-__device__ Iterator skipSpaces(Iterator pBegin, Iterator pEnd) noexcept
-{
-	auto pCurrent = pBegin;
-	while (iswhitespace(*pCurrent) && ++pCurrent < pEnd);
-	return pCurrent;
-}
-
-__device__ const char* skipSpaces(const char* input_string, std::size_t length) noexcept
-{
-	return skipSpaces(input_string, input_string + length);
-}
-
-__device__ const char* skipSpaces(const char* input_string) noexcept
-{
-	auto pCurrent = input_string;
-	while (iswhitespace(*pCurrent) && *pCurrent++ != 0);
-	return pCurrent;
-}
-
-__device__ inline char* skipSpaces(char* input_string, std::size_t length) noexcept
-{
-	return const_cast<char*>(skipSpaces(const_cast<const char*>(input_string), length));
-}
-
-__device__ inline char* skipSpaces(char* input_string) noexcept
-{
-	return const_cast<char*>(skipSpaces(const_cast<const char*>(input_string)));
-}
-
-template<class ForwardIt, class Compare>
-__device__ auto min_element(ForwardIt&& first, ForwardIt&& last, Compare comp)
-{
-	if (first == last) return last;
-
-	auto smallest = first;
-	++first;
-	for (; first != last; ++first) {
-		if (comp(*first, *smallest)) {
-			smallest = first;
-		}
-	}
-	return smallest;
-}
-
-struct token_string_entity
-{
-	__device__ token_string_entity() = default;
-	__device__ token_string_entity(const char* start_ptr, const char* end_ptr) :m_pStart(start_ptr), m_pEnd(end_ptr) {}
-
-	//return a negative if the token < pString, 0 - if token == pString, a positive if token > pString
-	__device__ int compare(const char* pString, std::size_t cbString) const noexcept
-	{
-		auto my_size = this->size();
-		auto min_length = my_size < cbString ? my_size : cbString;
-		for (std::size_t i = 0; i < min_length; ++i)
-		{
-			if (m_pStart[i] < pString[i])
-				return -1;
-			if (m_pStart[i] > pString[i])
-				return -1;
-		}
-		return my_size < cbString ? -1 : (my_size > cbString ? 1 : 0);
-	}
-	__device__ inline int compare(const token_string_entity& right) const noexcept
-	{
-		return this->compare(right.begin(), right.size());
-	}
-	__device__ inline int compare(const char* pszString) const noexcept
-	{
-		return this->compare(pszString, cu::strlen(pszString));
-	}
-	template <std::size_t N>
-	__device__ inline auto compare(const char(&strArray)[N]) const noexcept -> std::enable_if_t<N == 0, int>
-	{
-		return this->size() == 0;
-	}
-	template <std::size_t N>
-	__device__ inline auto compare(const char(&strArray)[N]) const noexcept->std::enable_if_t<(N > 0), int>
-	{
-		return strArray[N - 1] == '\0' ?
-			compare(strArray, N - 1) ://null terminated string, like "sin"
-			compare(strArray, N); //generic array, like const char Array[] = {'s', 'i', 'n'}
-	}
-	__device__ inline const char* begin() const noexcept
-	{
-		return m_pStart;
-	}
-	__device__ inline const char* end() const noexcept
-	{
-		return m_pEnd;
-	}
-	__device__ inline std::size_t size() const noexcept
-	{
-		return std::size_t(this->end() - this->begin());
-	}
-private:
-	const char* m_pStart = nullptr, *m_pEnd = nullptr;
-};
-
-__device__ bool operator==(const token_string_entity& left, const token_string_entity& right) noexcept
-{
-	return left.compare(right) == 0;
-}
-
-__device__ bool operator==(const token_string_entity& left, const char* pszRight) noexcept
-{
-	return left.compare(pszRight) == 0;
-}
-
-template <std::size_t N>
-__device__ bool operator==(const token_string_entity& left, const char(&strArray)[N]) noexcept
-{
-	return left.compare(strArray) == 0;
-}
-
-__device__ bool operator!=(const token_string_entity& left, const token_string_entity& right) noexcept
-{
-	return left.compare(right) != 0;
-}
-
-__device__ bool operator!=(const token_string_entity& left, const char* pszRight) noexcept
-{
-	return left.compare(pszRight) != 0;
-}
-
-template <std::size_t N>
-__device__ bool operator!=(const token_string_entity& left, const char(&strArray)[N]) noexcept
-{
-	return left.compare(strArray) != 0;
-}
-
-__device__ bool operator==(const char* pszLeft, const token_string_entity& right) noexcept
-{
-	return right == pszLeft;
-}
-
-template <std::size_t N>
-__device__ bool operator==(const char(&strArray)[N], const token_string_entity& right) noexcept
-{
-	return right == strArray;
-}
-
-__device__ bool operator!=(const char* pszRight, const token_string_entity& right) noexcept
-{
-	return right != pszRight;
-}
-
-template <std::size_t N>
-__device__ bool operator!=(const char(&strArray)[N], const token_string_entity& right) noexcept
-{
-	return right != strArray;
-}
-
-//let's define token as a word.
-//One operator: = + - * / ^ ( ) ,
-//Or: something that only consists of digits and one comma
-//Or: something that starts with a letter and proceeds with letters or digits
-
-__device__ token_string_entity parse_string_token(const char* pExpression, std::size_t cbExpression)
-{
-	auto pStart = skipSpaces(pExpression, cbExpression);
-	if (pStart == pExpression + cbExpression)
-		return token_string_entity();
-	if (isdigit(*pStart) || *pStart == '.')
-	{
-		bool fFlPointFound = *pStart == '.';
-		const char* pEnd = pStart;
-		while (isdigit(*++pEnd) || (!fFlPointFound && *pEnd == '.')) continue;
-		return token_string_entity(pStart, pEnd);
-	}
-	if (isalpha(*pStart))
-	{
-		const char* pEnd = pStart;
-		while (isalnum(*++pEnd)) continue;
-		return token_string_entity(pStart, pEnd);
-	}
-	return token_string_entity(pStart, pStart + 1);
-}
+CU_BEGIN
 
 enum class TokenType
 {
@@ -248,184 +36,12 @@ enum class TokenType
 	variable
 };
 
-enum class CudaParserErrorCodes
-{
-	Success,
-	NotReady,
-	UnexpectedCall,
-	InsufficientNumberParams,
-	UnexpectedToken,
-	ParameterIsNotUnique,
-	InvalidArgument,
-	ParameterIsNotFound,
-	InvalidExpression
-};
-
-template <class T>
-struct return_wrapper_t
-{
-	template <class U, class = std::enable_if_t<std::is_constructible<T, U&&>::value>>
-	__device__ return_wrapper_t(U&& value, CudaParserErrorCodes exit_code = CudaParserErrorCodes::Success) :m_code(exit_code)
-	{
-		m_pVal = std::move(this->get_buf_ptr());
-		new (m_pVal) T(std::forward<U>(value));
-	}
-	__device__ return_wrapper_t(const return_wrapper_t& rw) : m_code(rw.m_code), m_pVal((T*)rw.get_buf_ptr())
-	{
-		//m_pVal = rw.get_buf_ptr();
-		memcpy(val_buf, rw.val_buf, sizeof(T));
-	}
-	__device__ return_wrapper_t& operator= (const return_wrapper_t& rw)
-	{
-		this->m_code = rw.m_code;
-		this->m_pVal = this->get_buf_ptr();
-		memcpy(val_buf, rw.val_buf, sizeof(T));
-		return *this;
-	}
-	__device__ explicit return_wrapper_t(CudaParserErrorCodes exit_code) :m_pVal(nullptr), m_code(exit_code) {}
-	__device__ ~return_wrapper_t()
-	{
-		if (m_pVal)
-			m_pVal->~T();
-	}
-	__device__ T* get()
-	{
-		return m_pVal;
-	}
-	__device__ const T* get() const
-	{
-		return m_pVal;
-	}
-	__device__ T* operator->()
-	{
-		return this->get();
-	}
-	__device__ const T* operator->() const
-	{
-		return this->get();
-	}
-	__device__ const T& value() const &
-	{
-		return *this->get();
-	}
-	__device__ T& value() &
-	{
-		return *this->get();
-	}
-	__device__ const T&& value() const &&
-	{
-		return std::move(this->value());
-	}
-	__device__ T&& value() &&
-	{
-		return std::move(this->value());
-	}
-	__device__ CudaParserErrorCodes return_code() const
-	{
-		return m_code;
-	}
-private:
-	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
-	T* m_pVal = nullptr;
-	alignas(T) char val_buf[sizeof(T)];
-	__device__ T* get_buf_ptr()
-	{
-		return reinterpret_cast<T*>(val_buf);
-	}
-	__device__ const T* get_buf_ptr() const
-	{
-		return reinterpret_cast<const T*>(val_buf);
-	}
-	template <class U = T, class = std::enable_if_t<std::is_destructible<U>::value>>
-	__device__ static void destroy_val(U* pVal)
-	{
-		pVal->~T();
-	}
-	//template <class U = T, class = std::enable_if_t<!std::is_destructible<U>::value>>
-	//static void destroy_val(U*) {}
-};
-
-template <class T>
-struct return_wrapper_t<T&>
-{
-	__device__ return_wrapper_t(T& value, CudaParserErrorCodes exit_code = CudaParserErrorCodes::Success) :m_code(exit_code)
-	{
-		m_pVal = &value;
-	}
-	__device__ explicit return_wrapper_t(CudaParserErrorCodes exit_code) :m_pVal(nullptr), m_code(exit_code) {}
-	__device__ T* get()
-	{
-		return m_pVal;
-	}
-	__device__ const T* get() const
-	{
-		return m_pVal;
-	}
-	__device__ T* operator->()
-	{
-		return this->get();
-	}
-	__device__ const T* operator->() const
-	{
-		return this->get();
-	}
-	__device__ CudaParserErrorCodes return_code() const
-	{
-		return m_code;
-	}
-	__device__ T& value() 
-	{
-		return *this->get();
-	}
-private:
-	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
-	T* m_pVal = nullptr;
-};
-
-template <>
-struct return_wrapper_t<void>
-{
-	__device__ return_wrapper_t() = default;
-	//__device__ return_wrapper_t():m_code(CudaParserErrorCodes::Success) {}
-	__device__ explicit return_wrapper_t(CudaParserErrorCodes exit_code) :m_code(exit_code) {}
-	///*__device__*/ return_wrapper_t(const return_wrapper_t& ) = default;
-	///*__device__*/ return_wrapper_t(return_wrapper_t&& ) = default;
-	///*__device__*/  return_wrapper_t& operator= (const return_wrapper_t&) = default;
-	///*__device__*/  return_wrapper_t& operator= (return_wrapper_t&& ) = default;
-
-	__device__ void* get()
-	{
-		return nullptr;
-	}
-	__device__ const void* get() const
-	{
-		return nullptr;
-	}
-	__device__ void* operator->()
-	{
-		return this->get();
-	}
-	__device__ const void* operator->() const
-	{
-		return this->get();
-	}
-	__device__ CudaParserErrorCodes return_code() const
-	{
-		return m_code;
-	}
-private:
-	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
-};
-
 __device__ constexpr bool IsOperatorTokenTypeId(TokenType id)
 {
 	return id == TokenType::BinaryPlus || id == TokenType::BinaryMinus
 		|| id == TokenType::operatorMul || id == TokenType::operatorDiv
 		|| id == TokenType::operatorPow;
 }
-
-template <class T = void>
-auto make_return_wrapper_error(CudaParserErrorCodes error) { return return_wrapper_t<T>(error); }
 
 template <class T, std::size_t N>
 class static_parameter_storage
@@ -464,17 +80,13 @@ public:
 			return return_wrapper_t<T&>(strg.params[index]); //TODO не должно быть move
 		return return_wrapper_t<T&>(CudaParserErrorCodes::InvalidArgument);
 	}
-	/*__device__ auto operator[](std::size_t index)
-	{
-		return const_cast<const static_parameter_storage&>(*this)[index];
-	}*/
 	template <class U>
-	__device__ auto push_argument(U&& arg) -> std::enable_if_t<std::is_convertible<std::decay_t<U>, T>::value, return_wrapper_t<T>>
+	__device__ auto push_argument(U&& arg) -> std::enable_if_t<std::is_convertible<std::decay_t<U>, T>::value, return_wrapper_t<void>>
 	{
 		if (top - strg.params >= N)
-			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidArgument);
+			return return_wrapper_t<void>(CudaParserErrorCodes::InvalidArgument);
 		*(top++) = std::move(arg);
-		return return_wrapper_t<T>(std::move(*top));
+		return return_wrapper_t<void>();
 	}
 	__device__ bool is_ready() const
 	{
@@ -535,6 +147,14 @@ public:
 	{
 		return this->value - num();
 	}
+	__device__ T operator+() const
+	{
+		return this->value;
+	}
+	__device__ T operator-() const
+	{
+		return -this->value;
+	}
 	__device__ T operator*(const Number<T>& num) const
 	{
 		return this->value * num();
@@ -592,7 +212,7 @@ public:
 	{
 		m_pValue = val.m_pValue;
 		name_length = val.name_length;
-		this->name = std::move(make_cuda_device_unique_ptr<char[]>(val.name_length + 1));
+		this->name = make_cuda_device_unique_ptr<char[]>(val.name_length + 1);
 		cu::strncpy(this->name.get(), val.name.get(), val.name_length);
 		this->name[val.name_length] = 0;
 		return *this;
@@ -750,28 +370,25 @@ class UnaryMinus : public Operator<T> //+-*/
 public:
 	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
 	{
-		ops.push_argument(std::move(value));
-		return return_wrapper_t<void>();
+		return ops.push_argument(std::move(value));
 	}
 	__device__ virtual return_wrapper_t<T> operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
 		if (!this->is_ready())
 			return return_wrapper_t<T>(CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>(-1 * *((ops[0].get())->get()->operator()().get()));
+		return return_wrapper_t<T>(-*((ops[0].get())->get()->operator()().get()));
 	}
 	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
 	{
 		if (!this->is_ready())
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
-		//auto op0 = std::move(*((ops[0].get())->get()->simplify().get()));
-		auto op0 = (ops[0].get())->get()->simplify();
+		auto op0 = std::move(*((ops[0].get())->get()->simplify().get()));
 
-		if (op0->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(*((ops[0].get())->get()->operator()().get()))));
-			//return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(op0->operator().get()))); ///////////NOT READY
+		if (op0->type() == TokenType::number)
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(-*static_cast<Number<T>*>(op0.get()))); ///////////NOT READY
 		auto op_new = make_cuda_device_unique_ptr<UnaryMinus<T>>();
-		op_new->push_argument(std::move(op0.value()));
+		op_new->push_argument(std::move(op0));
 		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(op_new));
 	}
 	__device__ virtual bool is_ready() const
@@ -799,8 +416,7 @@ class BinaryMinus : public Operator<T>
 public:
 	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
 	{
-		ops.push_argument(std::move(value));
-		return return_wrapper_t<void>();
+		return ops.push_argument(std::move(value));
 	}
 	__device__ virtual return_wrapper_t<T> operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
@@ -889,20 +505,19 @@ public:
 template <class T>
 class OperatorMul : public Operator<T>
 {
-	cuda_device_unique_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<cuda_device_unique_ptr<IToken<T>>, 2> ops;
 
 public:
 	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
 	{
-		*top++ = std::move(value);
-		return return_wrapper_t<void>();
+		return ops.push_argument(std::move(value));
 	}
 	__device__ virtual return_wrapper_t<T> operator()() const
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!ops.is_ready())
 			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
 
-		return return_wrapper_t<T>(*(*ops[0])().get() * *(*ops[1])().get());
+		return return_wrapper_t<T>((*ops[0].value())().value() * (*ops[1].value())().value());
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -925,16 +540,16 @@ public:
 		typedef cuda_device_unique_ptr<IToken<T>> my_token_sptr;
 		if (!is_ready())
 			return return_wrapper_t<my_token_sptr>(CudaParserErrorCodes::NotReady);
-		auto op0 = ops[0]->simplify();
+		auto op0 = ops[0].value()->simplify();
 		if (op0.return_code() != CudaParserErrorCodes::Success)
 			return return_wrapper_t<my_token_sptr>(op0.return_code());
-		auto op1 = ops[1]->simplify();
+		auto op1 = ops[1].value()->simplify();
 		if (op1.return_code() != CudaParserErrorCodes::Success)
 			return return_wrapper_t<my_token_sptr>(op1.return_code());
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
 		{
-			auto result = (*op0.value())().value() + (*op1.value())().value();
+			auto result = (*op0.value())().value() * (*op1.value())().value();
 			return return_wrapper_t<my_token_sptr>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::move(result))));
 		}
 		auto op_new = make_cuda_device_unique_ptr<OperatorMul<T>>();
@@ -946,24 +561,23 @@ public:
 template <class T>
 class OperatorDiv : public Operator<T>
 {
-	cuda_device_unique_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<cuda_device_unique_ptr<IToken<T>>, 2> ops;
 
 public:
 	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
 	{
-		*top++ = std::move(value);
-		return return_wrapper_t<void>();
+		return ops.push_argument(std::move(value));
 	}
 	__device__ virtual return_wrapper_t<T> operator()() const
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!ops.is_ready())
 			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
 
-		return return_wrapper_t<T>(*(*ops[0])().get() / *(*ops[1])().get());
+		return return_wrapper_t<T>((*ops[1].value())().value() / (*ops[0].value())().value());
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -982,10 +596,10 @@ public:
 		typedef cuda_device_unique_ptr<IToken<T>> my_token_sptr;
 		if (!is_ready())
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<OperatorDiv<T>>(), CudaParserErrorCodes::NotReady);
-		auto op0 = ops[0]->simplify();
+		auto op0 = ops[0].value()->simplify();
 		if (op0.return_code() != CudaParserErrorCodes::Success)
 			return return_wrapper_t<my_token_sptr>(op0.return_code());
-		auto op1 = ops[1]->simplify();
+		auto op1 = ops[1].value()->simplify();
 		if (op1.return_code() != CudaParserErrorCodes::Success)
 			return return_wrapper_t<my_token_sptr>(op1.return_code());
 
@@ -1000,24 +614,23 @@ public:
 template <class T>
 class OperatorPow : public Operator<T>
 {
-	cuda_device_unique_ptr<IToken<T>> ops[2], *top = ops;
+	static_parameter_storage<cuda_device_unique_ptr<IToken<T>>, 2> ops;
 
 public:
 	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
 	{
-		*top++ = std::move(value);
-		return return_wrapper_t<void>();
+		return ops.push_argument(std::move(value));
 	}
 	__device__ virtual return_wrapper_t<T> operator()() const
 	{
-		if (!ops[0]->is_ready() || !ops[1]->is_ready())
+		if (!ops.is_ready())
 			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
 
-		return return_wrapper_t<T>(std::pow(*(*ops[0])().get(), *(*ops[1])().get()));
+		return return_wrapper_t<T>(std::pow((*ops[1].value())().value(), (*ops[0].value())().value()));
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return top == &ops[2] && ops[0]->is_ready() && ops[1]->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -1035,10 +648,10 @@ public:
 	{
 		if (!is_ready())
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<OperatorPow<T>>(), CudaParserErrorCodes::NotReady);
-		auto op0 = ops[0]->simplify();
-		auto op1 = ops[1]->simplify();
+		auto op0 = ops[0].value()->simplify();
+		auto op1 = ops[1].value()->simplify();
 
-		if ((op0.get())->get()->type() == TokenType::number && (op0.get())->get()->type() == TokenType::number)
+		if ((op0.get())->get()->type() == TokenType::number && (op1.get())->get()->type() == TokenType::number)
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::pow((*op1.value())().value(), (*op0.value())().value()))));
 		//auto op_new = std::make_shared<OperatorPlus<T>>();
 		auto op_new = make_cuda_device_unique_ptr<OperatorPow<T>>();
@@ -1093,7 +706,7 @@ public:
 	}
 	__device__ virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
 	{
@@ -1144,7 +757,7 @@ public:
 	}
 	__device__ virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
 	{
@@ -1182,7 +795,7 @@ public:
 	}
 	__device__ virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{
@@ -1335,7 +948,7 @@ public:
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{
-		return 1;
+		return 2;
 	}
 	__device__ virtual const char* get_function_name() const
 	{
@@ -1353,8 +966,9 @@ public:
 		auto op1 = (ops[1].get())->get()->simplify();
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::pow((*op1.value())().value(), (*op0.value())().value()))));
-		auto op_new = make_cuda_device_unique_ptr<OperatorPow<T>>();
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(
+				std::log((*op1.value())().value()) / std::log((*op0.value())().value()))));
+		auto op_new = make_cuda_device_unique_ptr<LogFunction<T>>();
 		op_new->push_argument(std::move(*op0.get()));
 		op_new->push_argument(std::move(*op1.get()));
 		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(op_new));
@@ -1375,7 +989,7 @@ public:
 		if (!this->is_ready())
 			return return_wrapper_t<T>(0, CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>(jnf(int((*ops[0].value())().value()), int((*ops[1].value())().value())));
+		return return_wrapper_t<T>(jn(int((*ops[0].value())().value()), double((*ops[1].value())().value())));
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1387,7 +1001,7 @@ public:
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{
-		return 1;
+		return 2;
 	}
 	__device__ virtual const char* get_function_name() const
 	{
@@ -1405,7 +1019,7 @@ public:
 		auto op1 = (ops[1].get())->get()->simplify();
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(jnf(int((*ops[0].value())().value()), int((*ops[1].value())().value())))));
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(jn(int((*ops[0].value())().value()), double((*ops[1].value())().value())))));
 		auto op_new = make_cuda_device_unique_ptr<JnFunction<T>>();
 		op_new->push_argument(std::move(*op0.get()));
 		op_new->push_argument(std::move(*op1.get()));
@@ -1427,7 +1041,7 @@ public:
 		if (!op->is_ready())
 			return return_wrapper_t<T>(0, CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>(j0f(*((op.get())->operator()()).get()), CudaParserErrorCodes::Success);
+		return return_wrapper_t<T>(j0(*((op.get())->operator()()).get()), CudaParserErrorCodes::Success);
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1455,7 +1069,7 @@ public:
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<J0Function<T>>(), CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if (newarg->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(j0f((*newarg.value())().value()))));
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(j0((*newarg.value())().value()))));
 		auto pNewTkn = make_cuda_device_unique_ptr<J0Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(pNewTkn));
@@ -1476,7 +1090,7 @@ public:
 		if (!op->is_ready())
 			return return_wrapper_t<T>(0, CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>(j1f(*((op.get())->operator()()).get()));
+		return return_wrapper_t<T>(j1(*((op.get())->operator()()).get()));
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1504,7 +1118,7 @@ public:
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if (newarg->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(j1f(*((newarg.get()->get()->operator()()).get())))));
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(j1(*((newarg.get()->get()->operator()()).get())))));
 		auto pNewTkn = make_cuda_device_unique_ptr<J1Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(pNewTkn));
@@ -1525,7 +1139,7 @@ public:
 		if (!this->is_ready())
 			return return_wrapper_t<T>(CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>(ynf(int(*((ops[0].get()->get()->operator()()).get())), *((ops[1].get()->get()->operator()()).get())));
+		return return_wrapper_t<T>(yn(int(*((ops[0].get()->get()->operator()()).get())), *((ops[1].get()->get()->operator()()).get())));
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1537,7 +1151,7 @@ public:
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{
-		return 1;
+		return 2;
 	}
 	__device__ virtual const char* get_function_name() const
 	{
@@ -1555,7 +1169,7 @@ public:
 		auto op1 = (ops[1].get())->get()->simplify();
 
 		if (op0->get()->type() == TokenType::number && op1->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(ynf(int(*((ops[0].get()->get()->operator()()).get())), *((ops[1].get()->get()->operator()()).get())))));
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(yn(int(*((ops[0].get()->get()->operator()()).get())), *((ops[1].get()->get()->operator()()).get())))));
 		auto op_new = make_cuda_device_unique_ptr<YnFunction<T>>();
 		op_new->push_argument(std::move(*op0.get()));
 		op_new->push_argument(std::move(*op1.get()));
@@ -1577,7 +1191,7 @@ public:
 		if (!op->is_ready())
 			return return_wrapper_t<T>(0, CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>(y0f(*((op.get())->operator()()).get()));
+		return return_wrapper_t<T>(y0(*((op.get())->operator()()).get()));
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1605,7 +1219,7 @@ public:
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Y0Function<T>>(), CudaParserErrorCodes::NotReady);
 		auto newarg = op->simplify();
 		if (newarg->get()->type() == TokenType::number)
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(y0f(*(newarg.get()->get()->operator()().get())))));
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(y0(*(newarg.get()->get()->operator()().get())))));
 		auto pNewTkn = make_cuda_device_unique_ptr<Y0Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(pNewTkn));
@@ -1624,9 +1238,9 @@ public:
 	__device__ virtual return_wrapper_t<T> operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
 		if (!op->is_ready())
-			return return_wrapper_t<T>(0, CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<T>(T(), CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>(y1f(*((op.get())->operator()()).get()));
+		return return_wrapper_t<T>(y1(*((op.get())->operator()()).get()));
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1657,7 +1271,7 @@ public:
 
 			//*(newarg.get()->get()->operator().get())
 			//(*op0.value())().value()
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(y1f((*newarg.value())().value()))));
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(Number<T>(y1((*newarg.value())().value()))));
 		auto pNewTkn = make_cuda_device_unique_ptr<Y1Function<T>>();
 		pNewTkn->op = std::move(newarg.value());
 		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(pNewTkn));
@@ -1688,7 +1302,7 @@ public:
 		if (!this->is_ready())
 			return return_wrapper_t<T>(CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>((*cu::min_element(std::move(ops.begin()), std::move(ops.end()), m_pred)).get()->operator()());
+		return return_wrapper_t<T>((*cu::min_element(ops.begin(), ops.end(), m_pred)).get()->operator()());
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1727,7 +1341,7 @@ public:
 				newargsVar.push_back(std::move(newarg.value()));
 		}
 		if (newargsVar.empty())
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(*cu::min_element( std::move(newargs.begin()), std::move(newargs.end()), m_pred)));			
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(*cu::min_element(newargs.begin(), newargs.end(), m_pred)));
 
 		auto pNewTkn = make_cuda_device_unique_ptr<Implementation>();
 		if (newargs.empty())
@@ -1735,7 +1349,7 @@ public:
 		else
 		{
 			pNewTkn = make_cuda_device_unique_ptr<Implementation>(Implementation(newargsVar.size() + 1));
-			pNewTkn->push_argument(std::move(*cu::min_element(std::move(newargs.begin()), std::move(newargs.end()), m_pred)));
+			pNewTkn->push_argument(std::move(*cu::min_element(newargs.begin(), newargs.end(), m_pred)));
 		}
 		for (auto& op : newargsVar)
 			pNewTkn->push_argument(std::move(op));
@@ -1755,10 +1369,6 @@ struct TokenLess
 	{
 		return (*left)().value() < (*right)().value();
 	};
-	__device__ bool operator()(cuda_device_unique_ptr<IToken<T>>&& left, cuda_device_unique_ptr<IToken<T>>&& right) const
-	{
-		return (*left)().value() < (*right)().value();
-	};
 };
 
 template <class T>
@@ -1767,10 +1377,6 @@ struct TokenGreater
 	__device__ bool operator()(const cuda_device_unique_ptr<IToken<T>>& left, const cuda_device_unique_ptr<IToken<T>>& right) const
 	{
 		return (*left)().value() > (*right)().value();
-	};
-	__device__ bool operator()(cuda_device_unique_ptr<IToken<T>>&& left, cuda_device_unique_ptr<IToken<T>>&& right) const
-	{
-		return (*left)().value() < (*right)().value();
 	};
 };
 
@@ -1850,492 +1456,6 @@ public:
 	//}
 };
 
-template <class T>
-class TokenStorage
-{
-	cuda_stack<cuda_device_unique_ptr<IToken<T>>> operationStack;
-	cuda_list<cuda_device_unique_ptr<IToken<T>>> outputList;
+CU_END
 
-public:
-
-	template <class TokenParamType>
-	__device__ auto push_token(TokenParamType&& op) -> std::enable_if_t<
-		std::is_base_of<Operator<T>, std::decay_t<TokenParamType>>::value ||
-		std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value,
-		IToken<T>*
-	>
-	{
-		auto my_priority = op.getPriority();
-		while (operationStack.size() != 0 && my_priority <= operationStack.top()->getPriority() && op.type() != TokenType::bracket)
-		{
-			outputList.push_back(std::move(operationStack.top()));
-			operationStack.pop();
-		}
-		operationStack.push(make_cuda_device_unique_ptr<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
-		return operationStack.top().get();
-	}
-
-	template <class TokenParamType>
-	__device__ auto push_token(TokenParamType&& value)->std::enable_if_t<
-		!(std::is_base_of<Operator<T>, std::decay_t<TokenParamType>>::value ||
-			std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value ||
-			std::is_base_of<Bracket<T>, std::decay_t<TokenParamType>>::value),
-		IToken<T>*
-	>
-	{
-		outputList.push_back(make_cuda_device_unique_ptr<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(value)));
-		return outputList.back().get();
-	}
-
-	__device__ return_wrapper_t<void> pop_bracket()
-	{
-		bool isOpeningBracket = false;
-		while (operationStack.size() != 0)
-		{
-			if (operationStack.top().get()->type() != TokenType::bracket)
-			{
-				this->outputList.push_back(std::move(operationStack.top()));
-				operationStack.pop();
-			}
-			else
-			{
-				isOpeningBracket = true;
-				break;
-			}
-		}
-		if (!isOpeningBracket)
-			return return_wrapper_t<void>(CudaParserErrorCodes::InsufficientNumberParams);
-		else
-			operationStack.pop();
-		return return_wrapper_t<void>();
-	}
-
-	__device__ return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>> finalize() &&
-	{
-		while (operationStack.size() != 0)
-		{
-			if (operationStack.top().get()->type() == TokenType::bracket) //checking enclosing brackets
-				return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InsufficientNumberParams);
-			else
-			{
-				outputList.push_back(std::move(operationStack.top()));
-				operationStack.pop();
-			}
-		}
-		return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(std::move(outputList));
-	}
-
-	__device__ cuda_device_unique_ptr<IToken<T>>& get_top_operation()
-	{
-		return operationStack.top();
-	}
-
-	__device__ return_wrapper_t<void> comma_parameter_replacement()
-	{
-		bool isOpeningBracket = false;
-
-		while (!isOpeningBracket && operationStack.size() != 0) //while an opening bracket is not found or an operation stack is not empty
-		{
-			if (operationStack.top().get()->type() != TokenType::bracket) //if the cast to Bracket is not successfull, return NULL => it is not '('
-			{
-				outputList.push_back(std::move(operationStack.top()));
-				operationStack.pop();
-			}
-			else
-			{
-				isOpeningBracket = true;
-			}
-		}
-
-		if (!isOpeningBracket) //missing '('
-			return return_wrapper_t<void>(CudaParserErrorCodes::InsufficientNumberParams);
-		return return_wrapper_t<void>();
-	}
-};
-
-template <class T>
-class Header
-{
-	cuda_map<cu::cuda_string, T> m_arguments;
-	cuda_vector<cu::cuda_string> m_parameters;
-	cu::cuda_string function_name;
-	mutable return_wrapper_t<void> construction_success_code;
-public:
-	__device__ Header() = default;
-	__device__ Header(const char* expression, std::size_t expression_len, char** endPtr)
-	{
-		char* begPtr = (char*)(expression);
-		cuda_list<cu::cuda_string> params;
-		construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::Success);
-
-		bool isOpeningBracket = false;
-		bool isClosingBracket = false;
-		std::size_t commaCount = 0;
-
-		while (*begPtr != '=' && begPtr < expression + expression_len)
-		{
-			if (isalpha(*begPtr))
-			{
-				auto l_endptr = begPtr + 1;
-				for (; isalnum(*l_endptr); ++l_endptr);
-				if (this->function_name.empty())
-					this->function_name = cu::cuda_string(begPtr, l_endptr);
-				else
-				{
-					if (!isOpeningBracket)
-						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
-					auto param_name = cu::cuda_string(begPtr, l_endptr);
-					auto argObj = make_cuda_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()));
-					auto res = m_arguments.insert(std::move(argObj));
-					//if (!m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()))).second)
-					if(!res.second)
-						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
-					params.push_back(std::move(param_name));
-				}
-				begPtr = l_endptr;
-			}
-
-			if (*begPtr == ' ')
-			{
-				begPtr += 1;
-				continue;
-			}
-
-			if (*begPtr == '(')
-			{
-				if (isOpeningBracket)
-					construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
-				isOpeningBracket = true;
-				begPtr += 1;
-			}
-
-			if (*begPtr == ',') //a-zA_Z0-9
-			{
-				commaCount += 1;
-				begPtr += 1;
-			}
-
-			if (*begPtr == ')')
-			{
-				if (!isOpeningBracket)
-					construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
-				if (isClosingBracket)
-					construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
-				isClosingBracket = true;
-				begPtr += 1;
-			}
-		}
-		m_parameters.reserve(params.size());
-		for (auto& param : params)
-			m_parameters.push_back(std::move(param));
-		*endPtr = begPtr;
-	}
-	Header(const Header<T>&) = delete;
-	Header& operator=(const Header<T>&) = delete;
-	__device__ Header(Header&&) = default;
-	__device__ Header& operator=(Header&&) = default;
-	/*__device__ Header(const Header<T>& val)
-	{
-		std::size_t size = val.get_name_length();
-		this->function_name = val.function_name;
-		this->m_arguments = val.m_arguments;
-		this->m_parameters = val.m_parameters;
-		construction_success_code = val.construction_success_code;
-	}*/
-
-	__device__ virtual bool is_ready() const
-	{
-		return true;
-	}
-	__device__ return_wrapper_t<void> push_argument(const char* name, std::size_t parameter_name_size, const T& value)
-	{
-		auto it = m_arguments.find(cuda_string(name, name + parameter_name_size));
-		if (it == m_arguments.end())
-		{
-			construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotFound);
-			return construction_success_code;
-		}
-		it->second = value;
-		return construction_success_code;
-	}
-	__device__ return_wrapper_t<const T&> get_argument(const char* parameter_name, std::size_t parameter_name_size) const //call this from Variable::operator()().
-	{
-		auto it = m_arguments.find(cuda_string(parameter_name, parameter_name + parameter_name_size));
-		if (it == m_arguments.end())
-		{
-			this->construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotFound);
-			return return_wrapper_t<const T&>(CudaParserErrorCodes::ParameterIsNotFound);
-		}
-		return return_wrapper_t<const T&>(it->second, CudaParserErrorCodes::Success);
-	}
-	__device__ auto get_argument(const char* parameter_name, std::size_t parameter_name_size) //call this from Variable::operator()().
-	{
-		auto carg = const_cast<const Header<T>*>(this)->get_argument(parameter_name, parameter_name_size);
-		if (carg.return_code() != CudaParserErrorCodes::Success)
-			return return_wrapper_t<T&>(carg.return_code());
-		return return_wrapper_t<T&>(const_cast<T&>(carg.value()), carg.return_code());
-	}
-	__device__ return_wrapper_t<T&> get_argument_by_index(std::size_t index)  //call this from Variable::operator()().
-	{
-		return this->get_argument(m_parameters[index].c_str(), m_parameters[index].size());
-	}
-	__device__ std::size_t get_required_parameter_count() const
-	{
-		return m_parameters.size();
-	}
-	__device__ const char* get_function_name() const
-	{
-		return function_name.c_str();
-	}
-	__device__ size_t get_name_length() const
-	{
-		return function_name.size();
-	}
-	__device__ return_wrapper_t<std::size_t> get_param_index(const cuda_string& param_name)
-	{
-		for (std::size_t i = 0; i < this->m_parameters.size(); ++i)
-		{
-			if (this->m_parameters[i] == param_name)
-				return return_wrapper_t<std::size_t>(i);
-		}
-		return return_wrapper_t<std::size_t>(CudaParserErrorCodes::ParameterIsNotFound);
-	}
-};
-
-template <class T>
-class Mathexpr
-{
-public:
-	__device__ Mathexpr(const char* sMathExpr, std::size_t cbMathExpr);
-	__device__ Mathexpr(const char* szMathExpr) :Mathexpr(szMathExpr, std::strlen(szMathExpr)) {}
-	__device__ Mathexpr(const cuda_string& strMathExpr) : Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
-	__device__ return_wrapper_t<T> compute() const
-	{
-		//auto result = body;
-	//	simplify_body(result);
-	//	if (result.size() != 1)
-			//throw std::exception("Invalid expression");
-	//		return return_wrapper_t<T>(CudaParserErrorCodes::InvalidExpression);
-		return (*body)();
-	}
-	__device__ return_wrapper_t<void> init_variables(const cuda_vector<T>& parameters)
-	{
-		if (parameters.size() < header.get_required_parameter_count())
-			//throw std::invalid_argument("Count of arguments < " + header.get_required_parameter_count());
-			return return_wrapper_t<void>(CudaParserErrorCodes::InsufficientNumberParams);
-		for (std::size_t iArg = 0; iArg < header.get_required_parameter_count(); ++iArg)
-			*header.get_argument_by_index(iArg).get() = parameters[iArg]; //////////return value not ref
-
-		return return_wrapper_t<void>();
-	}
-
-private:
-	Header<T> header;
-	cuda_device_unique_ptr<IToken<T>> body;
-
-	template <class T>
-	__device__ return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>> lexBody(const char* expr, std::size_t length)
-	{
-		char* begPtr = (char*)expr;
-		std::size_t cbRest = length;
-		TokenStorage<T> tokens;
-		cuda_stack <cu::cuda_pair<cuda_device_unique_ptr<Function<T>>, std::size_t>> funcStack;
-		int last_type_id = -1;
-
-		while (cbRest > 0)
-		{
-			auto tkn = parse_string_token(begPtr, cbRest);
-			if (tkn == "+")
-			{
-				if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
-					last_type_id = int(tokens.push_token(UnaryPlus<T>())->type());
-				else //binary form
-					last_type_id = int(tokens.push_token(BinaryPlus<T>())->type());
-			}
-			else if (tkn == "-")
-			{
-				if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
-					last_type_id = int(tokens.push_token(UnaryMinus<T>())->type());
-				else //binary form
-					last_type_id = int(tokens.push_token(BinaryMinus<T>())->type());
-			}
-			else if (tkn == "*")
-				last_type_id = int(tokens.push_token(OperatorMul<T>())->type());
-			else if (tkn == "/")
-				last_type_id = int(tokens.push_token(OperatorDiv<T>())->type());
-			else if (tkn == "^")
-				last_type_id = int(tokens.push_token(OperatorPow<T>())->type());
-			else if (tkn == ",")
-			{
-				tokens.comma_parameter_replacement();
-
-				if (funcStack.top().first.get()->type() == TokenType::maxFunction ||
-					funcStack.top().first.get()->type() == TokenType::minFunction)
-					funcStack.top().second += 1;
-			}
-			else if (isdigit(*tkn.begin()))
-			{
-				char* conversion_end;
-				static_assert(std::is_same<T, double>::value, "The following line is only applicable to double");
-				auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
-				if (conversion_end != tkn.end())
-					return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
-				last_type_id = int(tokens.push_token(Number<T>(value))->type());
-			}
-			else if (isalpha(*tkn.begin()))
-			{
-				if (tkn == "sin")
-				{
-					last_type_id = int(tokens.push_token(SinFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(std::move(make_cuda_device_unique_ptr<SinFunction<T>>()), 1));
-				}
-				else if (tkn == "cos")
-				{
-					last_type_id = int(tokens.push_token(CosFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(std::move(make_cuda_device_unique_ptr<CosFunction<T>>()), 1));
-				}
-				else if (tkn == "tg")
-				{
-					last_type_id = int(tokens.push_token(TgFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<TgFunction<T>>(), 1));
-				}
-				else if (tkn == "log10")
-				{
-					last_type_id = int(tokens.push_token(Log10Function<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<Log10Function<T>>(), 1));
-				}
-				else if (tkn == "ln")
-				{
-					last_type_id = int(tokens.push_token(LnFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<LnFunction<T>>(), 1));
-				}
-				else if (tkn == "log")
-				{
-					last_type_id = int(tokens.push_token(LogFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(std::move(make_cuda_device_unique_ptr<LogFunction<T>>()), 2));
-				}
-				else if (tkn == "j0")
-				{
-					last_type_id = int(tokens.push_token(J0Function<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<J0Function<T>>(), 1));
-				}
-				else if (tkn == "j1")
-				{
-					last_type_id = int(tokens.push_token(J1Function<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<J1Function<T>>(), 1));
-				}
-				else if (tkn == "jn")
-				{
-					last_type_id = int(tokens.push_token(JnFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<JnFunction<T>>(), 2));
-				}
-				else if (tkn == "y0")
-				{
-					last_type_id = int(tokens.push_token(Y0Function<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<Y0Function<T>>(), 1));
-				}
-				else if (tkn == "y1")
-				{
-					last_type_id = int(tokens.push_token(Y1Function<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<Y1Function<T>>(), 1));
-				}
-				else if (tkn == "yn")
-				{
-					last_type_id = int(tokens.push_token(YnFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<YnFunction<T>>(), 2));
-				}
-				else if (tkn == "max")
-				{
-					last_type_id = int(tokens.push_token(MaxFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<MaxFunction<T>>(), 0));
-				}
-				else if (tkn == "min")
-				{
-					last_type_id = int(tokens.push_token(MinFunction<T>())->type());
-					funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
-				}
-				else if (this->header.get_param_index(cuda_string(tkn.begin(), tkn.end())).return_code() == CudaParserErrorCodes::Success)
-					last_type_id = int(tokens.push_token(Variable<T>(this->header, cuda_string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()))->type());
-			}
-			else if (tkn == ")")
-			{
-				tokens.pop_bracket();
-				switch (funcStack.top().first.get()->type())
-				{
-				case TokenType::maxFunction:
-					static_cast<MaxFunction<T>&>(*tokens.get_top_operation()) = MaxFunction<T>(funcStack.top().second + 1);
-					break;
-				case TokenType::minFunction:
-					static_cast<MinFunction<T>&>(*tokens.get_top_operation()) = MinFunction<T>(funcStack.top().second + 1);
-					break;
-				}
-				funcStack.pop();
-			}
-			else if (tkn == "(")
-			{
-				last_type_id = int(tokens.push_token(Bracket<T>())->type());
-			}
-			else
-				return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
-			cbRest -= tkn.end() - begPtr;
-			begPtr = (char*)tkn.end();
-		}
-
-		auto formula = std::move(tokens).finalize();
-		return formula;//return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>();
-	}
-};
-
-template <class K>
-__device__ typename cuda_list<cuda_device_unique_ptr<IToken<K>>>::iterator simplify(cuda_list<cuda_device_unique_ptr<IToken<K>>>& body, typename cuda_list<cuda_device_unique_ptr<IToken<K>>>::iterator elem)
-{
-	auto paramsCount = elem->get()->get_required_parameter_count();
-	auto param_it = elem;
-	for (auto i = paramsCount; i > 0; --i)
-	{
-		--param_it;
-		elem->get()->push_argument(std::move(*param_it));
-		//((*elem.data).get())->push_argument(*param_it); //here std::move must be
-		param_it = body.erase(param_it);
-	}
-	if (elem->get()->is_ready())
-		*elem = std::move(*(elem->get()->simplify().get()));
-		//*elem = *(elem->data.get()->simplify()).get();
-	++elem;
-	return elem;
-}
-
-template <class T>
-__device__ auto simplify_body(cuda_list<cuda_device_unique_ptr<IToken<T>>>&& listBody)
-{
-	auto it = listBody.begin();
-	while (listBody.size() > 1)
-		it = simplify(listBody, it);
-	return std::move(it);
-	//When everything goes right, you are left with only one element within the list - the root of the tree.
-}
-
-template <class T>
-__device__ T compute(const cuda_list<cuda_device_unique_ptr<IToken<T>>>& body)
-{
-	assert(body.size() == 1);
-	return body.front()();
-}
-
-template <class T>
-__device__ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
-{
-	const char* endptr;
-	header = Header<T>(sMathExpr, cbMathExpr, (char**)&endptr);
-	++endptr;
-	//lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
-	//simplify_body(body);
-
-	auto formula = std::move(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value());
-	this->body = std::move(*simplify_body(std::move(formula)));
-
-}
-
-}
-
-#endif // !PARSER_H
+#endif // !CUDA_TOKENS_H

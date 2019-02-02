@@ -18,9 +18,6 @@
     <ClInclude Include="cuda_stack.cuh">
       <Filter>Header</Filter>
     </ClInclude>
-    <ClInclude Include="CudaParser.h">
-      <Filter>Header</Filter>
-    </ClInclude>
     <ClInclude Include="cuda_iterator.cuh">
       <Filter>Header</Filter>
     </ClInclude>
@@ -33,13 +30,25 @@
     <ClInclude Include="cuda_string.cuh">
       <Filter>Header</Filter>
     </ClInclude>
-    <ClInclude Include="impl_rb_tree.h">
-      <Filter>Header</Filter>
-    </ClInclude>
     <ClInclude Include="cuda_vector.cuh">
       <Filter>Header</Filter>
     </ClInclude>
     <ClInclude Include="cuda_pair.cuh">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_config.cuh">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_return_wrapper.cuh">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_tokens.cuh">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="impl_rb_tree.cuh">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="CudaParser.cuh">
       <Filter>Header</Filter>
     </ClInclude>
   </ItemGroup>

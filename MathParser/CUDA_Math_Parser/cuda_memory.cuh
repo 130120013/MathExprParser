@@ -4,9 +4,39 @@
 //#include <chsvlib/chsverr.h>
 //#include <cuda/config.h>
 //#include <cuda/except.cuh>
+#include "cuda_config.cuh"
 
 #ifndef CUDA_MEMORY_H
 #define CUDA_MEMORY_H
+
+CU_BEGIN
+
+template <class IteratorBegin, class IteratorEnd, class Predicate>
+__device__ auto min_element(IteratorBegin begin, IteratorEnd end, Predicate&& pred)
+	-> std::common_type_t<
+		IteratorBegin,
+		IteratorEnd
+	>
+{
+	auto itMin = begin;
+	if (begin != end)
+	{
+		auto pVal = &*(begin++);
+		while (begin != end)
+		{
+			auto pValComp = &*begin;
+			if (!pred(*pVal, *pValComp))
+			{
+				itMin = begin;
+				pVal = pValComp;
+			}
+			++begin;
+		}
+	}
+	return itMin;
+}
+
+CU_END
 
 template <class elemType>
 class cuda_unique_ptr
@@ -20,27 +50,27 @@ private:
 	struct Deleter
 	{
 #if __CUDA_ARCH__ >= 350
-		__device__ __host__ 
+		__device__ __host__
 #endif //__CUDA_ARCH__
-		void operator()(pointer ptr) const
+			void operator()(pointer ptr) const
 		{
 #if __CUDA_ARCH__ >= 350
 			deconstruct(ptr);
 #endif
-			cudaFree(ptr);
+			//cudaFree(ptr);
 		}
 	private:
 		template <class T>
 #if __CUDA_ARCH__ >= 350
 		__device__ __host__
 #endif
-		static auto deconstruct(T* ptr) -> typename std::enable_if<std::is_destructible<T>::value>::type
+			static auto deconstruct(T* ptr) -> typename std::enable_if<std::is_destructible<T>::value>::type
 		{
 			ptr->~T();
 		}
-		__device__ 
+		__device__
 #if __CUDA_ARCH__ >= 350
-		__device__ __host__
+			__device__ __host__
 #endif
 			static auto deconstruct(...) -> void {}
 	};
@@ -48,12 +78,12 @@ public:
 	typedef Deleter deleter_type;
 
 	cuda_unique_ptr() = default;
-	cuda_unique_ptr(cuda_unique_ptr&& right):ptr(right.ptr)
+	cuda_unique_ptr(cuda_unique_ptr&& right) :ptr(right.ptr)
 	{
 		right.ptr = nullptr;
 	}
 	template <class U, class = typename std::enable_if<std::is_convertible<U*, pointer>::value>::type>
-	cuda_unique_ptr(cuda_unique_ptr<U>&& right):ptr(right.release()) {}
+	cuda_unique_ptr(cuda_unique_ptr<U>&& right) : ptr(right.release()) {}
 	cuda_unique_ptr& operator=(cuda_unique_ptr&& right)
 	{
 		if (this != &right)
@@ -66,20 +96,20 @@ public:
 		return *this;
 	}
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+	__device__ __host__
 #endif //__CUDA_ARCH__
 		explicit cuda_unique_ptr(pointer p) :ptr(p) {};
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+	__device__ __host__
 #endif //__CUDA_ARCH__
 		~cuda_unique_ptr()
 	{
 		if (ptr != nullptr)
 			del(ptr);
 	};
-	
+
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+	__device__ __host__
 #endif //__CUDA_ARCH__
 		pointer release()
 	{
@@ -87,9 +117,9 @@ public:
 		ptr = nullptr;
 		return p;
 	}
-	
+
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+	__device__ __host__
 #endif //__CUDA_ARCH__
 		void reset(pointer p = pointer())
 	{
@@ -100,21 +130,21 @@ public:
 		ptr = p;
 	}
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+	__device__ __host__
 #endif //__CUDA_ARCH__
 		pointer get() const
 	{
 		return ptr;
 	}
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+	__device__ __host__
 #endif //__CUDA_ARCH__
 		operator bool()
 	{
 		return(ptr != nullptr);
 	}
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+	__device__ __host__
 #endif //__CUDA_ARCH__
 		pointer operator->() const
 	{
@@ -122,7 +152,7 @@ public:
 	}
 	template <class U = element_type, class = typename std::enable_if<!std::is_void<U>::value>::type>
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+	__device__ __host__
 #endif //__CUDA_ARCH__
 		U& operator*() const
 	{
@@ -147,31 +177,30 @@ namespace _Implementation
 
 template <class T>
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+__device__ __host__
 #endif //__CUDA_ARCH__
 cuda_unique_ptr<T> make_cuda_unique_ptr(std::size_t c = 1);
 
 template <>
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+__device__ __host__
 #endif //__CUDA_ARCH__
 inline cuda_unique_ptr<void> make_cuda_unique_ptr<void>(std::size_t cb)
 {
-	void* ptr;
-	auto err = cudaMalloc(&ptr, cb);
-	if (err != cudaSuccess)
+	auto ptr = malloc(cb);
+	if (ptr != 0)
 		return cuda_unique_ptr<void>();
-//#if defined(__CUDA_ARCH__)
-//		cuda_abort_with_error(CHSVERROR_OUTOFMEMORY);
-////#else
-////		throw cuda_exception(err);
-//#endif
+	//#if defined(__CUDA_ARCH__)
+	//		cuda_abort_with_error(CHSVERROR_OUTOFMEMORY);
+	////#else
+	////		throw cuda_exception(err);
+	//#endif
 	return cuda_unique_ptr<void>(ptr);
 }
 
 template <class T>
 #if __CUDA_ARCH__ >= 350
-	__device__ __host__ 
+__device__ __host__
 #endif //__CUDA_ARCH__
 cuda_unique_ptr<T> make_cuda_unique_ptr(std::size_t c)
 {
@@ -186,10 +215,10 @@ struct impl_cuda_device_unique_ptr_base
 	friend struct impl_cuda_device_unique_ptr_base;
 protected:
 	__device__ impl_cuda_device_unique_ptr_base() = default;
-	__device__ explicit impl_cuda_device_unique_ptr_base(T* ptr):m_ptr(ptr) {}
+	__device__ explicit impl_cuda_device_unique_ptr_base(T* ptr) :m_ptr(ptr) {}
 	__device__ impl_cuda_device_unique_ptr_base(const impl_cuda_device_unique_ptr_base&) = delete;
 	__device__ impl_cuda_device_unique_ptr_base operator=(const impl_cuda_device_unique_ptr_base&) = delete;
-	__device__ impl_cuda_device_unique_ptr_base(impl_cuda_device_unique_ptr_base&& right):m_ptr(right.m_ptr)
+	__device__ impl_cuda_device_unique_ptr_base(impl_cuda_device_unique_ptr_base&& right) :m_ptr(right.m_ptr)
 	{
 		right.m_ptr = nullptr;
 	}
@@ -217,10 +246,10 @@ private:
 };
 
 template <class T>
-struct impl_cuda_device_unique_ptr_spec:impl_cuda_device_unique_ptr_base<T>
+struct impl_cuda_device_unique_ptr_spec :impl_cuda_device_unique_ptr_base<T>
 {
 	typedef T element_type;
-	typedef typename impl_cuda_device_unique_ptr_base::pointer pointer;
+	typedef typename impl_cuda_device_unique_ptr_base<T>::pointer pointer;
 protected:
 	struct resource_mgr
 	{
@@ -235,7 +264,7 @@ protected:
 		}
 	};
 public:
-	using impl_cuda_device_unique_ptr_base::impl_cuda_device_unique_ptr_base;
+	using impl_cuda_device_unique_ptr_base<T>::impl_cuda_device_unique_ptr_base;
 	__device__ pointer operator->() const
 	{
 		return this->ptr();
@@ -247,10 +276,10 @@ public:
 };
 
 template <class T>
-struct impl_cuda_device_unique_ptr_spec<T[]>:impl_cuda_device_unique_ptr_base<T>
+struct impl_cuda_device_unique_ptr_spec<T[]> :impl_cuda_device_unique_ptr_base<T>
 {
 	typedef T element_type;
-	typedef typename impl_cuda_device_unique_ptr_base::pointer pointer;
+	typedef typename impl_cuda_device_unique_ptr_base<T>::pointer pointer;
 protected:
 	struct resource_mgr
 	{
@@ -260,11 +289,11 @@ protected:
 		}
 		__device__ static void release(pointer ptr)
 		{
-			delete [] ptr;
+			delete[] ptr;
 		}
 	};
 public:
-	using impl_cuda_device_unique_ptr_base::impl_cuda_device_unique_ptr_base;
+	using impl_cuda_device_unique_ptr_base<T>::impl_cuda_device_unique_ptr_base;
 	__device__ pointer operator->() const
 	{
 		return this->ptr();
@@ -280,7 +309,7 @@ public:
 };
 
 template<>
-struct impl_cuda_device_unique_ptr_spec<void>:impl_cuda_device_unique_ptr_base<void> 
+struct impl_cuda_device_unique_ptr_spec<void> :impl_cuda_device_unique_ptr_base<void>
 {
 	typedef std::uint8_t element_type;
 	typedef typename impl_cuda_device_unique_ptr_base::pointer pointer;
@@ -293,7 +322,7 @@ protected:
 		}
 		__device__ static void release(pointer ptr)
 		{
-			delete [] static_cast<std::uint8_t*>(ptr);
+			delete[] static_cast<std::uint8_t*>(ptr);
 		}
 	};
 public:
@@ -305,7 +334,7 @@ public:
 };
 
 template <>
-struct impl_cuda_device_unique_ptr_spec<const void>:impl_cuda_device_unique_ptr_base<const void> 
+struct impl_cuda_device_unique_ptr_spec<const void> :impl_cuda_device_unique_ptr_base<const void>
 {
 	typedef const std::uint8_t element_type;
 	typedef typename impl_cuda_device_unique_ptr_base::pointer pointer;
@@ -318,7 +347,7 @@ protected:
 		}
 		__device__ static void release(pointer ptr)
 		{
-			delete [] static_cast<std::uint8_t*>(const_cast<void*>(ptr));
+			delete[] static_cast<std::uint8_t*>(const_cast<void*>(ptr));
 		}
 	};
 public:
@@ -336,11 +365,11 @@ template <class T, class ... Args>
 __device__ cuda_device_unique_ptr<T> make_cuda_device_unique_ptr(Args&& ... args);
 
 template <class T>
-struct cuda_device_unique_ptr:impl_cuda_device_unique_ptr_spec<T>
+struct cuda_device_unique_ptr :impl_cuda_device_unique_ptr_spec<T>
 {
-	typedef typename impl_cuda_device_unique_ptr_spec::pointer pointer;
+	typedef typename impl_cuda_device_unique_ptr_spec<T>::pointer pointer;
 private:
-	typedef typename impl_cuda_device_unique_ptr_spec::resource_mgr resource_mgr;
+	typedef typename impl_cuda_device_unique_ptr_spec<T>::resource_mgr resource_mgr;
 	template <class T, class ... Args>
 	friend __device__ cuda_device_unique_ptr<T> make_cuda_device_unique_ptr(Args&& ... args);
 public:
@@ -404,11 +433,11 @@ public:
 
 	__device__ deleter_type& get_deleter()
 	{
-		return del;
+		return m_del;
 	}
 	__device__ const deleter_type& get_deleter() const
 	{
-		return del;
+		return m_del;
 	}
 };
 
@@ -429,17 +458,17 @@ public:
 	{
 		//cuda_runtime_call(cudaStreamCreate, &m_str);
 	}
-	inline explicit cuda_stream(cudaStream_t str):m_str(str) {};
-	inline cuda_stream(cuda_stream&& right):m_str(right.m_str)
+	inline explicit cuda_stream(cudaStream_t str) :m_str(str) {};
+	inline cuda_stream(cuda_stream&& right) noexcept :m_str(right.m_str)
 	{
 		right.m_str = nullptr;
 	}
-	inline cuda_stream& operator=(cuda_stream&& right)
+	inline cuda_stream& operator=(cuda_stream&& right) noexcept
 	{
 		if (this != &right)
 		{
-			if (m_str)
-				cudaStreamDestroy(m_str);
+			//if (m_str)
+			//	cudaStreamDestroy(m_str);
 			m_str = right.m_str;
 			right.m_str = nullptr;
 		}
@@ -447,8 +476,8 @@ public:
 	}
 	inline ~cuda_stream()
 	{
-		if (m_str != nullptr)
-			cudaStreamDestroy(m_str);
+		//if (m_str != nullptr)
+		//	cudaStreamDestroy(m_str);
 	};
 	inline cudaStream_t release()
 	{
@@ -486,8 +515,8 @@ class shared_cuda_stream
 public:
 	inline shared_cuda_stream()
 	{
-		m_pBuf = new shared_cuda_stream_holder;
-	//	cuda_runtime_call(cudaStreamCreate, &m_pBuf->stream);
+		m_pBuf = new shared_cuda_stream_holder();
+		//	cuda_runtime_call(cudaStreamCreate, &m_pBuf->stream);
 		m_pBuf->cRefs.store(1, std::memory_order_relaxed);
 	}
 	inline explicit shared_cuda_stream(cudaStream_t str)
@@ -499,7 +528,7 @@ public:
 			m_pBuf->cRefs.store(1, std::memory_order_relaxed);
 		}
 	}
-	inline shared_cuda_stream(cuda_stream&& str):shared_cuda_stream(str.release())
+	inline shared_cuda_stream(cuda_stream&& str) :shared_cuda_stream(str.release())
 	{
 	}
 	inline shared_cuda_stream(const shared_cuda_stream& right) noexcept :m_pBuf(right.m_pBuf)
@@ -507,7 +536,7 @@ public:
 		if (m_pBuf)
 			right.m_pBuf->cRefs.fetch_add(1, std::memory_order_acquire);
 	}
-	inline shared_cuda_stream(shared_cuda_stream&& right) noexcept:m_pBuf(right.m_pBuf)
+	inline shared_cuda_stream(shared_cuda_stream&& right) noexcept :m_pBuf(right.m_pBuf)
 	{
 		right.m_pBuf = nullptr;
 	}
@@ -515,7 +544,7 @@ public:
 	{
 		if (m_pBuf && m_pBuf->cRefs.fetch_sub(1, std::memory_order_acq_rel) == 1)
 		{
-			cudaStreamDestroy(m_pBuf->stream);
+			//cudaStreamDestroy(m_pBuf->stream);
 			delete m_pBuf;
 		}
 	}
@@ -541,25 +570,25 @@ public:
 	void reset(cudaStream_t str = 0);
 	inline cudaStream_t get() const noexcept
 	{
-		return m_pBuf == nullptr?0:m_pBuf->stream;
+		return m_pBuf == nullptr ? 0 : m_pBuf->stream;
 	}
 	inline std::size_t use_count() const noexcept
 	{
-		return m_pBuf == nullptr?0:m_pBuf->cRefs.load(std::memory_order_relaxed);
+		return m_pBuf == nullptr ? 0 : m_pBuf->cRefs.load(std::memory_order_relaxed);
 	}
 };
 
-template <class T>
-class cuda_shared_ptr
-{
-public:
-	__device__ T* get() const;
-	T& operator*() const;
-	T* operator->() const;
-
-};
-
-template< class T, class... Args >
-cuda_shared_ptr<T> make_cuda_shared(Args&&... args);
+//template <class T>
+//class cuda_shared_ptr
+//{
+//public:
+//	__device__ T* get() const;
+//	T& operator*() const;
+//	T* operator->() const;
+//
+//};
+//
+//template< class T, class... Args >
+//cuda_shared_ptr<T> make_cuda_shared(Args&&... args);
 
 #endif //CUDA_MEMORY_H

@@ -1,4 +1,8 @@
-#include "cuda_memory.cuh"
+#include "cuda_config.cuh"
+
+#ifndef CUDA_VECTOR_H
+#define CUDA_VECTOR_H
+
 template <class T>
 class cuda_vector
 {
@@ -91,7 +95,10 @@ public:
 			if (bool(buf))
 			{
 				if (bool(m_buf))
-					memcpy(buf.get(), m_buf.get(), this->size() * sizeof(value_type));
+				{
+					for (std::size_t iElement = 0; iElement < this->size(); ++iElement)
+						buf[iElement] = std::move(m_buf[iElement]);
+				}
 				this->m_capacity = new_size;
 				m_buf = std::move(buf);
 			}
@@ -128,3 +135,6 @@ private:
 	size_type m_size = 0;
 	size_type m_capacity = 0;
 };
+
+
+#endif // !CUDA_VECTOR

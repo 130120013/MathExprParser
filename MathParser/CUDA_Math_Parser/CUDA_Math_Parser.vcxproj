@@ -101,16 +101,19 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </CudaCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CudaParser.h" />
+    <ClInclude Include="CudaParser.cuh" />
+    <ClInclude Include="cuda_config.cuh" />
     <ClInclude Include="cuda_iterator.cuh" />
     <ClInclude Include="cuda_list.cuh" />
     <ClInclude Include="cuda_map.cuh" />
     <ClInclude Include="cuda_memory.cuh" />
     <ClInclude Include="cuda_pair.cuh" />
+    <ClInclude Include="cuda_return_wrapper.cuh" />
     <ClInclude Include="cuda_stack.cuh" />
     <ClInclude Include="cuda_string.cuh" />
+    <ClInclude Include="cuda_tokens.cuh" />
     <ClInclude Include="cuda_vector.cuh" />
-    <ClInclude Include="impl_rb_tree.h" />
+    <ClInclude Include="impl_rb_tree.cuh" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="on_cpu.cpp">

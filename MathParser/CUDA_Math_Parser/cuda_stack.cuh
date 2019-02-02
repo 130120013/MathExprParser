@@ -1,17 +1,19 @@
+#include "cuda_config.cuh"
+
 #ifndef CUDA_STACK_CUH
 #define CUDA_STACK_CUH
 #include <iostream>
 
 template <typename T>
-class cuda_stack 
+class cuda_stack
 {
-	struct node 
+	struct node
 	{
 		T data;
 		node* next;
 
-		__host__ __device__ node(T const& data, node* next): data(data), next(next) {}
-		__host__ __device__ node(T&& data, node* next): data(std::move(data)), next(next) {}
+		__host__ __device__ node(T const& data, node* next) : data(data), next(next) {}
+		__host__ __device__ node(T&& data, node* next) : data(std::move(data)), next(next) {}
 	};
 
 public:
@@ -20,7 +22,7 @@ public:
 	__host__ __device__ void push(T&& data);
 	__host__ __device__ bool empty() const;
 	__host__ __device__ int size() const;
-	__host__ __device__ T& top() ;
+	__host__ __device__ T& top();
 	__host__ __device__ const T& top() const;
 	__host__ __device__ void pop();
 
@@ -67,7 +69,7 @@ const T& cuda_stack<T>::top() const
 	return root->data;
 }
 template<typename T>
-T& cuda_stack<T>::top() 
+T& cuda_stack<T>::top()
 {
 	return root->data;
 }
