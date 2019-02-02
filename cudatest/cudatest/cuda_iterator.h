@@ -4,9 +4,7 @@
 //#include <thrust/iterator/std::reverse_iterator.h>
 //#include <cuda/config.h>
 
-#define __device__
-#define __host__
-
+#include "cuda_config.h"
 
 #ifndef CUDA_ITERATORS_H_
 #define CUDA_ITERATORS_H_

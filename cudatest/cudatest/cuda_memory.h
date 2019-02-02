@@ -4,10 +4,7 @@
 //#include <chsvlib/chsverr.h>
 //#include <cuda/config.h>
 //#include <cuda/except.cuh>
-
-#define __device__
-#define __host__
-#define cudaStream_t int*
+#include "cuda_config.h"
 
 #ifndef CUDA_MEMORY_H
 #define CUDA_MEMORY_H

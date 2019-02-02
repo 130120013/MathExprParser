@@ -4,14 +4,11 @@
 //#include <cuda/except.cuh>
 #include "cuda_iterator.h"
 #include "cuda_memory.h"
-
-#define __device__
-#define __host__
+#include "cuda_config.h"
 #ifndef CUDA_STRING_H_
 #define CUDA_STRING_H_
 
-namespace cu
-{
+CU_BEGIN
 
 	namespace _Implementation
 	{
@@ -459,6 +456,6 @@ namespace cu
 		return cuda_string(&buf[0], &buf[bufSize]);
 	}
 
-} //cu
+CU_END
 
 #endif //CUDA_STRING_H_

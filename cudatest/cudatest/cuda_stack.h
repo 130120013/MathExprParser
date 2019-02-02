@@ -1,9 +1,8 @@
+#include "cuda_config.h"
+
 #ifndef CUDA_STACK_CUH
 #define CUDA_STACK_CUH
 #include <iostream>
-
-#define __device__
-#define __host__
 
 template <typename T>
 class cuda_stack

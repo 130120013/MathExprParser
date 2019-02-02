@@ -2,13 +2,12 @@
 #include "cuda_pair.h"
 #include "impl_rb_tree.h"
 
+#include "cuda_config.h"
+
 #ifndef CUDAMAP_CUH
 #define CUDAMAP_CUH
 
-#define __device__ 
-
-namespace cu
-{
+CU_BEGIN
 
 	template <class Key, class Tp>
 	class cuda_map_value_compare
@@ -588,6 +587,6 @@ namespace cu
 		return r->value.second;
 	}
 
-} //cu
+CU_END
 
 #endif //CUDAMAP_CUH

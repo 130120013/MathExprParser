@@ -1,0 +1,54 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="cuda_iterator.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_list.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_map.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_memory.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_pair.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_stack.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_string.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_vector.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="impl_rb_tree.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_return_wrapper.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_tokens.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+    <ClInclude Include="cuda_config.h">
+      <Filter>headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="sources">
+      <UniqueIdentifier>{16a77f80-b477-406e-9623-c17a81f3854c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="headers">
+      <UniqueIdentifier>{13a99ac7-fc88-41fe-8598-1b124b44c199}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="cudatest.cpp">
+      <Filter>sources</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

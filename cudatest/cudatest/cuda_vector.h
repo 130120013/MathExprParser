@@ -1,5 +1,8 @@
-#include "cuda_memory.h"
-#define __device__ 
+#include "cuda_config.h"
+
+#ifndef CUDA_VECTOR_H
+#define CUDA_VECTOR_H
+
 template <class T>
 class cuda_vector
 {
@@ -129,3 +132,6 @@ private:
 	size_type m_size = 0;
 	size_type m_capacity = 0;
 };
+
+
+#endif // !CUDA_VECTOR
