@@ -9,6 +9,35 @@
 #ifndef CUDA_MEMORY_H
 #define CUDA_MEMORY_H
 
+CU_BEGIN
+
+template <class IteratorBegin, class IteratorEnd, class Predicate>
+__device__ auto min_element(IteratorBegin begin, IteratorEnd end, Predicate&& pred)
+	-> std::common_type_t<
+		IteratorBegin,
+		IteratorEnd
+	>
+{
+	auto itMin = begin;
+	if (begin != end)
+	{
+		auto pVal = &*(begin++);
+		while (begin != end)
+		{
+			auto pValComp = &*begin;
+			if (!pred(*pVal, *pValComp))
+			{
+				itMin = begin;
+				pVal = pValComp;
+			}
+			++begin;
+		}
+	}
+	return itMin;
+}
+
+CU_END
+
 template <class elemType>
 class cuda_unique_ptr
 {
@@ -28,7 +57,7 @@ private:
 #if __CUDA_ARCH__ >= 350
 			deconstruct(ptr);
 #endif
-			//cudaFree(ptr);
+			cudaFree(ptr);
 		}
 	private:
 		template <class T>
@@ -158,8 +187,9 @@ __device__ __host__
 #endif //__CUDA_ARCH__
 inline cuda_unique_ptr<void> make_cuda_unique_ptr<void>(std::size_t cb)
 {
-	auto ptr = malloc(cb);
-	if (ptr != 0)
+	void* ptr;
+	auto errc = cudaMalloc(&ptr, cb);
+	if (errc != 0 || ptr == nullptr)
 		return cuda_unique_ptr<void>();
 	//#if defined(__CUDA_ARCH__)
 	//		cuda_abort_with_error(CHSVERROR_OUTOFMEMORY);

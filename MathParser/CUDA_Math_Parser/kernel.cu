@@ -157,7 +157,7 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 			g_pExpr = new cu::Mathexpr<double>(pStr, cbStr);
 		__syncthreads();
 		cuda_vector<double> v;
-		v.push_back(2);
+		v.push_back(i);
 		g_pExpr->init_variables(v);
 		vec[i] = g_pExpr->compute().value();
 	}
@@ -175,7 +175,7 @@ int main()
 	cudaStatus = cudaMemcpy(pStr_d.get(), pStr, sizeof(pStr) - 1, cudaMemcpyHostToDevice);
 	if (cudaStatus != cudaSuccess)
 		return -1;
-	memset_expr<<<1, 1000>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
+	memset_expr<<<1, 1>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
 
 	/*cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
 	Mathexpr<double> mathexpr(expression);

@@ -51,6 +51,13 @@ CU_BEGIN
 		return dest;
 	}
 
+	__device__ char* strncpy(char* dest, const char* src, std::size_t cb)
+	{
+		auto i = cb;
+		for (char *p = dest; (*p++ = *src++) != '\0' && i > 0; --i);
+		return dest;
+	}
+
 	__device__ char* strcat(char *str1, const char *str2)
 	{
 		char* begin = str1;

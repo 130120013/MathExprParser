@@ -247,7 +247,12 @@ using impl_return_wrapper_proxy = std::conditional_t<
 template <class T>
 struct return_wrapper_t :impl_return_wrapper_proxy<T>
 {
-	using impl_return_wrapper_proxy<T>::impl_return_wrapper_proxy;
+	__device__ return_wrapper_t() = default;
+	template <class U, class = std::enable_if_t<std::is_constructible<T, U&&>::value>>
+	__device__ return_wrapper_t(U&& value, CudaParserErrorCodes exit_code = CudaParserErrorCodes::Success)
+		:impl_return_wrapper_proxy<T>(std::forward<U>(value), exit_code) {}
+	__device__ return_wrapper_t(CudaParserErrorCodes exit_code)
+		:impl_return_wrapper_proxy<T>(exit_code) {}
 	friend impl_copy_assignable_return_wrapper<return_wrapper_t<T>, T>;
 	friend impl_move_assignable_return_wrapper<return_wrapper_t<T>, T>;
 	template <class LeftReturnWrapper, class RightReturnWrapper>

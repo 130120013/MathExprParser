@@ -190,15 +190,15 @@ template <class T>
 class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 {
 	const T* m_pValue = nullptr;
-	std::unique_ptr<char[]> name;
+	cuda_device_unique_ptr<char[]> name;
 	std::size_t name_length = 0;
 	//bool isReady;
 public:
 	__device__ Variable(const Header<T>& header, const char* varname, std::size_t len)
 		:m_pValue((&header.get_argument(varname, len))->get()), name_length(len)
 	{
-		this->name = std::make_unique<char[]>(len + 1);
-		std::strncpy(this->name.get(), varname, len);
+		this->name = make_cuda_device_unique_ptr<char[]>(len + 1);
+		cu::strncpy(this->name.get(), varname, len);
 		this->name[len] = 0;
 	}
 	Variable(Variable<T>&& val) = default;
@@ -211,8 +211,8 @@ public:
 	{
 		m_pValue = val.m_pValue;
 		name_length = val.name_length;
-		this->name = std::make_unique<char[]>(val.name_length + 1);
-		std::strncpy(this->name.get(), val.name.get(), val.name_length);
+		this->name = make_cuda_device_unique_ptr<char[]>(val.name_length + 1);
+		cu::strncpy(this->name.get(), val.name.get(), val.name_length);
 		this->name[val.name_length] = 0;
 		return *this;
 	}
@@ -385,7 +385,7 @@ public:
 		auto op0 = std::move(*((ops[0].get())->get()->simplify().get()));
 
 		if (op0->type() == TokenType::number)
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(-*dynamic_cast<Number<T>*>(op0.get()))); ///////////NOT READY
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(make_cuda_device_unique_ptr<Number<T>>(-*static_cast<Number<T>*>(op0.get()))); ///////////NOT READY
 		auto op_new = make_cuda_device_unique_ptr<UnaryMinus<T>>();
 		op_new->push_argument(std::move(op0));
 		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(op_new));
@@ -1301,7 +1301,7 @@ public:
 		if (!this->is_ready())
 			return return_wrapper_t<T>(CudaParserErrorCodes::NotReady);
 
-		return return_wrapper_t<T>((*std::min_element(ops.begin(), ops.end(), m_pred)).get()->operator()());
+		return return_wrapper_t<T>((*cu::min_element(ops.begin(), ops.end(), m_pred)).get()->operator()());
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1340,7 +1340,7 @@ public:
 				newargsVar.push_back(std::move(newarg.value()));
 		}
 		if (newargsVar.empty())
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(*std::min_element(newargs.begin(), newargs.end(), m_pred)));
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(*cu::min_element(newargs.begin(), newargs.end(), m_pred)));
 
 		auto pNewTkn = make_cuda_device_unique_ptr<Implementation>();
 		if (newargs.empty())
@@ -1348,7 +1348,7 @@ public:
 		else
 		{
 			pNewTkn = make_cuda_device_unique_ptr<Implementation>(Implementation(newargsVar.size() + 1));
-			pNewTkn->push_argument(std::move(*std::min_element(newargs.begin(), newargs.end(), m_pred)));
+			pNewTkn->push_argument(std::move(*cu::min_element(newargs.begin(), newargs.end(), m_pred)));
 		}
 		for (auto& op : newargsVar)
 			pNewTkn->push_argument(std::move(op));

@@ -57,7 +57,7 @@ private:
 #if __CUDA_ARCH__ >= 350
 			deconstruct(ptr);
 #endif
-			//cudaFree(ptr);
+			cudaFree(ptr);
 		}
 	private:
 		template <class T>
@@ -187,8 +187,9 @@ __device__ __host__
 #endif //__CUDA_ARCH__
 inline cuda_unique_ptr<void> make_cuda_unique_ptr<void>(std::size_t cb)
 {
-	auto ptr = malloc(cb);
-	if (ptr != 0)
+	void* ptr;
+	auto errc = cudaMalloc(&ptr, cb);
+	if (errc != 0 || ptr == nullptr)
 		return cuda_unique_ptr<void>();
 	//#if defined(__CUDA_ARCH__)
 	//		cuda_abort_with_error(CHSVERROR_OUTOFMEMORY);
