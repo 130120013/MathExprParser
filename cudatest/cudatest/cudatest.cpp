@@ -603,16 +603,19 @@ namespace cu {
 				else if (tkn == ")")
 				{
 					tokens.pop_bracket();
-					switch (funcStack.top().first.get()->type())
+					if(!funcStack.empty())
 					{
-					case TokenType::maxFunction:
-						static_cast<MaxFunction<T>&>(*tokens.get_top_operation()) = MaxFunction<T>(funcStack.top().second + 1);
-						break;
-					case TokenType::minFunction:
-						static_cast<MinFunction<T>&>(*tokens.get_top_operation()) = MinFunction<T>(funcStack.top().second + 1);
-						break;
+						switch (funcStack.top().first.get()->type())
+						{
+						case TokenType::maxFunction:
+							static_cast<MaxFunction<T>&>(*tokens.get_top_operation()) = MaxFunction<T>(funcStack.top().second + 1);
+							break;
+						case TokenType::minFunction:
+							static_cast<MinFunction<T>&>(*tokens.get_top_operation()) = MinFunction<T>(funcStack.top().second + 1);
+							break;
+						}
+						funcStack.pop();
 					}
-					funcStack.pop();
 				}
 				else if (tkn == "(")
 				{
@@ -642,22 +645,21 @@ namespace cu {
 			param_it = body.erase(param_it);
 		}
 		if (elem->get()->is_ready())
-			*elem = std::move(*(elem->get()->simplify().get()));
+			*elem = elem->get()->simplify().value();
 		//*elem = *(elem->data.get()->simplify()).get();
 		++elem;
 		return elem;
 	}
 
 	template <class T>
-	__device__ auto simplify_body(cuda_list<cuda_device_unique_ptr<IToken<T>>>&& listBody)
+	__device__ cuda_device_unique_ptr<IToken<T>> simplify_body(cuda_list<cuda_device_unique_ptr<IToken<T>>>&& listBody)
 	{
 		auto it = listBody.begin();
 		while (listBody.size() > 1)
 			it = simplify(listBody, it);
-		return std::move(it);
+		return std::move(*listBody.begin());
 		//When everything goes right, you are left with only one element within the list - the root of the tree.
 	}
-
 	template <class T>
 	__device__ T compute(const cuda_list<cuda_device_unique_ptr<IToken<T>>>& body)
 	{
@@ -671,27 +673,23 @@ namespace cu {
 		const char* endptr;
 		header = Header<T>(sMathExpr, cbMathExpr, (char**)&endptr);
 		++endptr;
-		//lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
-		//simplify_body(body);
-
-		//auto rv = lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
-		//auto rvf = rv;// .value();
-		auto formula = cuda_list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value()); //TODO: empty formula
-		auto res = std::move((*simplify_body(std::move(formula))).get());
-		this->body.reset(res);
+		this->body = simplify_body(cuda_list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value()));
 	}
 }
 
 #endif // !PARSER_H
 
 #include <iostream>
+#include <cmath>
 int main()
 {
-	char expr[] = "f(x) = x";
+	char expr[] = "f(x, y) = x^(x+x)";
 	cu::Mathexpr<double> m(expr, sizeof(expr) - 1);
 	cuda_vector<double> v;
-	v.push_back(1);
+	v.push_back(2);
+	v.push_back(10);
 	m.init_variables(v);
 	std::cout << "Value: " << m.compute().value() << "\n";
+	//std::cout << "Expected value: " << _y0(2) * 2 << "\n";
 	return 0;
 }

@@ -713,7 +713,7 @@ public:
 		if (!this->is_ready())
 			throw std::exception("Invalid arguments of a division operator.");
 
-		return (*ops[0])() / (*ops[1])();
+		return (*ops[1])() / (*ops[0])();
 	}
 	virtual bool is_ready() const
 	{
@@ -1074,7 +1074,7 @@ public:
 	}
 	virtual std::size_t get_required_parameter_count() const
 	{
-		return 1;
+		return 2;
 	}
 	virtual const char* get_function_name() const
 	{
@@ -1092,8 +1092,8 @@ public:
 		auto op1 = ops[1]->simplify();
 
 		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
-			return std::make_shared<Number<T>>(std::pow((*op0)(), (*op1)()));
-		auto op_new = std::make_shared<OperatorPow<T>>();
+			return std::make_shared<Number<T>>(std::log((*op1)())/std::log((*op0)()));
+		auto op_new = std::make_shared<LogFunction<T>>();
 		op_new->push_argument(std::move(op0));
 		op_new->push_argument(std::move(op1));
 		return op_new;
@@ -1125,7 +1125,7 @@ public:
 	}
 	virtual std::size_t get_required_parameter_count() const
 	{
-		return 1;
+		return 2;
 	}
 	virtual const char* get_function_name() const
 	{
@@ -1272,7 +1272,7 @@ public:
 	}
 	virtual std::size_t get_required_parameter_count() const
 	{
-		return 1;
+		return 2;
 	}
 	virtual const char* get_function_name() const
 	{

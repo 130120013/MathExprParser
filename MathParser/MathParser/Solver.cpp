@@ -28,10 +28,10 @@ int main()
 	8. "f(x) = x + -5" - passed
 	10. "f(x) = x + +5" - passed
 	*/
-	std::string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
+	std::string expression = "f(x, y) = y0(2,x) / x";
 	Mathexpr<double> mathexpr = {expression};
 	std::vector<double> v;
-	v.push_back(1);
+	v.push_back(2);
 	v.push_back(10);
 	mathexpr.init_variables(v);
 	std::cout << "Value: " << mathexpr.compute() << "\n";

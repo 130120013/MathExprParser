@@ -95,7 +95,10 @@ public:
 			if (bool(buf))
 			{
 				if (bool(m_buf))
-					memcpy(buf.get(), m_buf.get(), this->size() * sizeof(value_type));
+				{
+					for (std::size_t iElement = 0; iElement < this->size(); ++iElement)
+						buf[iElement] = std::move(m_buf[iElement]);
+				}
 				this->m_capacity = new_size;
 				m_buf = std::move(buf);
 			}
