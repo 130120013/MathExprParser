@@ -267,7 +267,7 @@ namespace cu {
 					operationStack.pop();
 				}
 			}
-			return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(std::move(outputList));
+			return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(std::move(outputList), CudaParserErrorCodes::Success);
 		}
 
 		__device__ cuda_device_unique_ptr<IToken<T>>& get_top_operation()
@@ -621,11 +621,11 @@ namespace cu {
 				else
 					return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
 				cbRest -= tkn.end() - begPtr;
-				begPtr = (char*)tkn.end();
+				begPtr = (char*) tkn.end();
 			}
 
-			auto formula = std::move(tokens).finalize();
-			return formula;//return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>();
+			//auto formula = std::move(tokens).finalize();
+			return std::move(tokens).finalize();
 		}
 	};
 
@@ -674,8 +674,11 @@ namespace cu {
 		//lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
 		//simplify_body(body);
 
-		auto formula = std::move(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value());
-		this->body = std::move(*simplify_body(std::move(formula)));
+		//auto rv = lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr));
+		//auto rvf = rv;// .value();
+		auto formula = cuda_list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value()); //TODO: empty formula
+		auto res = std::move((*simplify_body(std::move(formula))).get());
+		this->body.reset(res);
 	}
 }
 

@@ -6,6 +6,7 @@
 #define CUDA_TOKENS_H
 
 CU_BEGIN
+
 enum class TokenType
 {
 	UnaryPlus,
@@ -1232,7 +1233,7 @@ public:
 	__device__ virtual return_wrapper_t<T> operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
 		if (!op->is_ready())
-			return return_wrapper_t<T>(0, CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<T>(T(), CudaParserErrorCodes::NotReady);
 
 		return return_wrapper_t<T>(_y1(*((op.get())->operator()()).get()));
 	}
@@ -1449,6 +1450,7 @@ public:
 	//	throw std::exception("Invalid operation");
 	//}
 };
+
 CU_END
 
 #endif // !CUDA_TOKENS_H

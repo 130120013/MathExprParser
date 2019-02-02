@@ -174,9 +174,42 @@ private:
 };
 
 template <class T, bool /*ignore*/, class derived_class = cuda_list_proxy<T>>
-struct cuda_list_proxy_move_assign:cuda_list_proxy_move_constr<T, true, derived_class> {};
+struct cuda_list_proxy_move_assign
+{
+	cuda_list_proxy_move_assign() = default;
+	cuda_list_proxy_move_assign(const cuda_list_proxy_move_assign&) = default;
+	cuda_list_proxy_move_assign(cuda_list_proxy_move_assign&& right)
+	{
+		*this = std::move(right);
+	}
+	cuda_list_proxy_move_assign& operator=(const cuda_list_proxy_move_assign&) = default;
+	cuda_list_proxy_move_assign& operator=(cuda_list_proxy_move_assign&& right)
+	{
+		if (this != &right)
+		{
+			this->derived().head = right.derived().head;
+			this->derived().tail = right.derived().tail;
+			this->derived().elements = right.derived().elements;
 
-template <class T, bool is_copy_constr, class derived_class = cuda_list_proxy<T>> struct cuda_list_proxy_copy_constr {};
+			right.derived().head = nullptr;
+			right.derived().tail = nullptr;
+			right.derived().elements = 0;
+		}
+		return *this;
+	}
+private:
+	const derived_class& derived() const noexcept {return static_cast<const derived_class&>(*this);}
+	derived_class& derived() noexcept {return static_cast<derived_class&>(*this);}
+};
+
+template <class T, bool is_copy_constr, class derived_class = cuda_list_proxy<T>> struct cuda_list_proxy_copy_constr
+{
+	cuda_list_proxy_copy_constr() = default;
+	cuda_list_proxy_copy_constr(const cuda_list_proxy_copy_constr&) = delete;
+	cuda_list_proxy_copy_constr(cuda_list_proxy_copy_constr&&) = default;
+	cuda_list_proxy_copy_constr& operator=(const cuda_list_proxy_copy_constr&) = default;
+	cuda_list_proxy_copy_constr& operator=(cuda_list_proxy_copy_constr&&) = default;
+};
 
 template <class T, class derived_class> struct cuda_list_proxy_copy_constr<T, true, derived_class> 
 {
@@ -209,7 +242,14 @@ private:
 	derived_class& derived() noexcept { return static_cast<derived_class&>(*this); }
 };
 
-template <class T, bool is_copy_assign, class derived_class = cuda_list_proxy<T>> struct cuda_list_proxy_copy_assign {};
+template <class T, bool is_copy_assign, class derived_class = cuda_list_proxy<T>> struct cuda_list_proxy_copy_assign
+{
+	cuda_list_proxy_copy_assign() = default;
+	cuda_list_proxy_copy_assign(const cuda_list_proxy_copy_assign&) = default;
+	cuda_list_proxy_copy_assign(cuda_list_proxy_copy_assign&&) = default;
+	cuda_list_proxy_copy_assign& operator=(const cuda_list_proxy_copy_assign&) = delete;
+	cuda_list_proxy_copy_assign& operator=(cuda_list_proxy_copy_assign&&) = default;
+};
 
 template <class T, class derived_class> struct cuda_list_proxy_copy_assign<T, true, derived_class> 
 {
@@ -287,7 +327,11 @@ class cuda_list:public cuda_list_proxy<T>
 public:
 	typedef cuda_list_iterator<T> iterator;
 	typedef cuda_list_const_iterator<T> const_iterator;
-	//__host__ __device__ cuda_list() = default;
+	__host__ __device__ cuda_list() = default;
+	__host__ __device__ cuda_list(const cuda_list&) = default;
+	__host__ __device__ cuda_list(cuda_list&&) = default;
+	__host__ __device__ cuda_list& operator=(const cuda_list&) = default;
+	__host__ __device__ cuda_list& operator=(cuda_list&&) = default;
 	__host__ __device__ ~cuda_list();
 
 	template <class U>
@@ -521,7 +565,8 @@ __host__ __device__ void cuda_list<T>::swap(cuda_list &that) {
 template <typename T>
 __host__ __device__ void cuda_list<T>::clear() {
 	node<T>* curr = this->head;
-	while (this->head) {
+	while (this->head) 
+	{
 		curr = this->head;
 		this->head = this->head->next;
 		delete curr;

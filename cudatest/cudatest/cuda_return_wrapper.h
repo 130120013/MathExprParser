@@ -17,13 +17,12 @@ enum class CudaParserErrorCodes
 	ParameterIsNotFound,
 	InvalidExpression
 };
-
 template <class LeftReturnWrapper, class RightReturnWrapper>
 __device__ auto impl_assign_return_wrapper(LeftReturnWrapper& left, RightReturnWrapper&& right)
-	-> std::enable_if_t <
-	std::is_convertible<typename std::decay<RightReturnWrapper>::type::value_type, typename LeftReturnWrapper::value_type>::value,
+-> std::enable_if_t <
+	std::is_convertible<decltype(std::declval<RightReturnWrapper&&>().value()), typename LeftReturnWrapper::value_type>::value,
 	LeftReturnWrapper&
-	>
+>
 {
 	typedef typename LeftReturnWrapper::value_type value_type;
 	left.code_ref() = right.return_code();
@@ -45,10 +44,10 @@ __device__ auto impl_assign_return_wrapper(LeftReturnWrapper& left, RightReturnW
 
 template <class LeftReturnWrapper, class RightReturnWrapper>
 __device__ auto impl_construct_return_wrapper(LeftReturnWrapper& left, RightReturnWrapper&& right)
-	-> std::enable_if_t <
-	std::is_convertible<typename std::decay<RightReturnWrapper>::type::value_type, typename LeftReturnWrapper::value_type>::value,
+-> std::enable_if_t <
+	std::is_convertible<decltype(std::declval<RightReturnWrapper&&>().value()), typename LeftReturnWrapper::value_type>::value,
 	LeftReturnWrapper&
-	>
+>
 {
 	typedef typename LeftReturnWrapper::value_type value_type;
 	if (right.get() == nullptr)
@@ -64,12 +63,20 @@ __device__ auto impl_construct_return_wrapper(LeftReturnWrapper& left, RightRetu
 template <class Derived, class T, class = void>
 struct impl_move_assignable_return_wrapper
 {
+	impl_move_assignable_return_wrapper() = default;
+	impl_move_assignable_return_wrapper(const impl_move_assignable_return_wrapper&) = default;
+	impl_move_assignable_return_wrapper(impl_move_assignable_return_wrapper&&) = default;
+	impl_move_assignable_return_wrapper& operator=(const impl_move_assignable_return_wrapper&) = default;
 	impl_move_assignable_return_wrapper& operator=(impl_move_assignable_return_wrapper&&) = delete;
 };
 
 template <class Derived, class T>
 struct impl_move_assignable_return_wrapper<Derived, T, std::enable_if_t<std::is_move_assignable<T>::value>>
 {
+	impl_move_assignable_return_wrapper() = default;
+	impl_move_assignable_return_wrapper(const impl_move_assignable_return_wrapper&) = default;
+	impl_move_assignable_return_wrapper(impl_move_assignable_return_wrapper&&) = default;
+	impl_move_assignable_return_wrapper& operator=(const impl_move_assignable_return_wrapper&) = default;
 	__device__ impl_move_assignable_return_wrapper& operator=(impl_move_assignable_return_wrapper&& right)
 	{
 		impl_assign_return_wrapper(get_this(), std::move(right.get_this()));
@@ -83,16 +90,24 @@ private:
 template <class Derived, class T, class = void>
 struct impl_copy_assignable_return_wrapper
 {
+	impl_copy_assignable_return_wrapper() = default;
+	impl_copy_assignable_return_wrapper(const impl_copy_assignable_return_wrapper&) = default;
+	impl_copy_assignable_return_wrapper(impl_copy_assignable_return_wrapper&&) = default;
 	impl_copy_assignable_return_wrapper& operator=(const impl_copy_assignable_return_wrapper&) = delete;
+	__device__ impl_copy_assignable_return_wrapper& operator=(impl_copy_assignable_return_wrapper&&) = default;
 };
 template <class Derived, class T>
 struct impl_copy_assignable_return_wrapper<Derived, T, std::enable_if_t<std::is_copy_assignable<T>::value>>
 {
+	impl_copy_assignable_return_wrapper() = default;
+	impl_copy_assignable_return_wrapper(const impl_copy_assignable_return_wrapper&) = default;
+	impl_copy_assignable_return_wrapper(impl_copy_assignable_return_wrapper&&) = default;
 	__device__ impl_copy_assignable_return_wrapper& operator=(const impl_copy_assignable_return_wrapper& right)
 	{
 		impl_assign_return_wrapper(get_this(), right.get_this());
 		return *this;
 	}
+	__device__ impl_copy_assignable_return_wrapper& operator=(impl_copy_assignable_return_wrapper&&) = default;
 private:
 	__device__ Derived& get_this() { return static_cast<Derived&>(*this); }
 	__device__ const Derived& get_this() const { return static_cast<const Derived&>(*this); }
@@ -107,10 +122,12 @@ struct impl_storage_wrapper :impl_copy_assignable_return_wrapper<Derived, T>, im
 	template <class U, class = std::enable_if_t<std::is_constructible<T, U&&>::value>>
 	__device__ impl_storage_wrapper(U&& value, CudaParserErrorCodes exit_code = CudaParserErrorCodes::Success) :m_code(exit_code)
 	{
+		static_assert(sizeof(T) <= sizeof(val_buf) /*&& alignof(T) <= alignof(decltype(val_buf))*/,
+			"Sizes and alignments of T and U!");
 		m_pVal = std::move(this->get_buf_ptr());
 		new (m_pVal) T(std::forward<U>(value));
 	}
-	__device__ impl_storage_wrapper(CudaParserErrorCodes exit_code) : m_code(exit_code), m_pVal(nullptr) {}
+	__device__ impl_storage_wrapper(CudaParserErrorCodes exit_code) :m_code(exit_code), m_pVal(nullptr) {}
 	__device__ ~impl_storage_wrapper()
 	{
 		if (m_pVal)
@@ -158,6 +175,7 @@ protected:
 private:
 	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
 	pointer m_pVal = nullptr;
+
 	alignas(T) char val_buf[sizeof(T)];
 protected:
 	__device__ T* get_buf_ptr()
@@ -188,7 +206,7 @@ protected:
 template <class Derived, class T>
 struct impl_move_constructible_return_wrapper :impl_storage_wrapper<Derived, T>
 {
-	impl_storage_wrapper<Derived, T>::impl_storage_wrapper;
+	using impl_storage_wrapper<Derived, T>::impl_storage_wrapper;
 	__device__ impl_move_constructible_return_wrapper() = default;
 	__device__ impl_move_constructible_return_wrapper(impl_move_constructible_return_wrapper&& right)
 	{
@@ -201,7 +219,7 @@ struct impl_move_constructible_return_wrapper :impl_storage_wrapper<Derived, T>
 template <class Derived, class T>
 struct impl_copy_constructible_return_wrapper :impl_move_constructible_return_wrapper<Derived, T>
 {
-	impl_move_constructible_return_wrapper<Derived, T>::impl_move_constructible_return_wrapper;
+	using impl_move_constructible_return_wrapper<Derived, T>::impl_move_constructible_return_wrapper;
 	__device__ impl_copy_constructible_return_wrapper() = default;
 	__device__ impl_copy_constructible_return_wrapper(const impl_copy_constructible_return_wrapper& right)
 	{
@@ -233,14 +251,16 @@ struct return_wrapper_t :impl_return_wrapper_proxy<T>
 	friend impl_copy_assignable_return_wrapper<return_wrapper_t<T>, T>;
 	friend impl_move_assignable_return_wrapper<return_wrapper_t<T>, T>;
 	template <class LeftReturnWrapper, class RightReturnWrapper>
-	friend __device__ auto impl_assign_return_wrapper(LeftReturnWrapper& left, RightReturnWrapper&& right)->std::enable_if_t <
-		std::is_convertible<typename std::decay<RightReturnWrapper>::type::value_type, typename LeftReturnWrapper::value_type>::value,
+	friend __device__ auto impl_assign_return_wrapper(LeftReturnWrapper& left, RightReturnWrapper&& right)
+		->std::enable_if_t <
+		std::is_convertible<decltype(std::declval<RightReturnWrapper&&>().value()), typename LeftReturnWrapper::value_type>::value,
 		LeftReturnWrapper&
-	>;
+		>;
+
 	template <class LeftReturnWrapper, class RightReturnWrapper>
 	friend __device__ auto impl_construct_return_wrapper(LeftReturnWrapper& left, RightReturnWrapper&& right)
 		->std::enable_if_t <
-		std::is_convertible<typename std::decay<RightReturnWrapper>::type::value_type, typename LeftReturnWrapper::value_type>::value,
+		std::is_convertible<decltype(std::declval<RightReturnWrapper&&>().value()), typename LeftReturnWrapper::value_type>::value,
 		LeftReturnWrapper&
 		>;
 };
@@ -319,5 +339,6 @@ private:
 
 template <class T = void>
 auto make_return_wrapper_error(CudaParserErrorCodes error) { return return_wrapper_t<T>(error); }
+
 CU_END
 #endif // !CUDA_RETURN_WRAPPER_H
