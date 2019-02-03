@@ -3,6 +3,7 @@
 //#include <stdexcept>
 //#include "cuda_memory.h"
 #include "cuda_config.cuh"
+#include "cuda_return_wrapper.cuh"
 
 #ifndef CUDA_LIST_CUH
 #define CUDA_LIST_CUH
@@ -334,9 +335,9 @@ public:
 	__device__ ~cuda_list();
 
 	template <class U>
-	__device__ void push_back(U&& data);
+	__device__ cu::return_wrapper_t<void> push_back(U&& data);
 	template <class U>
-	__device__ void push_front(U&& data);
+	__device__ cu::return_wrapper_t<void> push_front(U&& data);
 	//__device__ void pop_back();
 	//__device__ void pop_front();
 	__device__ void swap(cuda_list &x);
@@ -395,14 +396,17 @@ __device__ T const& cuda_list<T>::back() const {
 }
 
 template <typename T> template <class U>
-__device__ void cuda_list<T>::push_back(U&& data) {
+__device__ cu::return_wrapper_t<void> cuda_list<T>::push_back(U&& data) {
 	node<T>* newNode = new node<T>(std::forward<U>(data), nullptr, this->m_tail);
+	if (!newNode)
+		return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
 	if (this->m_head == nullptr)
 		this->m_head = newNode;
 	if (this->m_tail != nullptr)
 		this->m_tail->next = newNode;
 	this->m_tail = newNode;
 	++this->m_elements;
+	return cu::return_wrapper_t<void>();
 }
 
 template <typename T>
@@ -439,14 +443,17 @@ __device__ typename cuda_list<T>::iterator cuda_list<T>::erase(typename cuda_lis
 //}
 
 template <typename T> template <class U>
-__device__ void cuda_list<T>::push_front(U&& data) {
+__device__ cu::return_wrapper_t<void> cuda_list<T>::push_front(U&& data) {
 	node<T>* newNode = new node<T>(std::forward<U>(data), this->m_head, nullptr);
+	if (!newNode)
+		return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
 	if (this->m_tail == nullptr)
 		this->m_tail = newNode;
 	if (this->m_head != nullptr)
 		this->m_head->prev = newNode;
 	this->m_head = newNode;
 	++this->m_elements;
+	return cu::return_wrapper_t<void>();
 }
 
 //template <typename T>

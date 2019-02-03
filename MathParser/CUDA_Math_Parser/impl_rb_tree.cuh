@@ -801,13 +801,13 @@ public:
 
 	__device__ void swap(cuda_red_black_tree&  t);
 
-	__device__ cu::cuda_pair<iterator, bool> insert_unique(const value_type& v);
-	__device__ cu::cuda_pair<iterator, bool> insert_unique(value_type&& v);
+	__device__ cu::pair<iterator, bool> insert_unique(const value_type& v);
+	__device__ cu::pair<iterator, bool> insert_unique(value_type&& v);
 	__device__ iterator insert_unique(const_iterator p, const value_type& v);
 	__device__ iterator insert_multi(const value_type& v);
 	__device__ iterator insert_multi(const_iterator p, const value_type& v);
 
-	__device__ cu::cuda_pair<iterator, bool> node_insert_unique(node_pointer nd);
+	__device__ cu::pair<iterator, bool> node_insert_unique(node_pointer nd);
 	__device__ iterator node_insert_unique(const_iterator p, node_pointer nd);
 
 	__device__ iterator node_insert_multi(node_pointer nd);
@@ -869,17 +869,17 @@ public:
 		node_const_pointer root,
 		node_const_pointer result) const;
 	template <class Key>
-	__device__ cu::cuda_pair<iterator, iterator>
+	__device__ cu::pair<iterator, iterator>
 		equal_range_unique(const Key& k);
 	template <class Key>
-	__device__ cu::cuda_pair<const_iterator, const_iterator>
+	__device__ cu::pair<const_iterator, const_iterator>
 		equal_range_unique(const Key& k) const;
 
 	template <class Key>
-	__device__ cu::cuda_pair<iterator, iterator>
+	__device__ cu::pair<iterator, iterator>
 		equal_range_multi(const Key& k);
 	template <class Key>
-	__device__ cu::cuda_pair<const_iterator, const_iterator>
+	__device__ cu::pair<const_iterator, const_iterator>
 		equal_range_multi(const Key& k) const;
 
 	typedef cuda_device_unique_ptr<node> node_holder;
@@ -1339,7 +1339,7 @@ __device__ void cuda_red_black_tree<Tp, Compare>::insert_node_at(typename tree_n
 }
 
 template <class Tp, class Compare>
-__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bool>
+__device__ cu::pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bool>
 	cuda_red_black_tree<Tp, Compare>::insert_unique(const value_type& v)
 {
 	node_pointer parent;
@@ -1353,11 +1353,11 @@ __device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bo
 		r = h.release();
 		inserted = true;
 	}
-	return cu::cuda_pair<iterator, bool>(iterator(r), inserted);
+	return cu::pair<iterator, bool>(iterator(r), inserted);
 }
 
 template <class Tp, class Compare>
-__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bool>
+__device__ cu::pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bool>
 	cuda_red_black_tree<Tp, Compare>::insert_unique(value_type&& v)
 {
 	node_pointer parent;
@@ -1371,7 +1371,7 @@ __device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bo
 		r = h.release();
 		inserted = true;
 	}
-	return cu::cuda_pair<iterator, bool>(iterator(r), inserted);
+	return cu::pair<iterator, bool>(iterator(r), inserted);
 }
 
 template <class Tp, class Compare>
@@ -1412,7 +1412,7 @@ __device__ typename cuda_red_black_tree<Tp, Compare>::iterator
 }
 
 template <class Tp, class Compare>
-__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bool>
+__device__ cu::pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bool>
 	cuda_red_black_tree<Tp, Compare>::node_insert_unique(node_pointer nd)
 {
 	node_pointer parent;
@@ -1425,7 +1425,7 @@ __device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bo
 		r = nd;
 		inserted = true;
 	}
-	return cu::cuda_pair<iterator, bool>(iterator(r), inserted);
+	return cu::pair<iterator, bool>(iterator(r), inserted);
 }
 
 template <class Tp, class Compare>
@@ -1506,7 +1506,7 @@ template <class Key>
 __device__ typename cuda_red_black_tree<Tp, Compare>::size_type
 	cuda_red_black_tree<Tp, Compare>::erase_multi(const Key& k)
 {
-	cu::cuda_pair<iterator, iterator> p = equal_range_multi(k);
+	cu::pair<iterator, iterator> p = equal_range_multi(k);
 	size_type r = 0;
 	for (; p.first != p.second; ++r)
 		p.first = erase(p.first);
@@ -1562,7 +1562,7 @@ template <class Key>
 __device__ typename cuda_red_black_tree<Tp, Compare>::size_type
 	cuda_red_black_tree<Tp, Compare>::count_multi(const Key& k) const
 {
-	typedef cu::cuda_pair<const_iterator, const_iterator> Pp;
+	typedef cu::pair<const_iterator, const_iterator> Pp;
 	node_const_pointer result = end_node();
 	node_const_pointer rt = root();
 	while (rt != 0)
@@ -1660,10 +1660,10 @@ __device__ typename cuda_red_black_tree<Tp, Compare>::const_iterator
 
 template <class Tp, class Compare>
 template <class Key>
-__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator,
+__device__ cu::pair<typename cuda_red_black_tree<Tp, Compare>::iterator,
 	typename cuda_red_black_tree<Tp, Compare>::iterator> cuda_red_black_tree<Tp, Compare>::equal_range_unique(const Key& k)
 {
-	typedef cu::cuda_pair<iterator, iterator> _Pp;
+	typedef cu::pair<iterator, iterator> _Pp;
 	node_pointer result = end_node();
 	node_pointer rt = root();
 	while (rt != 0)
@@ -1687,10 +1687,10 @@ __device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator,
 
 template <class Tp, class Compare>
 template <class Key>
-__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::const_iterator,
+__device__ cu::pair<typename cuda_red_black_tree<Tp, Compare>::const_iterator,
 	typename cuda_red_black_tree<Tp, Compare>::const_iterator> cuda_red_black_tree<Tp, Compare>::equal_range_unique(const Key& k) const
 {
-	typedef cu::cuda_pair<const_iterator, const_iterator> _Pp;
+	typedef cu::pair<const_iterator, const_iterator> _Pp;
 	node_const_pointer result = end_node();
 	node_const_pointer rt = root();
 	while (rt != 0)
@@ -1714,10 +1714,10 @@ __device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::const_iterat
 
 template <class Tp, class Compare>
 template <class Key>
-__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator,
+__device__ cu::pair<typename cuda_red_black_tree<Tp, Compare>::iterator,
 	typename cuda_red_black_tree<Tp, Compare>::iterator> cuda_red_black_tree<Tp, Compare>::equal_range_multi(const Key& k)
 {
-	typedef cu::cuda_pair<iterator, iterator> _Pp;
+	typedef cu::pair<iterator, iterator> _Pp;
 	node_pointer result = end_node();
 	node_pointer rt = root();
 	while (rt != 0)
@@ -1738,10 +1738,10 @@ __device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator,
 
 template <class Tp, class Compare>
 template <class Key>
-__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::const_iterator,
+__device__ cu::pair<typename cuda_red_black_tree<Tp, Compare>::const_iterator,
 	typename cuda_red_black_tree<Tp, Compare>::const_iterator> cuda_red_black_tree<Tp, Compare>::equal_range_multi(const Key& k) const
 {
-	typedef cu::cuda_pair<const_iterator, const_iterator> _Pp;
+	typedef cu::pair<const_iterator, const_iterator> _Pp;
 	node_const_pointer result = end_node();
 	node_const_pointer rt = root();
 	while (rt != 0)

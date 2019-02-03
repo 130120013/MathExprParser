@@ -299,10 +299,79 @@ namespace cu {
 	};
 
 	template <class T>
+	class expr_param_init_block //move this to cuda_tokens
+	{
+		cuda_vector<cu::pair<cu::cuda_string, T>> m_sorted_arguments;
+	public:
+		expr_param_init_block() = default;
+		expr_param_init_block(cuda_vector<cu::pair<cu::cuda_string, T>>&& sorted_arg_frame):m_sorted_arguments(std::move(sorted_arg_frame)) {}
+		cu::return_wrapper_t<T> get_parameter(const char* pName, std::size_t cbName)
+		{
+			auto pFrameBegin = &m_sorted_arguments[0];
+			auto cb = cbName;
+			while (cb != 0)
+			{
+				auto mid = cb / 2;
+				auto cbMin = pFrameBegin[mid].first.size();
+				if (cbName < cbMin)
+					cbMin = cbName;
+				auto cmp = cu::memcmp(pFrameBegin[mid].first.c_str(), pName, cbMin);
+				if (cmp == 0)
+				{
+					if (cbMin < cbName)
+						cmp = -1;
+					else if (cbMin < pFrameBegin[mid].first.size())
+						cmp = 1;
+					else
+						return cu::return_wrapper_t<T>(pFrameBegin[min].second);
+				}
+				if (cmp < 0)
+				{
+					pFrameBegin = &pFrameBegin[mid];
+					cb -= min;
+				}else
+					cb = min;
+			}
+			return cu::make_return_wrapper_error<T>(CudaParserErrorCodes::ParameterIsNotFound);
+		}
+	};
+
+	template <class T>
+	class expr_param_storage
+	{
+		cuda_list<cu::cuda_string> m_parameters;
+		cuda_vector<cu::cuda_string*> m_sorted_params;
+	public:
+		__device__ expr_param_storage() = default;
+		template <class ParameterNameType>
+		__device__ inline cu::return_wrapper_t<void> add_parameter(ParameterNameType&& strParameterName)
+		{
+			using cu::swap;
+			auto rv = m_parameters.push_back(std::forward<ParameterNameType>(strParameterName));
+			if (!rv)
+				return rv;
+			m_sorted_params.emplace_back(&m_parameters.back());
+			auto i = m_sorted_params.size() - 1;
+			while (i > 0)
+			{
+				auto repl = i / 2 - 1;
+				if (*m_sorted_params[repl] > *m_sorted_params[i])
+					return cu::return_wrapper_t();
+				swap(m_sorted_params[repl], m_sorted_params[i]);
+				i = repl;
+			}
+			return cu::return_wrapper_t();
+		}
+		__device__ inline cu::return_wrapper_t<void> finalize()
+		{
+		}
+		template <class ArgIteratorBegin, class ArgIteratorEnd>
+		expr_param_init_block<T> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const;
+	};
+
+	template <class T>
 	class Header
 	{
-		cuda_map<cu::cuda_string, T> m_arguments;
-		cuda_vector<cu::cuda_string> m_parameters;
 		cu::cuda_string function_name;
 		mutable return_wrapper_t<void> construction_success_code;
 	public:
@@ -331,7 +400,7 @@ namespace cu {
 						if (!isOpeningBracket)
 							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 						auto param_name = cu::cuda_string(begPtr, l_endptr);
-						auto val = cu::make_cuda_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()));
+						auto val = cu::make_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()));
 						auto res = m_arguments.insert(std::move(val));
 
 						if (!res.second)
@@ -485,7 +554,7 @@ namespace cu {
 			char* begPtr = (char*)expr;
 			std::size_t cbRest = length;
 			TokenStorage<T> tokens;
-			cuda_stack <cu::cuda_pair<cuda_device_unique_ptr<Function<T>>, std::size_t>> funcStack;
+			cuda_stack <cu::pair<cuda_device_unique_ptr<Function<T>>, std::size_t>> funcStack;
 			int last_type_id = -1;
 
 			while (cbRest > 0)
@@ -533,72 +602,72 @@ namespace cu {
 					if (tkn == "sin")
 					{
 						last_type_id = int(tokens.push_token(SinFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(std::move(make_cuda_device_unique_ptr<SinFunction<T>>()), 1));
+						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<SinFunction<T>>()), 1));
 					}
 					else if (tkn == "cos")
 					{
 						last_type_id = int(tokens.push_token(CosFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(std::move(make_cuda_device_unique_ptr<CosFunction<T>>()), 1));
+						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<CosFunction<T>>()), 1));
 					}
 					else if (tkn == "tg")
 					{
 						last_type_id = int(tokens.push_token(TgFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<TgFunction<T>>(), 1));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<TgFunction<T>>(), 1));
 					}
 					else if (tkn == "log10")
 					{
 						last_type_id = int(tokens.push_token(Log10Function<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<Log10Function<T>>(), 1));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Log10Function<T>>(), 1));
 					}
 					else if (tkn == "ln")
 					{
 						last_type_id = int(tokens.push_token(LnFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<LnFunction<T>>(), 1));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<LnFunction<T>>(), 1));
 					}
 					else if (tkn == "log")
 					{
 						last_type_id = int(tokens.push_token(LogFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(std::move(make_cuda_device_unique_ptr<LogFunction<T>>()), 2));
+						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<LogFunction<T>>()), 2));
 					}
 					else if (tkn == "j0")
 					{
 						last_type_id = int(tokens.push_token(J0Function<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<J0Function<T>>(), 1));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<J0Function<T>>(), 1));
 					}
 					else if (tkn == "j1")
 					{
 						last_type_id = int(tokens.push_token(J1Function<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<J1Function<T>>(), 1));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<J1Function<T>>(), 1));
 					}
 					else if (tkn == "jn")
 					{
 						last_type_id = int(tokens.push_token(JnFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<JnFunction<T>>(), 2));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<JnFunction<T>>(), 2));
 					}
 					else if (tkn == "y0")
 					{
 						last_type_id = int(tokens.push_token(Y0Function<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<Y0Function<T>>(), 1));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Y0Function<T>>(), 1));
 					}
 					else if (tkn == "y1")
 					{
 						last_type_id = int(tokens.push_token(Y1Function<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<Y1Function<T>>(), 1));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Y1Function<T>>(), 1));
 					}
 					else if (tkn == "yn")
 					{
 						last_type_id = int(tokens.push_token(YnFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<YnFunction<T>>(), 2));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<YnFunction<T>>(), 2));
 					}
 					else if (tkn == "max")
 					{
 						last_type_id = int(tokens.push_token(MaxFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<MaxFunction<T>>(), 0));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MaxFunction<T>>(), 0));
 					}
 					else if (tkn == "min")
 					{
 						last_type_id = int(tokens.push_token(MinFunction<T>())->type());
-						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
 					}
 					else //if (this->header.get_param_index(cuda_string(tkn.begin(), tkn.end())).value() >= 0)
 						last_type_id = int(tokens.push_token(Variable<T>(this->header, cuda_string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()))->type());

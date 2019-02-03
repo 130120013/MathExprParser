@@ -9,6 +9,7 @@ enum class CudaParserErrorCodes
 {
 	Success,
 	NotReady,
+	NotEnoughMemory,
 	UnexpectedCall,
 	InsufficientNumberParams,
 	UnexpectedToken,
@@ -169,6 +170,14 @@ struct impl_storage_wrapper :impl_copy_assignable_return_wrapper<Derived, T>, im
 	{
 		return m_code;
 	}
+	__device__ explicit operator bool() const
+	{
+		return m_code == CudaParserErrorCodes::Success;
+	}
+	__device__ bool operator!() const
+	{
+		return m_code != CudaParserErrorCodes::Success;
+	}
 protected:
 	__device__ Derived& get_this() { return static_cast<Derived&>(*this); }
 	__device__ const Derived& get_this() const { return static_cast<const Derived&>(*this); }
@@ -302,6 +311,14 @@ struct return_wrapper_t<T&>
 	{
 		return *this->get();
 	}
+	__device__ explicit operator bool() const
+	{
+		return m_code == CudaParserErrorCodes::Success;
+	}
+	__device__ bool operator!() const
+	{
+		return m_code != CudaParserErrorCodes::Success;
+	}
 private:
 	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
 	T* m_pVal = nullptr;
@@ -337,6 +354,14 @@ struct return_wrapper_t<void>
 	__device__ CudaParserErrorCodes return_code() const
 	{
 		return m_code;
+	}
+	__device__ explicit operator bool() const
+	{
+		return m_code == CudaParserErrorCodes::Success;
+	}
+	__device__ bool operator!() const
+	{
+		return m_code != CudaParserErrorCodes::Success;
 	}
 private:
 	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;

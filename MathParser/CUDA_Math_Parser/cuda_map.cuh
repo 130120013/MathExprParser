@@ -13,7 +13,7 @@ CU_BEGIN
 	class cuda_map_value_compare
 	{
 		template <class PairKey, class PairValue>
-		using pair = cu::cuda_pair<PairKey, PairValue>;
+		using pair = cu::pair<PairKey, PairValue>;
 	public:
 		struct key_compare
 		{
@@ -91,7 +91,7 @@ CU_BEGIN
 		typedef typename _TreeIterator::value_type::second_type      mapped_type;
 	public:
 		typedef std::bidirectional_iterator_tag                           iterator_category;
-		typedef cu::cuda_pair<key_type, mapped_type>                      value_type;
+		typedef cu::pair<key_type, mapped_type>                      value_type;
 		typedef typename _TreeIterator::difference_type              difference_type;
 		typedef value_type&                                          reference;
 		typedef typename std::pointer_traits<typename _TreeIterator::pointer>::template
@@ -144,7 +144,7 @@ CU_BEGIN
 		typedef typename _TreeIterator::value_type::second_type      __mapped_type;
 	public:
 		typedef std::bidirectional_iterator_tag                           iterator_category;
-		typedef cu::cuda_pair<__key_type, __mapped_type>                      value_type;
+		typedef cu::pair<__key_type, __mapped_type>                      value_type;
 		typedef typename _TreeIterator::difference_type              difference_type;
 		typedef const value_type&                                    reference;
 		typedef typename pointer_traits::template
@@ -199,14 +199,14 @@ CU_BEGIN
 		// types:
 		typedef Key key_type;
 		typedef T mapped_type;
-		typedef cu::cuda_pair<key_type, mapped_type> value_type;
+		typedef cu::pair<key_type, mapped_type> value_type;
 		typedef cuda_map_value_compare<key_type, mapped_type> value_compare;
 		typedef typename value_compare::key_compare key_compare;
 		typedef value_type& reference;
 		typedef const value_type& const_reference;
 
 	private:
-		typedef cu::cuda_pair<key_type, mapped_type> my_value_type;
+		typedef cu::pair<key_type, mapped_type> my_value_type;
 		typedef cuda_map_value_compare<key_type, mapped_type> my_value_compare;
 		typedef cuda_red_black_tree<my_value_type, my_value_compare>   my_base;
 		//typedef typename my_base::__node_traits                 __node_traits;
@@ -278,13 +278,13 @@ CU_BEGIN
 		__device__ mapped_type& at(const key_type& key);
 		__device__ const mapped_type& at(const key_type& key) const;
 
-		__device__ cu::cuda_pair<iterator, bool>
+		__device__ cu::pair<iterator, bool>
 			insert(const value_type& val) 
 		{
 			return tree.insert_unique(val); 
 		}
 
-		__device__ cu::cuda_pair<iterator, bool>
+		__device__ cu::pair<iterator, bool>
 			insert(value_type&& val) 
 		{
 			return tree.insert_unique(std::move(val)); 
@@ -341,16 +341,16 @@ CU_BEGIN
 		{
 			return tree.upper_bound(key);
 		}
-		__device__ cu::cuda_pair<iterator, iterator> equal_range(const key_type& key)
+		__device__ cu::pair<iterator, iterator> equal_range(const key_type& key)
 		{
 			return tree.equal_range_unique(key);
 		}
-		__device__  cu::cuda_pair<const_iterator, const_iterator> equal_range(const key_type& key) const
+		__device__  cu::pair<const_iterator, const_iterator> equal_range(const key_type& key) const
 		{
 			return tree.equal_range_unique(key);
 		}
 		template <class ... Tk>
-		__device__ cu::cuda_pair<iterator, bool> emplace(Tk&&... keys);
+		__device__ cu::pair<iterator, bool> emplace(Tk&&... keys);
 
 	public:
 		// Member access
@@ -370,7 +370,7 @@ CU_BEGIN
 		typedef cuda_device_unique_ptr<node> node_holder;
 
 	private:
-		template <class ... Tk, class = std::enable_if_t<std::is_constructible<cu::cuda_pair<Key, T>, Tk&&...>::value>>
+		template <class ... Tk, class = std::enable_if_t<std::is_constructible<cu::pair<Key, T>, Tk&&...>::value>>
 		__device__ node_holder construct_node(Tk&& ... key);
 		__device__ node_holder construct_node(const key_type& key);
 		__device__ node_pointer& find_equal_key(node_pointer& parent, const key_type& key);
@@ -383,7 +383,7 @@ CU_BEGIN
 
 	template <class _Key, class _Tp, class _Compare>
 	template <class ... Tk>
-	__device__ cu::cuda_pair<typename cuda_map<_Key, _Tp, _Compare>::iterator, bool> cuda_map<_Key, _Tp, _Compare>::emplace(Tk&&... keys)
+	__device__ cu::pair<typename cuda_map<_Key, _Tp, _Compare>::iterator, bool> cuda_map<_Key, _Tp, _Compare>::emplace(Tk&&... keys)
 	{
 		node_holder h = construct_node(std::forward<Tk>(keys)...);
 		node_pointer parent;
@@ -394,7 +394,7 @@ CU_BEGIN
 			this->tree.insert_node_at(parent, child, h.release());
 			inserted = true;
 		}
-		return cu::make_cuda_pair(iterator(typename my_base::iterator(child)), inserted);
+		return cu::make_pair(iterator(typename my_base::iterator(child)), inserted);
 	}
 
 	template <class _Key, class _Tp, class _Compare>
@@ -571,7 +571,7 @@ CU_BEGIN
 	__device__ typename cuda_map<_Key, _Tp, _Compare>::node_holder
 		cuda_map<_Key, _Tp, _Compare>::construct_node(const key_type& key)
 	{
-		return node_holder(new node(cu::make_cuda_pair(key, mapped_type())));
+		return node_holder(new node(cu::make_pair(key, mapped_type())));
 	}
 
 	template <class _Key, class _Tp, class _Compare>
