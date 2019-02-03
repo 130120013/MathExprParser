@@ -165,14 +165,14 @@ int main()
 {
 	cudaError_t cudaStatus;
 	const char pStr[] = "f(x) = yn(1, 2) + sin(3.14 / (x + 1))";
-	double V[10];
+	double V[100];
 	std::size_t cbStack;
 
 	cudaStatus = cudaDeviceGetLimit(&cbStack, cudaLimitStackSize);
 	if (cudaStatus != 0)
 		return -6;
 
-	cudaStatus = cudaDeviceSetLimit(cudaLimitStackSize, 1 << 15);
+	cudaStatus = cudaDeviceSetLimit(cudaLimitStackSize, 1 << 13);
 	if (cudaStatus != 0)
 		return -5;
 
@@ -182,7 +182,7 @@ int main()
 	cudaStatus = cudaMemcpy(pStr_d.get(), pStr, sizeof(pStr) - 1, cudaMemcpyHostToDevice);
 	if (cudaStatus != cudaSuccess)
 		return -1;
-	memset_expr<<<1, 10>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
+	memset_expr<<<1, sizeof(V) / sizeof(double)>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
 
 	/*cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
 	Mathexpr<double> mathexpr(expression);
@@ -200,18 +200,10 @@ int main()
 		fprintf(stderr, "cudaDeviceSynchronize failed!");
 		return -2;
 	}
-	else
-	{
-		fprintf(stderr, "cudaDeviceSynchronize fine!");
-	}
 
 	cudaStatus = cudaMemcpy(V, V_d.get(), sizeof(V), cudaMemcpyDeviceToHost);
 	if (cudaStatus != cudaSuccess)
 		return -3;
-	else
-	{
-		fprintf(stderr, "cudaMemcpy fine!");
-	}
 
 	//printf("%d", l.front());
 
@@ -222,10 +214,10 @@ int main()
 		fprintf(stderr, "cudaDeviceReset failed!");
 		return -4;
 	}
-	else
-	{
-		fprintf(stderr, "cudaDeviceReset fine!");
-	}
+
+	for (auto elem:V)
+		std::cout << elem << " ";
+	std::cout << "\n";
 
 	return 0;
 }
