@@ -165,7 +165,16 @@ int main()
 {
 	cudaError_t cudaStatus;
 	const char pStr[] = "f(x) = x^2";
-	double V[1000];
+	double V[10];
+	std::size_t cbStack;
+
+	cudaStatus = cudaDeviceGetLimit(&cbStack, cudaLimitStackSize);
+	if (cudaStatus != 0)
+		return -6;
+
+	cudaStatus = cudaDeviceSetLimit(cudaLimitStackSize, 1 << 14);
+	if (cudaStatus != 0)
+		return -5;
 
 	auto pStr_d = make_cuda_unique_ptr<char>(sizeof(pStr));
 	auto V_d = make_cuda_unique_ptr<double>(sizeof(V) / sizeof(double));
@@ -173,7 +182,7 @@ int main()
 	cudaStatus = cudaMemcpy(pStr_d.get(), pStr, sizeof(pStr) - 1, cudaMemcpyHostToDevice);
 	if (cudaStatus != cudaSuccess)
 		return -1;
-	memset_expr<<<1, 1>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
+	memset_expr<<<1, 10>>>(V_d.get(), sizeof(V) / sizeof(double), pStr_d.get(), sizeof(pStr) - 1);
 
 	/*cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
 	Mathexpr<double> mathexpr(expression);

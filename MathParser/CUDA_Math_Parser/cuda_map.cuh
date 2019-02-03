@@ -222,7 +222,8 @@ CU_BEGIN
 		typedef cuda_reverse_iterator<const_iterator>            const_reverse_iterator;
 
 	public:
-		explicit __device__ cuda_map(const key_compare& = key_compare()) : tree(my_value_compare()) {}
+		__device__ cuda_map() = default;
+		explicit __device__ cuda_map(const key_compare&) : tree(my_value_compare()) {}
 
 		template <class _InputIterator>
 		__device__ cuda_map(_InputIterator itBegin, _InputIterator itEnd,
@@ -278,7 +279,16 @@ CU_BEGIN
 		__device__ const mapped_type& at(const key_type& key) const;
 
 		__device__ cu::cuda_pair<iterator, bool>
-			insert(const value_type& val) { return tree.insert_unique(val); }
+			insert(const value_type& val) 
+		{
+			return tree.insert_unique(val); 
+		}
+
+		__device__ cu::cuda_pair<iterator, bool>
+			insert(value_type&& val) 
+		{
+			return tree.insert_unique(std::move(val)); 
+		}
 
 		__device__ iterator
 			insert(const_iterator itWhere, const value_type& val)

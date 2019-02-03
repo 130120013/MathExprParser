@@ -230,8 +230,11 @@ protected:
 	}
 	__device__ impl_cuda_device_unique_ptr_base& operator=(impl_cuda_device_unique_ptr_base&& right)
 	{
-		m_ptr = right.m_ptr;
-		right.m_ptr = nullptr;
+		if (this != &right)
+		{
+			m_ptr = right.m_ptr;
+			right.m_ptr = nullptr;
+		}
 		return *this;
 	}
 	__device__ constexpr const pointer& ptr() const

@@ -196,7 +196,7 @@ class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 	//bool isReady;
 public:
 	__device__ Variable(const Header<T>& header, const char* varname, std::size_t len)
-		:m_pValue((&header.get_argument(varname, len))->get()), name_length(len)
+		:m_pValue(header.get_argument(varname, len).get()), name_length(len)
 	{
 		this->name = make_cuda_device_unique_ptr<char[]>(len + 1);
 		cu::strncpy(this->name.get(), varname, len);

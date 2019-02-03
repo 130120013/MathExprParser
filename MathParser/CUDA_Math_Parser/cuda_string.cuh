@@ -134,7 +134,7 @@ __device__ unsigned long long strtoull_n(const char *str, std::size_t cbMax, cha
 			auto result_new = result * 10 + (str[i++] - 48);
 			if (result > result_new)
 			{
-				result = (str[0] == '-') ? cuda_numeric_limits<long long>::min() : cuda_numeric_limits<unsigned long long>::max();
+				result = (str[0] == '-') ? (unsigned long long)(cuda_numeric_limits<long long>::min()) : cuda_numeric_limits<unsigned long long>::max();
 				break;
 			}
 			result = result_new;
@@ -246,27 +246,24 @@ public:
 	typedef const char* const_iterator;
 	typedef cuda_reverse_iterator<iterator> reverse_iterator;
 	typedef cuda_reverse_iterator<const_iterator> const_reverse_iterator;
-	__device__ inline cuda_string() : strSize(0)
-	{
-		pStr = cuda_device_unique_ptr<char[]>();
-	}
+	__device__ cuda_string() = default;
 	__device__ inline cuda_string(const cuda_string& str)
 	{
 		*this = str;
 	}
-	__device__ inline cuda_string(cuda_string&& str) noexcept
-	{
-		*this = std::move(str);
-	}
+	__device__ inline cuda_string(cuda_string&&) = default;
 	__device__ cuda_string& operator=(const cuda_string& str)
 	{
-		auto tmp = make_cuda_device_unique_ptr<char[]>(str.size() + 1);
-		if (bool(tmp))
+		if (&str != this)
 		{
-			if(str.c_str() != nullptr)
-				memcpy(tmp.get(), str.c_str(), str.size() + 1);
-			this->pStr = std::move(tmp);
-			this->strSize = str.size();
+			auto tmp = make_cuda_device_unique_ptr<char[]>(str.size() + 1);
+			if (bool(tmp))
+			{
+				if(str.c_str() != nullptr)
+					memcpy(tmp.get(), str.c_str(), str.size() + 1);
+				this->pStr = std::move(tmp);
+				this->strSize = str.size();
+			}
 		}
 		return *this;
 	}
@@ -375,7 +372,7 @@ public:
 	{
 		return(strSize == 0);
 	}
-	template<class Iterator>
+	/*template<class Iterator>
 	__device__ Iterator erase(Iterator begin, Iterator end)
 	{
 		Iterator it;
@@ -394,7 +391,7 @@ public:
 		it = ++end;
 		*this = temp;
 		return it;
-	}
+	}*/
 };
 __device__ double stod(const cuda_string& str, std::size_t* pos = 0)
 {

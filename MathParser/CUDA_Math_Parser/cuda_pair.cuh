@@ -23,7 +23,7 @@ struct cuda_pair
 template <class T1, class T2>
 __device__ cuda_pair<T1, T2> make_cuda_pair(T1&& t, T2&& u)
 {
-	return cuda_pair<T1, T2>{std::move(t), std::move(u)};
+	return cuda_pair<T1, T2>{std::forward<T1>(t), std::forward<T2>(u)};
 }
 CU_END
 

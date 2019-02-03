@@ -527,14 +527,16 @@ public:
 		const_pointer;
 	typedef Tp value_type;
 
-	pointer right;
-	pointer left;
-	pointer parent;
+	pointer right = pointer();
+	pointer left = pointer();
+	pointer parent = pointer();
 	bool is_black;
-	value_type value;
+	value_type value = value_type();
 
+	
+	__device__ tree_node() = default;
 	template <class ... Args, class = std::enable_if<std::is_constructible<Tp, Args&&...>::value>>
-	__device__ tree_node(Args&& ... args) :right(), left(), parent(), value(std::forward<Args>(args)...), is_black(false) {}
+	__device__ tree_node(Args&& ... args) :value(std::forward<Args>(args)...), is_black(false) {}
 
 	/*__device__ explicit tree_node(const value_type& v)
 		: right(), left(), parent(), value(v), is_black(false) {}*/
@@ -728,8 +730,8 @@ private:
 		rebind<const node>
 		node_const_ptr;
 
-	node_pointer m_begin_node;
 	node m_end_node;
+	node_pointer m_begin_node = &m_end_node;
 	size_type count;
 	Compare val_compare;
 	//pair<node, void*>  pair1_;
@@ -770,6 +772,7 @@ public:
 	typedef tree_iterator<value_type, node_pointer, difference_type> iterator;
 	typedef tree_const_iterator<value_type, node_const_pointer, difference_type> const_iterator;
 
+	__device__ cuda_red_black_tree() = default;
 	__device__ inline cuda_red_black_tree(const cuda_red_black_tree& t) :cuda_red_black_tree(t.val_compare)
 	{
 		*this = t;
@@ -799,6 +802,7 @@ public:
 	__device__ void swap(cuda_red_black_tree&  t);
 
 	__device__ cu::cuda_pair<iterator, bool> insert_unique(const value_type& v);
+	__device__ cu::cuda_pair<iterator, bool> insert_unique(value_type&& v);
 	__device__ iterator insert_unique(const_iterator p, const value_type& v);
 	__device__ iterator insert_multi(const value_type& v);
 	__device__ iterator insert_multi(const_iterator p, const value_type& v);
@@ -1345,6 +1349,24 @@ __device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bo
 	if (child == 0)
 	{
 		node_holder h = construct_node(v);
+		insert_node_at(parent, child, h.get());
+		r = h.release();
+		inserted = true;
+	}
+	return cu::cuda_pair<iterator, bool>(iterator(r), inserted);
+}
+
+template <class Tp, class Compare>
+__device__ cu::cuda_pair<typename cuda_red_black_tree<Tp, Compare>::iterator, bool>
+	cuda_red_black_tree<Tp, Compare>::insert_unique(value_type&& v)
+{
+	node_pointer parent;
+	node_pointer& child = find_equal(parent, std::move(v));
+	node_pointer r = child;
+	bool inserted = false;
+	if (child == 0)
+	{
+		node_holder h = construct_node(std::move(v));
 		insert_node_at(parent, child, h.get());
 		r = h.release();
 		inserted = true;

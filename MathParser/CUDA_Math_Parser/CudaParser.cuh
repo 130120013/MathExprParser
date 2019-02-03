@@ -307,8 +307,9 @@ namespace cu {
 		mutable return_wrapper_t<void> construction_success_code;
 	public:
 		__device__ Header() = default;
-		__device__ Header(const char* expression, std::size_t expression_len, char** endPtr)
+		__device__ Header(const char* expression, std::size_t expression_len, char** ppEndPtr)
 		{
+			auto endPtr = expression + expression_len;
 			char* begPtr = (char*)(expression);
 			cuda_list<cu::cuda_string> params;
 			construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::Success);
@@ -317,12 +318,12 @@ namespace cu {
 			bool isClosingBracket = false;
 			std::size_t commaCount = 0;
 
-			while (*begPtr != '=' && begPtr < expression + expression_len)
+			while (begPtr < endPtr && *begPtr != '=')
 			{
 				if (isalpha(*begPtr))
 				{
 					auto l_endptr = begPtr + 1;
-					for (; isalnum(*l_endptr); ++l_endptr);
+					while (l_endptr < endPtr && isalnum(*l_endptr)) ++l_endptr;
 					if (this->function_name.empty())
 						this->function_name = cu::cuda_string(begPtr, l_endptr);
 					else
@@ -330,8 +331,10 @@ namespace cu {
 						if (!isOpeningBracket)
 							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 						auto param_name = cu::cuda_string(begPtr, l_endptr);
-						//auto res = m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(param_name, T()));
-						if (!m_arguments.insert(make_cuda_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()))).second)
+						auto val = cu::make_cuda_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()));
+						auto res = m_arguments.insert(std::move(val));
+
+						if (!res.second)
 							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
 						params.push_back(std::move(cu::cuda_string(begPtr, l_endptr)));
 					}
@@ -371,7 +374,7 @@ namespace cu {
 			m_parameters.reserve(params.size());
 			for (auto& param : params)
 				m_parameters.push_back(std::move(param));
-			*endPtr = begPtr;
+			*ppEndPtr = begPtr;
 		}
 		Header(const Header<T>&) = delete;
 		Header& operator=(const Header<T>&) = delete;
@@ -597,7 +600,7 @@ namespace cu {
 						last_type_id = int(tokens.push_token(MinFunction<T>())->type());
 						funcStack.push(cu::make_cuda_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
 					}
-					else if (this->header.get_param_index(cuda_string(tkn.begin(), tkn.end())).value() >= 0)
+					else //if (this->header.get_param_index(cuda_string(tkn.begin(), tkn.end())).value() >= 0)
 						last_type_id = int(tokens.push_token(Variable<T>(this->header, cuda_string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()))->type());
 				}
 				else if (tkn == ")")
