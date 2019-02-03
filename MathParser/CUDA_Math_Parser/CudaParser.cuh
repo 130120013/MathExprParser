@@ -364,7 +364,7 @@ namespace cu {
 		}
 		__device__ inline cu::return_wrapper_t<void> finalize()
 		{
-		}
+		} 
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
 		expr_param_init_block<T> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const;
 	};
