@@ -201,7 +201,7 @@ __device__ double strtod_n(const char* str, std::size_t cbMax, char** str_end)
 		result = (double) intPart;
 		cbRest -= p1 - p;
 
-		if (cbRest > 0 && *p1 == '.' || *p1 == ',')
+		if (cbRest > 0 && (*p1 == '.' /*|| *p1 == ','*/))
 		{
 			std::size_t cbFractialPart;
 			auto realPart = strtoll_n(p1 + 1, cbRest, (char**)&p2, 10);

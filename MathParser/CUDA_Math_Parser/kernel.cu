@@ -164,7 +164,7 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 int main()
 {
 	cudaError_t cudaStatus;
-	const char pStr[] = "f(x) = x^2";
+	const char pStr[] = "f(x) = yn(1, 2) + sin(3.14 / (x + 1))";
 	double V[10];
 	std::size_t cbStack;
 
@@ -172,7 +172,7 @@ int main()
 	if (cudaStatus != 0)
 		return -6;
 
-	cudaStatus = cudaDeviceSetLimit(cudaLimitStackSize, 1 << 14);
+	cudaStatus = cudaDeviceSetLimit(cudaLimitStackSize, 1 << 15);
 	if (cudaStatus != 0)
 		return -5;
 
