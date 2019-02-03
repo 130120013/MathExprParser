@@ -153,13 +153,11 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i < n)
 	{
-		if (i == 0)
-			g_pExpr = new cu::Mathexpr<double>(pStr, cbStr);
-		__syncthreads();
+		cu::Mathexpr<double> m(pStr, cbStr);
 		cuda_vector<double> v;
 		v.push_back(i);
-		g_pExpr->init_variables(v);
-		vec[i] = g_pExpr->compute().value();
+		m.init_variables(v);
+		vec[i] = m.compute().value();
 	}
 }
 
