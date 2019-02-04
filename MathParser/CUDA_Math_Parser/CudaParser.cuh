@@ -299,37 +299,6 @@ namespace cu {
 	};
 
 	template <class T>
-	class expr_param_init_block //move this to cuda_tokens
-	{
-		cuda_vector<cu::pair<cu::cuda_string*, T>> m_sorted_arguments;
-	public:
-		expr_param_init_block() = default;
-		expr_param_init_block(cuda_vector<cu::pair<cu::cuda_string*, T>>&& sorted_arg_frame):m_sorted_arguments(std::move(sorted_arg_frame)) {}
-		cu::return_wrapper_t<T> get_parameter(const char* pName, std::size_t cbName) const
-		{
-			auto pFrameBegin = &m_sorted_arguments[0];
-			auto cb = cbName;
-			while (cb != 0)
-			{
-				auto mid = cb / 2;
-				auto cbMin = pFrameBegin[mid].first->size();
-				if (cbName < cbMin)
-					cbMin = cbName;
-				auto cmp = cu::strncmpnz(pFrameBegin[mid].first->c_str(), pName, cbMin);
-				if (cmp == 0)
-					return cu::return_wrapper_t<T>(pFrameBegin[min].second);
-				if (cmp < 0)
-				{
-					pFrameBegin = &pFrameBegin[mid];
-					cb -= min;
-				}else
-					cb = min;
-			}
-			return cu::make_return_wrapper_error<T>(CudaParserErrorCodes::ParameterIsNotFound);
-		}
-	};
-
-	template <class T>
 	class expr_param_storage
 	{
 		cuda_list<cu::cuda_string> m_parameters;
