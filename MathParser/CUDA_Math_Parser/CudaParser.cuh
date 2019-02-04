@@ -482,27 +482,12 @@ namespace cu {
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
 		__device__ return_wrapper_t<T> compute(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 		{
-			//auto result = body;
-		//	simplify_body(result);
-		//	if (result.size() != 1)
-				//throw std::exception("Invalid expression");
-		//		return return_wrapper_t<T>(CudaParserErrorCodes::InvalidExpression);
-			//return (*body)();
+			return body->compute(header.construct_argument_block(arg_begin, arg_end));
 		}
 		template <class ArgSequenceContainer>
-		__device__ inline return_wrapper_t<expr_param_init_block<T>> compute(const ArgSequenceContainer& container) const
+		__device__ inline return_wrapper_t<T> compute(const ArgSequenceContainer& container) const
 		{
 			return this->compute(std::begin(container), std::end(container));
-		}
-		__device__ return_wrapper_t<void> init_variables(const cuda_vector<T>& parameters)
-		{
-			if (parameters.size() < header.get_required_parameter_count())
-				//throw std::invalid_argument("Count of arguments < " + header.get_required_parameter_count());
-				return return_wrapper_t<void>(CudaParserErrorCodes::InvalidNumberOfArguments);
-			for (std::size_t iArg = 0; iArg < header.get_required_parameter_count(); ++iArg)
-				*header.get_argument_by_index(iArg).get() = parameters[iArg]; //////////return value not ref
-
-			return return_wrapper_t<void>();
 		}
 
 	private:

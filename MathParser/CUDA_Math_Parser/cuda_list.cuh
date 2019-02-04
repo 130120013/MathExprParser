@@ -520,24 +520,24 @@ __device__ typename cuda_list<T>::iterator cuda_list<T>::end() {
 	return cuda_list<T>::iterator();
 }
 
-
-template <typename T>
-__device__ typename cuda_list<T>::const_iterator cuda_list<T>::rbegin() const {
-	return cuda_list<T>::const_iterator(this->m_tail);
-}
-template <typename T>
-__device__ typename cuda_list<T>::iterator cuda_list<T>::rbegin() {
-	return cuda_list<T>::iterator(this->m_tail);
-}
-template <typename T>
-__device__ typename cuda_list<T>::const_iterator cuda_list<T>::rend() const {
-	return cuda_list<T>::const_iterator();
-}
-
-template <typename T>
-__device__ typename cuda_list<T>::iterator cuda_list<T>::rend() {
-	return cuda_list<T>::iterator();
-}
+//
+//template <typename T>
+//__device__ typename cuda_list<T>::const_iterator cuda_list<T>::rbegin() const {
+//	return cuda_list<T>::const_iterator(this->m_tail);
+//}
+//template <typename T>
+//__device__ typename cuda_list<T>::iterator cuda_list<T>::rbegin() {
+//	return cuda_list<T>::iterator(this->m_tail);
+//}
+//template <typename T>
+//__device__ typename cuda_list<T>::const_iterator cuda_list<T>::rend() const {
+//	return cuda_list<T>::const_iterator();
+//}
+//
+//template <typename T>
+//__device__ typename cuda_list<T>::iterator cuda_list<T>::rend() {
+//	return cuda_list<T>::iterator();
+//}
 template <typename T>
 __device__ void cuda_list<T>::swap(cuda_list &that) {
 	std::swap(this->m_head, that.m_head);

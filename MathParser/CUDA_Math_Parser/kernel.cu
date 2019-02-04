@@ -19,8 +19,7 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 		cu::Mathexpr<double> m(pStr, cbStr);
 		cuda_vector<double> v;
 		v.push_back(i);
-		m.init_variables(v);
-		vec[i] = m.compute().value();
+		vec[i] = m.compute(v).value();
 	}
 }
 

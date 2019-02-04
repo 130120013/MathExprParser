@@ -57,7 +57,7 @@ __device__ auto impl_construct_return_wrapper(LeftReturnWrapper& left, RightRetu
 	else
 	{
 		left.value_ptr() = left.get_buf_ptr();
-		new (left.value_ptr()) value_type(right.value());
+		new (left.value_ptr()) value_type(std::forward<RightReturnWrapper>(right).value());
 	}
 	return left;
 }

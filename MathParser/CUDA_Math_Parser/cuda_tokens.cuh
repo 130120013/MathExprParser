@@ -2,6 +2,7 @@
 #include "cuda_return_wrapper.cuh"
 #include "cuda_memory.cuh"
 #include "cuda_vector.cuh"
+#include "cuda_pair.cuh"
 
 #ifndef CUDA_TOKENS_H
 #define CUDA_TOKENS_H
@@ -369,15 +370,15 @@ public:
 		auto rw1s = rw1.value()->simplify();
 		if (!rw1s)
 			return rw1s;
-		auto& op0 = *rw0s.value();
-		auto& op1 = *rw1s.value();
+		auto& op0 = rw0s.value();
+		auto& op1 = rw1s.value();
 
-		if (op0.type() == TokenType::number && op1.type() == TokenType::number)
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(op0).value() + static_cast<Number<T>&>(op1).value()));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(*op0).value() + static_cast<Number<T>&>(*op1).value()));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<cu::IToken<double>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<BinaryPlus<T>>();
 		if (!op_new)
@@ -443,7 +444,7 @@ public:
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(-static_cast<Number<T>&>(*rws.value())));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<cu::IToken<double>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<UnaryMinus<T>>();
 		if(!op_new)
@@ -528,15 +529,15 @@ public:
 		auto rw1s = rw1.value()->simplify();
 		if (!rw1s)
 			return rw1s;
-		auto& op0 = *rw0s.value();
-		auto& op1 = *rw1s.value();
+		auto& op0 = rw0s.value();
+		auto& op1 = rw1s.value();
 
-		if (op0.type() == TokenType::number && op1.type() == TokenType::number)
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(op1).value() - static_cast<Number<T>&>(op0).value()));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(*op1).value() - static_cast<Number<T>&>(*op0).value()));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;				
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));				
 		}
 		auto op_new = make_cuda_device_unique_ptr<BinaryMinus<T>>();
 		if (!op_new)
@@ -612,19 +613,19 @@ public:
 			return rw1;
 		auto rw0s = rw0.value()->simplify();
 		if (!rw0s)
-			return rW0s;
+			return rw0s;
 		auto rw1s = rw1.value()->simplify();
 		if (!rw1s)
 			return rw1s;
-		auto& op0 = *rw0s.value();
-		auto& op1 = *rw1s.value();
+		auto& op0 = rw0s.value();
+		auto& op1 = rw1s.value();
 
-		if (op0.type() == TokenType::number && op1.type() == TokenType::number)
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(op0).value() * static_cast<Number<T>&>(op1).value()));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(*op0).value() * static_cast<Number<T>&>(*op1).value()));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<OperatorMul<T>>();
 		if (!op_new)
@@ -700,15 +701,15 @@ public:
 		auto rw1s = rw1.value()->simplify();
 		if (!rw1s)
 			return rw1s;
-		auto& op0 = *rw0s.value();
-		auto& op1 = *rw1s.value();
+		auto& op0 = rw0s.value();
+		auto& op1 = rw1s.value();
 
-		if (op0.type() == TokenType::number && op1.type() == TokenType::number)
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(op1).value() / static_cast<Number<T>&>(op0).value()));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(*op1).value() / static_cast<Number<T>&>(*op0).value()));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;				
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));				
 		}
 		auto op_new = make_cuda_device_unique_ptr<OperatorDiv<T>>();
 		if (!op_new)
@@ -784,15 +785,15 @@ public:
 		auto rw1s = rw1.value()->simplify();
 		if (!rw1s)
 			return rw1s;
-		auto& op0 = *rw0s.value();
-		auto& op1 = *rw1s.value();
+		auto& op0 = rw0s.value();
+		auto& op1 = rw1s.value();
 
-		if (op0.type() == TokenType::number && op1.type() == TokenType::number)
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::pow(static_cast<Number<T>&>(*op1).value(), static_cast<Number<T>&>(*op0).value())));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<OperatorPow<T>>();
 		if (!op_new)
@@ -839,7 +840,7 @@ public:
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{
@@ -873,7 +874,7 @@ public:
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::sin(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<SinFunction<T>>();
 		if(!op_new)
@@ -906,7 +907,7 @@ public:
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{
@@ -940,7 +941,7 @@ public:
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::cos(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<CosFunction<T>>();
 		if(!op_new)
@@ -973,7 +974,7 @@ public:
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -1007,7 +1008,7 @@ public:
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::tan(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<TgFunction<T>>();
 		if(!op_new)
@@ -1041,7 +1042,7 @@ public:
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -1075,7 +1076,7 @@ public:
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::log10(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<Log10Function<T>>();
 		if(!op_new)
@@ -1110,7 +1111,7 @@ public:
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -1144,7 +1145,7 @@ public:
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::log(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<LnFunction<T>>();
 		if(!op_new)
@@ -1220,15 +1221,15 @@ public:
 		auto rw1s = rw1.value()->simplify();
 		if (!rw1s)
 			return rw1s;
-		auto& op0 = *rw0s.value();
-		auto& op1 = *rw1s.value();
+		auto& op0 = rw0s.value();
+		auto& op1 = rw1s.value();
 
-		if (op0.type() == TokenType::number && op1.type() == TokenType::number)
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::log(static_cast<Number<T>&>(*op1).value()) / std::log(static_cast<Number<T>&>(*op0).value())));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<LogFunction<T>>();
 		if (!op_new)
@@ -1269,7 +1270,7 @@ public:
 		if(!rw1c)
 			return rw1c;
 
-		return std::jn(int(rw0c.value()), rw1c.value());
+		return jn(int(rw0c.value()), rw1c.value());
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1307,15 +1308,15 @@ public:
 		auto rw1s = rw1.value()->simplify();
 		if (!rw1s)
 			return rw1s;
-		auto& op0 = *rw0s.value();
-		auto& op1 = *rw1s.value();
+		auto& op0 = rw0s.value();
+		auto& op1 = rw1s.value();
 
-		if (op0.type() == TokenType::number && op1.type() == TokenType::number)
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::jn(int(static_cast<Number<T>&>(*op0).value()), static_cast<Number<T>&>(*op1).value()))); //maybe need std::sph_bessel(unsigned n, double x) or std::cyl_bessel(double v, double x)
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(jn(int(static_cast<Number<T>&>(*op0).value()), static_cast<Number<T>&>(*op1).value()))); //maybe need std::sph_bessel(unsigned n, double x) or std::cyl_bessel(double v, double x)
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<JnFunction<T>>();
 		if (!op_new)
@@ -1347,11 +1348,11 @@ public:
 			return rw;
 		auto rwc = rw.value()->compute(args);
 
-		return std::j0(rwc.value());
+		return j0(rwc.value());
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -1382,10 +1383,10 @@ public:
 
 		if (rws.value()->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::j0(static_cast<Number<T>&>(*rws.value()))));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(j0(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<J0Function<T>>();
 		if(!op_new)
@@ -1414,11 +1415,11 @@ public:
 			return rw;
 		auto rwc = rw.value()->compute(args);
 
-		return std::j1(rwc.value());
+		return j1(rwc.value());
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -1449,10 +1450,10 @@ public:
 
 		if (rws.value()->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::j1(static_cast<Number<T>&>(*rws.value()))));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(j1(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<J1Function<T>>();
 		if(!op_new)
@@ -1490,7 +1491,7 @@ public:
 		if(!rw1c)
 			return rw1c;
 
-		return std::yn(int(rw0c.value()), rw1c.value()); 
+		return yn(int(rw0c.value()), rw1c.value()); 
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1528,15 +1529,15 @@ public:
 		auto rw1s = rw1.value()->simplify();
 		if (!rw1s)
 			return rw1s;
-		auto& op0 = *rw0s.value();
-		auto& op1 = *rw1s.value();
+		auto& op0 = rw0s.value();
+		auto& op1 = rw1s.value();
 
-		if (op0.type() == TokenType::number && op1.type() == TokenType::number)
+		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::yn(int(static_cast<Number<T>&>(*op0).value()), static_cast<Number<T>&>(*op1).value())));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(yn(int(static_cast<Number<T>&>(*op0).value()), static_cast<Number<T>&>(*op1).value())));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<YnFunction<T>>();
 		if (!op_new)
@@ -1557,8 +1558,7 @@ class Y0Function : public Function<T>
 public:
 	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
 	{
-		op = std::move(value);
-		return return_wrapper_t<void>();
+		return ops.push_argument(std::move(value));
 	}
 	__device__ virtual return_wrapper_t<T> compute(const expr_param_init_block<T>& args) const
 	{
@@ -1569,11 +1569,11 @@ public:
 			return rw;
 		auto rwc = rw.value()->compute(args);
 
-		return std::y0(rwc.value());
+		return y0(rwc.value());
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -1604,10 +1604,10 @@ public:
 
 		if (rws.value()->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::y0(static_cast<Number<T>&>(*rws.value()))));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(y0(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<Y0Function<T>>();
 		if(!op_new)
@@ -1636,11 +1636,11 @@ public:
 			return rw;
 		auto rwc = rw.value()->compute(args);
 
-		return std::y1(rwc.value());
+		return y1(rwc.value());
 	}
 	__device__ virtual bool is_ready() const
 	{
-		return op->is_ready();
+		return ops.is_ready();
 	}
 	__device__ virtual short getPriority()
 	{
@@ -1671,10 +1671,10 @@ public:
 
 		if (rws.value()->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(std::y1(static_cast<Number<T>&>(*rws.value()))));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(y1(static_cast<Number<T>&>(*rws.value()))));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return ptr;
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<Y1Function<T>>();
 		if(!op_new)
@@ -1692,6 +1692,8 @@ class ExtremumFunction : public Function<T>
 	cuda_vector<cuda_device_unique_ptr<IToken<T>>> ops;
 	std::size_t nRequiredParamsCount = 0;
 	TokenBinPredicate m_pred;
+
+	//ExtremumFunction(cuda_vector<cuda_device_unique_ptr<IToken<T>>>&& operands, const TokenBinPredicate& pred)
 public:
 	__device__ ExtremumFunction() = default;
 	__device__ ExtremumFunction(std::size_t paramsNumber) : nRequiredParamsCount(paramsNumber) {}
@@ -1707,24 +1709,24 @@ public:
 	__device__ virtual return_wrapper_t<T> compute(const expr_param_init_block<T>& args) const
 	{
 		if (!this->is_ready())
-			return return_wrapper_t<T>(CudaParserErrorCodes::NotReady);
-
-		cuda_vector<T> rwc; //checked computed values
-		for(auto it : ops)
+			return cu::make_return_wrapper_error(CudaParserErrorCodes::NotReady);
+		auto rwExtr = ops[0]->compute(args);
+		if (!rwExtr)
+			return rwExtr;
+		auto extrVal = rwExtr.value();
+		for (typename cuda_vector<cuda_device_unique_ptr<IToken<T>>>::size_type iElement = 1; iElement < ops.size(); ++iElement)
 		{
-			auto rw = it->compute(args);
-			if(!rw)
-				return rw;
-			auto rwp = rwc.push_back(rw.value());
-			if (!rwp)
-				return rwp;
+			auto rw_i = ops[iElement]->compute(args);
+			if (!rw_i)
+				return rw_i;
+			if (m_pred(rw_i.value(), extrVal))
+				extrVal = rw_i.value();
 		}
-
-		return *cu::min_element(rwc.begin(), rwc.end(), m_pred);
+		return extrVal;
 	}
 	__device__ virtual bool is_ready() const
 	{
-		if (ops.size() != nRequiredParamsCount)
+		if (ops.empty() || ops.size() != nRequiredParamsCount)
 			return false;
 		for (auto op = ops.begin(); op != ops.end(); ++op)
 		{
@@ -1741,26 +1743,27 @@ public:
 	{
 		return nRequiredParamsCount;
 	}
-	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
+	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const///////////////////////////////TODO:continue
 	{
+		cuda_vector<cuda_device_unique_ptr<IToken<T>>> new_ops;
 		if (!is_ready())
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
-		cuda_vector<cuda_device_unique_ptr<IToken<T>>> newargs;
-		newargs.reserve(ops.size());
-		cuda_vector<cuda_device_unique_ptr<IToken<T>>> newargsVar;
-		newargsVar.reserve(ops.size());
+		new_ops.reserve(ops.size());
 
 		for (const auto& op : ops)
 		{
 			auto newarg = op->simplify();
 			if (!newarg)
 				return newarg;
+			
 			auto& op = *newarg.value();
-			if (op.type() == TokenType::number)
+			
+
+
 			{
 				auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(*op));
 				if (!ptr)
-					return ptr;
+					return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
 				auto rwp = newargs.push_back(ptr);
 				if (!rwp)
 					return rwp;

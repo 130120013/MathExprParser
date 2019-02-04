@@ -92,7 +92,7 @@ public:
 			if (!rv)
 				return rv;
 		}
-		new m_buf[m_size++] std::forward<U>(value);
+		new (m_buf[m_size++]) T(std::forward<U>(value));
 		return cu::return_wrapper_t<void>();
 	}
 
@@ -111,7 +111,7 @@ public:
 			if (bool(buf))
 			{
 				for (std::size_t iElement = 0; iElement < this->size(); ++iElement)
-					new (buf[iElement]) std::move(m_buf[iElement]);
+					new (buf[iElement]) T(std::move(m_buf[iElement]));
 				this->m_capacity = new_cap;
 				m_buf = std::move(buf);
 			}
@@ -128,7 +128,7 @@ public:
 			if (bool(buf))
 			{
 				for (std::size_t iElement = 0; iElement < this->size(); ++iElement)
-					new (buf[iElement]) std::move(m_buf[iElement]);
+					new (buf[iElement]) T(std::move(m_buf[iElement]));
 				this->m_capacity = m_size;
 				m_buf = std::move(buf);
 			}
