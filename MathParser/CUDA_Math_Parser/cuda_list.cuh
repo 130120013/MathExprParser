@@ -350,11 +350,11 @@ public:
 	__device__ const_iterator end() const;
 	__device__ iterator end();
 
-	__device__ const_iterator rbegin() const;
-	__device__ iterator rbegin();
+	//__device__ const_iterator rbegin() const; //reverse_iterator!
+	//__device__ iterator rbegin();
 
-	__device__ const_iterator rend() const;
-	__device__ iterator rend();
+	//__device__ const_iterator rend() const;
+	//__device__ iterator rend();
 
 	__device__ size_t size() const;
 	__device__ bool empty() const;

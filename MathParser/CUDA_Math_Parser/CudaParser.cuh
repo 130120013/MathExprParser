@@ -249,7 +249,7 @@ namespace cu {
 				}
 			}
 			if (!isOpeningBracket)
-				return return_wrapper_t<void>(CudaParserErrorCodes::InsufficientNumberParams);
+				return return_wrapper_t<void>(CudaParserErrorCodes::InvalidNumberOfArguments);
 			else
 				operationStack.pop();
 			return return_wrapper_t<void>();
@@ -260,7 +260,7 @@ namespace cu {
 			while (operationStack.size() != 0)
 			{
 				if (operationStack.top().get()->type() == TokenType::bracket) //checking enclosing brackets
-					return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InsufficientNumberParams);
+					return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidNumberOfArguments);
 				else
 				{
 					outputList.push_back(std::move(operationStack.top()));
@@ -293,7 +293,7 @@ namespace cu {
 			}
 
 			if (!isOpeningBracket) //missing '('
-				return return_wrapper_t<void>(CudaParserErrorCodes::InsufficientNumberParams);
+				return return_wrapper_t<void>(CudaParserErrorCodes::InvalidNumberOfArguments);
 			return return_wrapper_t<void>();
 		}
 	};
@@ -301,26 +301,26 @@ namespace cu {
 	template <class T>
 	class expr_param_init_block //move this to cuda_tokens
 	{
-		cuda_vector<cu::pair<cu::cuda_string, T>> m_sorted_arguments;
+		cuda_vector<cu::pair<cu::cuda_string*, T>> m_sorted_arguments;
 	public:
 		expr_param_init_block() = default;
-		expr_param_init_block(cuda_vector<cu::pair<cu::cuda_string, T>>&& sorted_arg_frame):m_sorted_arguments(std::move(sorted_arg_frame)) {}
-		cu::return_wrapper_t<T> get_parameter(const char* pName, std::size_t cbName)
+		expr_param_init_block(cuda_vector<cu::pair<cu::cuda_string*, T>>&& sorted_arg_frame):m_sorted_arguments(std::move(sorted_arg_frame)) {}
+		cu::return_wrapper_t<T> get_parameter(const char* pName, std::size_t cbName) const
 		{
 			auto pFrameBegin = &m_sorted_arguments[0];
 			auto cb = cbName;
 			while (cb != 0)
 			{
 				auto mid = cb / 2;
-				auto cbMin = pFrameBegin[mid].first.size();
+				auto cbMin = pFrameBegin[mid].first->size();
 				if (cbName < cbMin)
 					cbMin = cbName;
-				auto cmp = cu::memcmp(pFrameBegin[mid].first.c_str(), pName, cbMin);
+				auto cmp = cu::memcmp(pFrameBegin[mid].first->c_str(), pName, cbMin);
 				if (cmp == 0)
 				{
 					if (cbMin < cbName)
 						cmp = -1;
-					else if (cbMin < pFrameBegin[mid].first.size())
+					else if (cbMin < pFrameBegin[mid].first->size())
 						cmp = 1;
 					else
 						return cu::return_wrapper_t<T>(pFrameBegin[min].second);
@@ -344,7 +344,7 @@ namespace cu {
 	public:
 		__device__ expr_param_storage() = default;
 		template <class ParameterNameType>
-		__device__ inline cu::return_wrapper_t<void> add_parameter(ParameterNameType&& strParameterName)
+		__device__ cu::return_wrapper_t<void> add_parameter(ParameterNameType&& strParameterName)
 		{
 			using cu::swap;
 			auto rv = m_parameters.push_back(std::forward<ParameterNameType>(strParameterName));
@@ -356,22 +356,52 @@ namespace cu {
 			{
 				auto repl = i / 2 - 1;
 				if (*m_sorted_params[repl] > *m_sorted_params[i])
-					return cu::return_wrapper_t();
+					return cu::return_wrapper_t<void>();
 				swap(m_sorted_params[repl], m_sorted_params[i]);
 				i = repl;
 			}
-			return cu::return_wrapper_t();
+			return cu::return_wrapper_t<void>();
 		}
-		__device__ inline cu::return_wrapper_t<void> finalize()
+		__device__ cu::return_wrapper_t<void> finalize()
 		{
+			using cu::swap;
+			if (m_sorted_params.empty())
+				return return_wrapper_t<void>();
+			auto heap_end = m_sorted_params.size() - 1;
+			while (heap_end > 0)
+			{
+				swap(m_sorted_params[0], m_sorted_params[--heap_end]);
+				for (cuda_vector<cuda_string*>::size_type iStart = 0, iSwap; iStart < heap_end / 2 - 1; iStart = iSwap)
+				{
+					iSwap = iStart * 2 + 1;
+					if (m_sorted_params[iSwap] < m_sorted_params[iSwap + 1])
+						++iSwap;
+					if (m_sorted_params[iStart] >= m_sorted_params[iSwap])
+						break;
+					swap(m_sorted_params[iStart], m_sorted_params[iSwap]);
+				}
+			}
+			return cu::return_wrapper_t<void>();
 		} 
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
-		expr_param_init_block<T> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const;
+		__device__ return_wrapper_t<expr_param_init_block<T>> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
+		{
+			cuda_vector<cu::pair<cu::cuda_string*, T>> v_init;
+			auto itParam = m_parameters.begin();
+			while (arg_begin != arg_end)
+			{
+				if (itParam == m_parameters.end())
+					return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidNumberOfArguments);
+				v_init.emplace_back(cu::make_pair(&*(itParam++), *(arg_begin++)));
+			}
+			return expr_param_init_block<T>(std::move(v_init));
+		}
 	};
 
 	template <class T>
 	class Header
 	{
+		expr_param_storage<T> m_strg;
 		cu::cuda_string function_name;
 		mutable return_wrapper_t<void> construction_success_code;
 	public:
@@ -537,7 +567,7 @@ namespace cu {
 		{
 			if (parameters.size() < header.get_required_parameter_count())
 				//throw std::invalid_argument("Count of arguments < " + header.get_required_parameter_count());
-				return return_wrapper_t<void>(CudaParserErrorCodes::InsufficientNumberParams);
+				return return_wrapper_t<void>(CudaParserErrorCodes::InvalidNumberOfArguments);
 			for (std::size_t iArg = 0; iArg < header.get_required_parameter_count(); ++iArg)
 				*header.get_argument_by_index(iArg).get() = parameters[iArg]; //////////return value not ref
 

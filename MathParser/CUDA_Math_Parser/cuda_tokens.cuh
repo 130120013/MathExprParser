@@ -471,7 +471,7 @@ public:
 //	{
 //		if (!ops[0]->is_ready() || !ops[1]->is_ready())
 //		//	throw std::exception("Insufficient number are given for the plus operator.");
-//			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
+//			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidNumberOfArguments);
 //
 //		return return_wrapper_t<T>(*(*ops[0])().get() - *(*ops[1])().get());
 //	}
@@ -515,7 +515,7 @@ public:
 	__device__ virtual return_wrapper_t<T> operator()() const
 	{
 		if (!ops.is_ready())
-			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
+			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidNumberOfArguments);
 
 		return return_wrapper_t<T>((*ops[0].value())().value() * (*ops[1].value())().value());
 	}
@@ -571,7 +571,7 @@ public:
 	__device__ virtual return_wrapper_t<T> operator()() const
 	{
 		if (!ops.is_ready())
-			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
+			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidNumberOfArguments);
 
 		return return_wrapper_t<T>((*ops[1].value())().value() / (*ops[0].value())().value());
 	}
@@ -624,7 +624,7 @@ public:
 	__device__ virtual return_wrapper_t<T> operator()() const
 	{
 		if (!ops.is_ready())
-			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
+			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidNumberOfArguments);
 
 		return return_wrapper_t<T>(std::pow((*ops[1].value())().value(), (*ops[0].value())().value()));
 	}
@@ -684,7 +684,7 @@ public:
 	__device__ virtual return_wrapper_t<T> operator()() const/*Implementation of IToken<T>::operator()()*/
 	{
 		if (!op->is_ready())
-			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
+			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidNumberOfArguments);
 
 		return return_wrapper_t<T>(std::sin(*((op.get())->operator()()).get()));
 	}
@@ -734,7 +734,7 @@ public:
 	__device__ virtual return_wrapper_t<T> operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
 		if (!op->is_ready())
-			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
+			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidNumberOfArguments);
 
 		return return_wrapper_t<T>(std::cos(*((op.get())->operator()()).get()));
 		//std::cos((*op)());
@@ -785,7 +785,7 @@ public:
 	__device__ virtual return_wrapper_t<T> operator()() const /*Implementation of IToken<T>::operator()()*/
 	{
 		if (!op->is_ready())
-			return return_wrapper_t<T>(CudaParserErrorCodes::InsufficientNumberParams);
+			return return_wrapper_t<T>(CudaParserErrorCodes::InvalidNumberOfArguments);
 
 		return  return_wrapper_t<T>(std::tan(*((op.get())->operator()()).get()));
 	}

@@ -11,7 +11,7 @@ enum class CudaParserErrorCodes
 	NotReady,
 	NotEnoughMemory,
 	UnexpectedCall,
-	InsufficientNumberParams,
+	InvalidNumberOfArguments,
 	UnexpectedToken,
 	ParameterIsNotUnique,
 	InvalidArgument,
