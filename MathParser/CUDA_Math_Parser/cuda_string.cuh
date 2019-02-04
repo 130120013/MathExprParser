@@ -82,7 +82,7 @@ __device__ int strcmp(const char* str1, const char* str2)
 		if (str1[i] == 0)
 			return 0;
 	}
-	return ((unsigned char)str1[i] > (unsigned char)str2[i]) ? 1 : -1;
+	return ((unsigned char) str1[i] > (unsigned char) str2[i]) ? 1 : -1;
 	//return ((unsigned char)str1[i] - (unsigned char)str2[i]);
 }
 
@@ -97,6 +97,15 @@ __device__ int memcmp(const void* str1, const void* str2, std::size_t size)
 			return (s1[i] > s2[i]) ? 1 : -1;
 	}
 	return 0;
+}
+
+__device__ int strncmpnz(const char* pStr1, std::size_t cbStr1, const char* pStr2, std::size_t cbStr2)
+{
+	auto cbMin = cbStr1 < cbStr2?cbStr1:cbStr2;
+	auto cmp = memcmp(pStr1, pStr2, cbMin);
+	if (cmp != 0)
+		return cmp;
+	return cbStr1 == cbStr2?0:(cbStr1 < cbStr2?-1:1);
 }
 
 __host__ __device__ constexpr bool isdigit(const char ch) noexcept

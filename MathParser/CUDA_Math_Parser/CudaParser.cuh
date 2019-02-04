@@ -315,16 +315,9 @@ namespace cu {
 				auto cbMin = pFrameBegin[mid].first->size();
 				if (cbName < cbMin)
 					cbMin = cbName;
-				auto cmp = cu::memcmp(pFrameBegin[mid].first->c_str(), pName, cbMin);
+				auto cmp = cu::strncmpnz(pFrameBegin[mid].first->c_str(), pName, cbMin);
 				if (cmp == 0)
-				{
-					if (cbMin < cbName)
-						cmp = -1;
-					else if (cbMin < pFrameBegin[mid].first->size())
-						cmp = 1;
-					else
-						return cu::return_wrapper_t<T>(pFrameBegin[min].second);
-				}
+					return cu::return_wrapper_t<T>(pFrameBegin[min].second);
 				if (cmp < 0)
 				{
 					pFrameBegin = &pFrameBegin[mid];
@@ -374,15 +367,25 @@ namespace cu {
 				for (cuda_vector<cuda_string*>::size_type iStart = 0, iSwap; iStart < heap_end / 2 - 1; iStart = iSwap)
 				{
 					iSwap = iStart * 2 + 1;
-					if (m_sorted_params[iSwap] < m_sorted_params[iSwap + 1])
+					auto cmp = cu::strncmpnz(m_sorted_params[iSwap]->data(), m_sorted_params[iSwap]->size(), m_sorted_params[iSwap + 1]->data(), m_sorted_params[iSwap + 1]->size());
+					if (!cmp)
+						return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::ParameterIsNotUnique);
+					if (cmp < 0)
 						++iSwap;
-					if (m_sorted_params[iStart] >= m_sorted_params[iSwap])
+					cmp = cu::strncmpnz(m_sorted_params[iStart]->data(), m_sorted_params[iStart]->size(), m_sorted_params[iSwap]->data(), m_sorted_params[iSwap]->size());
+					if (!cmp)
+						return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::ParameterIsNotUnique);
+					if (cmp > 0)
 						break;
 					swap(m_sorted_params[iStart], m_sorted_params[iSwap]);
 				}
 			}
 			return cu::return_wrapper_t<void>();
-		} 
+		}
+		inline std::size_t size()const
+		{
+			return m_parameters.size();
+		}
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
 		__device__ return_wrapper_t<expr_param_init_block<T>> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 		{
@@ -411,7 +414,7 @@ namespace cu {
 			auto endPtr = expression + expression_len;
 			char* begPtr = (char*)(expression);
 			cuda_list<cu::cuda_string> params;
-			construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::Success);
+			construction_success_code = return_wrapper_t<void>();
 
 			bool isOpeningBracket = false;
 			bool isClosingBracket = false;
@@ -428,14 +431,13 @@ namespace cu {
 					else
 					{
 						if (!isOpeningBracket)
+						{
 							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
-						auto param_name = cu::cuda_string(begPtr, l_endptr);
-						auto val = cu::make_pair<cu::cuda_string, T>(std::move(param_name), std::move(T()));
-						auto res = m_arguments.insert(std::move(val));
-
-						if (!res.second)
-							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
-						params.push_back(std::move(cu::cuda_string(begPtr, l_endptr)));
+							return;
+						}
+						construction_success_code = m_strg.add_parameter(cu::cuda_string(begPtr, l_endptr));
+						if (!construction_success_code)
+							return;
 					}
 					begPtr = l_endptr;
 				}
@@ -449,7 +451,7 @@ namespace cu {
 				if (*begPtr == '(')
 				{
 					if (isOpeningBracket)
-						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
+						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::InvalidExpression);
 					isOpeningBracket = true;
 					begPtr += 1;
 				}
@@ -462,17 +464,12 @@ namespace cu {
 
 				if (*begPtr == ')')
 				{
-					if (!isOpeningBracket)
-						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
-					if (isClosingBracket)
-						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotUnique);
+					if (!isOpeningBracket || isClosingBracket)
+						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::InvalidExpression);
 					isClosingBracket = true;
 					begPtr += 1;
 				}
 			}
-			m_parameters.reserve(params.size());
-			for (auto& param : params)
-				m_parameters.push_back(std::move(param));
 			*ppEndPtr = begPtr;
 		}
 		Header(const Header<T>&) = delete;
@@ -487,63 +484,22 @@ namespace cu {
 			this->m_parameters = val.m_parameters;
 			construction_success_code = val.construction_success_code;
 		}*/
-
-		__device__ virtual bool is_ready() const
+		__device__ inline std::size_t get_required_parameter_count() const
 		{
-			return true;
+			return m_strg.size();
 		}
-		__device__ return_wrapper_t<void> push_argument(const char* name, std::size_t parameter_name_size, const T& value)
-		{
-			auto it = m_arguments.find(cuda_string(name, name + parameter_name_size));
-			if (it == m_arguments.end())
-			{
-				construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotFound);
-				return construction_success_code;
-			}
-			it->second = value;
-			return construction_success_code;
-		}
-		__device__ return_wrapper_t<const T&> get_argument(const char* parameter_name, std::size_t parameter_name_size) const //call this from Variable::operator()().
-		{
-			auto it = m_arguments.find(cuda_string(parameter_name, parameter_name + parameter_name_size));
-			if (it == m_arguments.end())
-			{
-				this->construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::ParameterIsNotFound);
-				return return_wrapper_t<const T&>(CudaParserErrorCodes::ParameterIsNotFound);
-			}
-			return return_wrapper_t<const T&>(it->second, CudaParserErrorCodes::Success);
-		}
-		__device__ auto get_argument(const char* parameter_name, std::size_t parameter_name_size) //call this from Variable::operator()().
-		{
-			auto carg = const_cast<const Header<T>*>(this)->get_argument(parameter_name, parameter_name_size);
-			if (carg.return_code() != CudaParserErrorCodes::Success)
-				return return_wrapper_t<T&>(carg.return_code());
-			return return_wrapper_t<T&>(const_cast<T&>(carg.value()), carg.return_code());
-		}
-		__device__ return_wrapper_t<T&> get_argument_by_index(std::size_t index)  //call this from Variable::operator()().
-		{
-			return this->get_argument(m_parameters[index].c_str(), m_parameters[index].size());
-		}
-		__device__ std::size_t get_required_parameter_count() const
-		{
-			return m_parameters.size();
-		}
-		__device__ const char* get_function_name() const
+		__device__ inline const char* get_function_name() const
 		{
 			return function_name.c_str();
 		}
-		__device__ size_t get_name_length() const
+		__device__ inline size_t get_name_length() const
 		{
 			return function_name.size();
 		}
-		__device__ return_wrapper_t<std::size_t> get_param_index(const cuda_string& param_name)
+		template <class ArgIteratorBegin, class ArgIteratorEnd>
+		__device__ inline return_wrapper_t<expr_param_init_block<T>> construct_argument_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 		{
-			for (std::size_t i = 0; i < this->m_parameters.size(); ++i)
-			{
-				if (this->m_parameters[i] == param_name)
-					return return_wrapper_t<std::size_t>(i);
-			}
-			return return_wrapper_t<std::size_t>(CudaParserErrorCodes::ParameterIsNotFound);
+			return m_strg.construct_init_block(arg_begin, arg_end);
 		}
 	};
 
@@ -554,14 +510,20 @@ namespace cu {
 		__device__ Mathexpr(const char* sMathExpr, std::size_t cbMathExpr);
 		__device__ Mathexpr(const char* szMathExpr) :Mathexpr(szMathExpr, std::strlen(szMathExpr)) {}
 		__device__ Mathexpr(const cuda_string& strMathExpr) : Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
-		__device__ return_wrapper_t<T> compute() const
+		template <class ArgIteratorBegin, class ArgIteratorEnd>
+		__device__ return_wrapper_t<T> compute(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 		{
 			//auto result = body;
 		//	simplify_body(result);
 		//	if (result.size() != 1)
 				//throw std::exception("Invalid expression");
 		//		return return_wrapper_t<T>(CudaParserErrorCodes::InvalidExpression);
-			return (*body)();
+			//return (*body)();
+		}
+		template <class ArgSequenceContainer>
+		__device__ inline return_wrapper_t<expr_param_init_block<T>> compute(const ArgSequenceContainer& container) const
+		{
+			return this->compute(std::begin(container), std::end(container));
 		}
 		__device__ return_wrapper_t<void> init_variables(const cuda_vector<T>& parameters)
 		{
