@@ -14,20 +14,25 @@ __device__ cu::Mathexpr<double>* g_pExpr;
 __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::size_t cbStr)
 {
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
+	if (i == 0)
+		g_pExpr = new cu::Mathexpr<double>(pStr, cbStr);
+	__syncthreads();
 	if (i < n)
 	{
-		cu::Mathexpr<double> m(pStr, cbStr);
-		cuda_vector<double> v;
-		v.push_back(i);
-		vec[i] = m.compute(v).value();
+		auto& m = *g_pExpr;
+		vec[i] = m(i).value();
 	}
+	__syncthreads();
+	if (!i)
+		delete g_pExpr;
 }
 
 int main()
 {
 	cudaError_t cudaStatus;
-	const char pStr[] = "f(x) = yn(1, 2) + sin(3.14 / (x + 1))";
-	double V[100];
+	//const char pStr[] = "f(x) = sin(x)^2 + cos(x)^2";
+	const char pStr[] = "f(x) = x";
+	double V[1000];
 	std::size_t cbStack;
 
 	cudaStatus = cudaDeviceGetLimit(&cbStack, cudaLimitStackSize);

@@ -351,14 +351,14 @@ namespace cu {
 			}
 			return cu::return_wrapper_t<void>();
 		}
-		inline std::size_t size()const
+		__device__ inline std::size_t size() const
 		{
 			return m_parameters.size();
 		}
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
 		__device__ return_wrapper_t<expr_param_init_block<T>> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 		{
-			cuda_vector<cu::pair<cu::cuda_string*, T>> v_init;
+			cuda_vector<cu::pair<const cu::cuda_string*, T>> v_init;
 			auto itParam = m_parameters.begin();
 			while (arg_begin != arg_end)
 			{
@@ -480,16 +480,37 @@ namespace cu {
 		__device__ Mathexpr(const char* szMathExpr) :Mathexpr(szMathExpr, std::strlen(szMathExpr)) {}
 		__device__ Mathexpr(const cuda_string& strMathExpr) : Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
-		__device__ return_wrapper_t<T> compute(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
+		__device__ auto operator()(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
+			-> std::enable_if_t<
+				std::is_convertible<
+					std::common_type_t<
+						typename std::iterator_traits<ArgIteratorBegin>::value_type,
+						typename std::iterator_traits<ArgIteratorEnd>::value_type
+					>,
+					T
+				>::value,
+			return_wrapper_t<T>>
 		{
-			return body->compute(header.construct_argument_block(arg_begin, arg_end));
+			auto rw_init_blck = header.construct_argument_block(arg_begin, arg_end);
+			if (!rw_init_blck)
+				return rw_init_blck;
+			return body->compute(rw_init_blck.value());
 		}
 		template <class ArgSequenceContainer>
-		__device__ inline return_wrapper_t<T> compute(const ArgSequenceContainer& container) const
+		__device__ inline auto operator()(const ArgSequenceContainer& container) const 
+			-> decltype((*this)(cu::begin(std::declval<ArgSequenceContainer&>()), cu::end(std::declval<ArgSequenceContainer&>())))
 		{
-			return this->compute(std::begin(container), std::end(container));
+			return (*this)(cu::begin(container), cu::end(container));
 		}
-
+		__device__ inline return_wrapper_t<T> operator()(std::initializer_list<T> list) const
+		{
+			return (*this)(cu::begin(list), cu::end(list));
+		}
+		template <class ... Args>
+		__device__ inline auto operator()(Args&& ... args) const -> decltype((*this)({T(std::declval<Args&&>()) ...}))
+		{
+			return (*this)({T(std::forward<Args>(args)) ...});
+		}
 	private:
 		Header<T> header;
 		cuda_device_unique_ptr<IToken<T>> body;
@@ -616,7 +637,7 @@ namespace cu {
 						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
 					}
 					else //if (this->header.get_param_index(cuda_string(tkn.begin(), tkn.end())).value() >= 0)
-						last_type_id = int(tokens.push_token(Variable<T>(this->header, cuda_string(tkn.begin(), tkn.end()).c_str(), tkn.end() - tkn.begin()))->type());
+						last_type_id = int(tokens.push_token(Variable<T>(&*tkn.begin(), tkn.size()))->type());
 				}
 				else if (tkn == ")")
 				{

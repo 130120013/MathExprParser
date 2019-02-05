@@ -76,6 +76,31 @@ __device__ inline void swap(T& l, T& r)
 	r = std::move(buf);
 }
 
+template <class SequenceContainer>
+__device__ constexpr auto begin(SequenceContainer& sequence_container) -> decltype(std::declval<SequenceContainer>().begin())
+{
+	return sequence_container.begin();
+}
+
+template <class SequenceContainer>
+__device__ constexpr auto end(SequenceContainer& sequence_container) -> decltype(std::declval<SequenceContainer>().end())
+{
+	return sequence_container.end();
+}
+
+template <class T, std::size_t N>
+__device__ constexpr T* begin(T (&array)[N])
+{
+	return &array[0];
+}
+
+template <class T, std::size_t N>
+__device__ constexpr T* end(T (&array)[N])
+{
+	return &array[N];
+}
+
+
 CU_END
 
 template <class elemType>
@@ -496,9 +521,11 @@ struct cuda_device_unique_ptr_malloc
 	typedef T element_type;
 
 	__device__ cuda_device_unique_ptr_malloc() = default;
-	__device__ cuda_device_unique_ptr_malloc(cuda_device_unique_ptr_malloc&&):m_ptr(right.release()) {}
+	cuda_device_unique_ptr_malloc(const cuda_device_unique_ptr_malloc&) = delete;
+	cuda_device_unique_ptr_malloc& operator=(const cuda_device_unique_ptr_malloc&) = delete;
+	__device__ cuda_device_unique_ptr_malloc(cuda_device_unique_ptr_malloc&& right):m_ptr(reinterpret_cast<char*>(right.release())) {}
 	template <class U, class = typename std::enable_if<std::is_convertible<U*, pointer>::value>::type>
-	__device__ cuda_device_unique_ptr_malloc(cuda_device_unique_ptr_malloc<U>&& right):m_ptr(right.release()) {}
+	__device__ cuda_device_unique_ptr_malloc(cuda_device_unique_ptr_malloc<U>&& right):m_ptr(reinterpret_cast<char*>(right.release())) {}
 	__device__ inline cuda_device_unique_ptr_malloc& operator=(cuda_device_unique_ptr_malloc&& right)
 	{
 		this->reset(right.release());
