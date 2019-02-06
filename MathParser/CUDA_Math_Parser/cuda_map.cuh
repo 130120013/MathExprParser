@@ -4,13 +4,13 @@
 
 #include "cuda_config.cuh"
 
-#ifndef CUDAMAP_CUH
-#define CUDAMAP_CUH
+#ifndef CUDA_MAP_CUH
+#define CUDA_MAP_CUH
 
 CU_BEGIN
 
 	template <class Key, class Tp>
-	class cuda_map_value_compare
+	class map_value_compare
 	{
 		template <class PairKey, class PairValue>
 		using pair = cu::pair<PairKey, PairValue>;
@@ -44,7 +44,7 @@ CU_BEGIN
 	};
 
 	template <class _Allocator>
-	class cuda_map_node_destructor
+	class map_node_destructor
 	{
 		typedef _Allocator                          allocator_type;
 		typedef std::allocator_traits<allocator_type>    __alloc_traits;
@@ -57,13 +57,13 @@ CU_BEGIN
 
 		allocator_type& __na_;
 
-		__device__ cuda_map_node_destructor& operator=(const cuda_map_node_destructor&) = default;
+		__device__ map_node_destructor& operator=(const map_node_destructor&) = default;
 
 	public:
 		bool __first_constructed;
 		bool __second_constructed;
 
-		explicit __device__ cuda_map_node_destructor(allocator_type& __na)
+		explicit __device__ map_node_destructor(allocator_type& __na)
 			: __na_(__na),
 			__first_constructed(false),
 			__second_constructed(false)
@@ -80,10 +80,10 @@ CU_BEGIN
 		}
 	};
 
-	template <class _TreeIterator> class cuda_map_const_iterator;
+	template <class _TreeIterator> class map_const_iterator;
 
 	template <class _TreeIterator>
-	class cuda_map_iterator
+	class map_iterator
 	{
 		_TreeIterator m_itTree;
 
@@ -97,45 +97,45 @@ CU_BEGIN
 		typedef typename std::pointer_traits<typename _TreeIterator::pointer>::template
 			rebind<value_type>                      pointer;
 
-		__device__ cuda_map_iterator() {}
+		__device__ map_iterator() {}
 
-		__device__ cuda_map_iterator(_TreeIterator itTree) : m_itTree(itTree) {}
+		__device__ map_iterator(_TreeIterator itTree) : m_itTree(itTree) {}
 
 		__device__ reference operator*() const { return *operator->(); }
 		__device__ pointer operator->() const { return (pointer)m_itTree.operator->(); }
 
-		__device__ cuda_map_iterator& operator++() { ++m_itTree; return *this; }
-		__device__ cuda_map_iterator operator++(int)
+		__device__ map_iterator& operator++() { ++m_itTree; return *this; }
+		__device__ map_iterator operator++(int)
 		{
 			auto old = *this;
 			++(*this);
 			return old;
 		}
 
-		__device__ cuda_map_iterator& operator--() { --m_itTree; return *this; }
-		__device__ cuda_map_iterator operator--(int)
+		__device__ map_iterator& operator--() { --m_itTree; return *this; }
+		__device__ map_iterator operator--(int)
 		{
 			auto old = *this;
 			--(*this);
 			return old;
 		}
 
-		friend __device__ bool operator==(const cuda_map_iterator& left, const cuda_map_iterator& right)
+		friend __device__ bool operator==(const map_iterator& left, const map_iterator& right)
 		{
 			return left.m_itTree == right.m_itTree;
 		}
 		friend
-			__device__ bool operator!=(const cuda_map_iterator& left, const cuda_map_iterator& right)
+			__device__ bool operator!=(const map_iterator& left, const map_iterator& right)
 		{
 			return left.m_itTree != right.m_itTree;
 		}
 
-		template <class, class, class> friend class cuda_map;
-		template <class> friend class cuda_map_const_iterator;
+		template <class, class, class> friend class map;
+		template <class> friend class map_const_iterator;
 	};
 
 	template <class _TreeIterator>
-	class cuda_map_const_iterator
+	class map_const_iterator
 	{
 		_TreeIterator m_itTree;
 
@@ -150,64 +150,64 @@ CU_BEGIN
 		typedef typename pointer_traits::template
 			rebind<const value_type>                      pointer;
 
-		__device__ cuda_map_const_iterator() {}
+		__device__ map_const_iterator() {}
 
-		__device__ cuda_map_const_iterator(_TreeIterator itTree) : m_itTree(itTree) {}
-		__device__ cuda_map_const_iterator(
-			cuda_map_iterator<typename _TreeIterator::non_const_iterator> itTree)
+		__device__ map_const_iterator(_TreeIterator itTree) : m_itTree(itTree) {}
+		__device__ map_const_iterator(
+			map_iterator<typename _TreeIterator::non_const_iterator> itTree)
 
 			: m_itTree(itTree.m_itTree) {}
 
 		__device__ reference operator*() const { return *operator->(); }
 		__device__ pointer operator->() const { return (pointer)m_itTree.operator->(); }
 
-		__device__ cuda_map_const_iterator& operator++() { ++m_itTree; return *this; }
-		__device__ cuda_map_const_iterator operator++(int)
+		__device__ map_const_iterator& operator++() { ++m_itTree; return *this; }
+		__device__ map_const_iterator operator++(int)
 		{
 			auto old = *this;
 			++(*this);
 			return old;
 		}
 
-		__device__ cuda_map_const_iterator& operator--() { --m_itTree; return *this; }
-		__device__ cuda_map_const_iterator operator--(int)
+		__device__ map_const_iterator& operator--() { --m_itTree; return *this; }
+		__device__ map_const_iterator operator--(int)
 		{
 			auto old = *this;
 			--(*this);
 			return old;
 		}
 
-		friend __device__ bool operator==(const cuda_map_const_iterator& left, const cuda_map_const_iterator& right)
+		friend __device__ bool operator==(const map_const_iterator& left, const map_const_iterator& right)
 		{
 			return left.m_itTree == right.m_itTree;
 		}
 		friend
-			__device__ bool operator!=(const cuda_map_const_iterator& left, const cuda_map_const_iterator& right)
+			__device__ bool operator!=(const map_const_iterator& left, const map_const_iterator& right)
 		{
 			return left.m_itTree != right.m_itTree;
 		}
 
-		template <class, class, class> friend class cuda_map;
+		template <class, class, class> friend class map;
 		template <class, class, class> friend class tree_const_iterator;
 	};
 
 
 	template <class Key, class T, class Compare>
-	class cuda_map
+	class map
 	{
 	public:
 		// types:
 		typedef Key key_type;
 		typedef T mapped_type;
 		typedef cu::pair<key_type, mapped_type> value_type;
-		typedef cuda_map_value_compare<key_type, mapped_type> value_compare;
+		typedef map_value_compare<key_type, mapped_type> value_compare;
 		typedef typename value_compare::key_compare key_compare;
 		typedef value_type& reference;
 		typedef const value_type& const_reference;
 
 	private:
 		typedef cu::pair<key_type, mapped_type> my_value_type;
-		typedef cuda_map_value_compare<key_type, mapped_type> my_value_compare;
+		typedef map_value_compare<key_type, mapped_type> my_value_compare;
 		typedef cuda_red_black_tree<my_value_type, my_value_compare>   my_base;
 		//typedef typename my_base::__node_traits                 __node_traits;
 
@@ -216,30 +216,30 @@ CU_BEGIN
 		typedef typename my_base::const_pointer      const_pointer;
 		typedef typename my_base::size_type          size_type;
 		typedef typename my_base::difference_type    difference_type;
-		typedef cuda_map_iterator<typename my_base::iterator>   iterator;
-		typedef cuda_map_const_iterator<typename my_base::const_iterator> const_iterator;
-		typedef cuda_reverse_iterator<iterator>                  reverse_iterator;
-		typedef cuda_reverse_iterator<const_iterator>            const_reverse_iterator;
+		typedef map_iterator<typename my_base::iterator>   iterator;
+		typedef map_const_iterator<typename my_base::const_iterator> const_iterator;
+		typedef cu::reverse_iterator<iterator>                  reverse_iterator;
+		typedef cu::reverse_iterator<const_iterator>            const_reverse_iterator;
 
 	public:
-		__device__ cuda_map() = default;
-		explicit __device__ cuda_map(const key_compare&) : tree(my_value_compare()) {}
+		__device__ map() = default;
+		explicit __device__ map(const key_compare&) : tree(my_value_compare()) {}
 
 		template <class _InputIterator>
-		__device__ cuda_map(_InputIterator itBegin, _InputIterator itEnd,
+		__device__ map(_InputIterator itBegin, _InputIterator itEnd,
 			const key_compare& comp = key_compare())
 			: tree(my_value_compare(comp))
 		{
 			insert(itBegin, itEnd);
 		}
 
-		__device__ cuda_map(const cuda_map& m)
+		__device__ map(const map& m)
 			: tree(m.tree)
 		{
 			insert(m.begin(), m.end());
 		}
 
-		__device__ cuda_map& operator=(const cuda_map& m)
+		__device__ map& operator=(const map& m)
 		{
 			tree = m.tree;
 			return *this;
@@ -314,7 +314,7 @@ CU_BEGIN
 		}
 		__device__ void clear() { tree.clear(); }
 
-		__device__ void swap(cuda_map& m)
+		__device__ void swap(map& m)
 		{
 			tree.swap(m.tree);
 		}
@@ -366,7 +366,7 @@ CU_BEGIN
 		typedef typename my_base::node_pointer node_pointer;
 		typedef typename my_base::node_const_pointer node_const_pointer;
 
-		//typedef cuda_map_node_destructor<__node_allocator> _Dp;
+		//typedef map_node_destructor<__node_allocator> _Dp;
 		typedef cuda_device_unique_ptr<node> node_holder;
 
 	private:
@@ -383,7 +383,7 @@ CU_BEGIN
 
 	template <class _Key, class _Tp, class _Compare>
 	template <class ... Tk>
-	__device__ cu::pair<typename cuda_map<_Key, _Tp, _Compare>::iterator, bool> cuda_map<_Key, _Tp, _Compare>::emplace(Tk&&... keys)
+	__device__ cu::pair<typename map<_Key, _Tp, _Compare>::iterator, bool> map<_Key, _Tp, _Compare>::emplace(Tk&&... keys)
 	{
 		node_holder h = construct_node(std::forward<Tk>(keys)...);
 		node_pointer parent;
@@ -398,7 +398,7 @@ CU_BEGIN
 	}
 
 	template <class _Key, class _Tp, class _Compare>
-	__device__ typename cuda_map<_Key, _Tp, _Compare>::mapped_type& cuda_map<_Key, _Tp, _Compare>::at(const key_type& key)
+	__device__ typename map<_Key, _Tp, _Compare>::mapped_type& map<_Key, _Tp, _Compare>::at(const key_type& key)
 	{
 		node_pointer p;
 		auto res = find_equal_key(p, key);
@@ -408,7 +408,7 @@ CU_BEGIN
 	}
 
 	template <class _Key, class _Tp, class _Compare>
-	__device__ const typename cuda_map<_Key, _Tp, _Compare>::mapped_type& cuda_map<_Key, _Tp, _Compare>::at(const key_type& key) const
+	__device__ const typename map<_Key, _Tp, _Compare>::mapped_type& map<_Key, _Tp, _Compare>::at(const key_type& key) const
 	{
 		node_const_pointer p;
 		auto res = find_equal_key(p, key);
@@ -422,8 +422,8 @@ CU_BEGIN
 	// Return reference to null leaf
 	// If key exists, set parent to node of key and return reference to node of key
 	template <class _Key, class _Tp, class _Compare>
-	__device__ typename cuda_map<_Key, _Tp, _Compare>::node_pointer&
-		cuda_map<_Key, _Tp, _Compare>::find_equal_key(node_pointer& parent,
+	__device__ typename map<_Key, _Tp, _Compare>::node_pointer&
+		map<_Key, _Tp, _Compare>::find_equal_key(node_pointer& parent,
 			const key_type& key)
 	{
 		node_pointer nd = tree.root();
@@ -470,8 +470,8 @@ CU_BEGIN
 	// Return reference to null leaf
 	// If key exists, set parent to node of key and return reference to node of key
 	template <class _Key, class _Tp, class _Compare>
-	__device__ typename cuda_map<_Key, _Tp, _Compare>::node_pointer&
-		cuda_map<_Key, _Tp, _Compare>::find_equal_key(const_iterator hint,
+	__device__ typename map<_Key, _Tp, _Compare>::node_pointer&
+		map<_Key, _Tp, _Compare>::find_equal_key(const_iterator hint,
 			node_pointer& parent,
 			const key_type& key)
 	{
@@ -527,8 +527,8 @@ CU_BEGIN
 	//    return reference to null leaf iv key does not exist.
 	// If key exists, set parent to node of key and return reference to node of key
 	template <class _Key, class _Tp, class _Compare>
-	__device__ typename cuda_map<_Key, _Tp, _Compare>::node_const_pointer
-		cuda_map<_Key, _Tp, _Compare>::find_equal_key(node_const_pointer& parent,
+	__device__ typename map<_Key, _Tp, _Compare>::node_const_pointer
+		map<_Key, _Tp, _Compare>::find_equal_key(node_const_pointer& parent,
 			const key_type& key) const
 	{
 		node_const_pointer nd = tree.root();
@@ -568,22 +568,22 @@ CU_BEGIN
 	}
 
 	template <class _Key, class _Tp, class _Compare>
-	__device__ typename cuda_map<_Key, _Tp, _Compare>::node_holder
-		cuda_map<_Key, _Tp, _Compare>::construct_node(const key_type& key)
+	__device__ typename map<_Key, _Tp, _Compare>::node_holder
+		map<_Key, _Tp, _Compare>::construct_node(const key_type& key)
 	{
 		return node_holder(new node(cu::make_pair(key, mapped_type())));
 	}
 
 	template <class _Key, class _Tp, class _Compare>
 	template <class ... Tk, class>
-	__device__ typename cuda_map<_Key, _Tp, _Compare>::node_holder
-		cuda_map<_Key, _Tp, _Compare>::construct_node(Tk&& ... key)
+	__device__ typename map<_Key, _Tp, _Compare>::node_holder
+		map<_Key, _Tp, _Compare>::construct_node(Tk&& ... key)
 	{
 		return node_holder(new node(std::forward<Tk>(key)...));
 	}
 
 	template <class _Key, class _Tp, class _Compare>
-	__device__ _Tp& cuda_map<_Key, _Tp, _Compare>::operator[](const key_type& key)
+	__device__ _Tp& map<_Key, _Tp, _Compare>::operator[](const key_type& key)
 	{
 		node_pointer parent;
 		node_pointer& child = find_equal_key(parent, key);
@@ -599,4 +599,4 @@ CU_BEGIN
 
 CU_END
 
-#endif //CUDAMAP_CUH
+#endif //CUDA_MAP_CUH

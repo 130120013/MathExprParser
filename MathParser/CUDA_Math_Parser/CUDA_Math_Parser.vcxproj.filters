@@ -21,9 +21,6 @@
     <ClInclude Include="cuda_iterator.cuh">
       <Filter>Header</Filter>
     </ClInclude>
-    <ClInclude Include="cuda_map.cuh">
-      <Filter>Header</Filter>
-    </ClInclude>
     <ClInclude Include="cuda_memory.cuh">
       <Filter>Header</Filter>
     </ClInclude>
@@ -43,9 +40,6 @@
       <Filter>Header</Filter>
     </ClInclude>
     <ClInclude Include="cuda_tokens.cuh">
-      <Filter>Header</Filter>
-    </ClInclude>
-    <ClInclude Include="impl_rb_tree.cuh">
       <Filter>Header</Filter>
     </ClInclude>
     <ClInclude Include="CudaParser.cuh">

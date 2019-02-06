@@ -5,13 +5,14 @@
 //#include <cuda/config.h>
 //#include <cuda/except.cuh>
 #include "cuda_config.cuh"
+#include <cstdlib>
 
 #ifndef CUDA_MEMORY_H
 #define CUDA_MEMORY_H
 
 CU_BEGIN
 
-__device__ inline void* aligned_malloc(size_t required_bytes, size_t alignment)
+__device__ inline void* aligned_malloc(std::size_t required_bytes, std::size_t alignment)
 {
     int offset = alignment - 1 + sizeof(void*);
     void* p1 = (void*) malloc(required_bytes + offset);

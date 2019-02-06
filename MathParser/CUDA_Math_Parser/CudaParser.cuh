@@ -6,10 +6,13 @@
 #include "cuda_map.cuh"
 #include "cuda_memory.cuh"
 #include "cuda_stack.cuh"
+#include "cuda_vector.cuh"
 
 #ifndef PARSER_H
 #define PARSER_H
-namespace cu {
+
+CU_BEGIN
+
 	__device__ constexpr bool iswhitespace(char ch) noexcept
 	{
 		return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\0'; //see also std::isspace
@@ -198,8 +201,8 @@ namespace cu {
 	template <class T>
 	class TokenStorage
 	{
-		cuda_stack<cuda_device_unique_ptr<IToken<T>>> operationStack;
-		cuda_list<cuda_device_unique_ptr<IToken<T>>> outputList;
+		cu::stack<cuda_device_unique_ptr<IToken<T>>> operationStack;
+		cu::list<cuda_device_unique_ptr<IToken<T>>> outputList;
 
 	public:
 
@@ -232,7 +235,7 @@ namespace cu {
 			return outputList.back().get();
 		}
 
-		__device__ return_wrapper_t<void> pop_bracket()
+		__device__ cu::return_wrapper_t<void> pop_bracket()
 		{
 			bool isOpeningBracket = false;
 			while (operationStack.size() != 0)
@@ -249,25 +252,25 @@ namespace cu {
 				}
 			}
 			if (!isOpeningBracket)
-				return return_wrapper_t<void>(CudaParserErrorCodes::InvalidNumberOfArguments);
+				return cu::return_wrapper_t<void>(CudaParserErrorCodes::InvalidNumberOfArguments);
 			else
 				operationStack.pop();
-			return return_wrapper_t<void>();
+			return cu::return_wrapper_t<void>();
 		}
 
-		__device__ return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>> finalize() &&
+		__device__ cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>> finalize() &&
 		{
 			while (operationStack.size() != 0)
 			{
 				if (operationStack.top().get()->type() == TokenType::bracket) //checking enclosing brackets
-					return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidNumberOfArguments);
+					return cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidNumberOfArguments);
 				else
 				{
 					outputList.push_back(std::move(operationStack.top()));
 					operationStack.pop();
 				}
 			}
-			return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(std::move(outputList), CudaParserErrorCodes::Success);
+			return cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>>(std::move(outputList), CudaParserErrorCodes::Success);
 		}
 
 		__device__ cuda_device_unique_ptr<IToken<T>>& get_top_operation()
@@ -275,7 +278,7 @@ namespace cu {
 			return operationStack.top();
 		}
 
-		__device__ return_wrapper_t<void> comma_parameter_replacement()
+		__device__ cu::return_wrapper_t<void> comma_parameter_replacement()
 		{
 			bool isOpeningBracket = false;
 
@@ -293,16 +296,16 @@ namespace cu {
 			}
 
 			if (!isOpeningBracket) //missing '('
-				return return_wrapper_t<void>(CudaParserErrorCodes::InvalidNumberOfArguments);
-			return return_wrapper_t<void>();
+				return cu::return_wrapper_t<void>(CudaParserErrorCodes::InvalidNumberOfArguments);
+			return cu::return_wrapper_t<void>();
 		}
 	};
 
 	template <class T>
 	class expr_param_storage
 	{
-		cuda_list<cu::cuda_string> m_parameters;
-		cuda_vector<cu::cuda_string*> m_sorted_params;
+		cu::list<cu::string> m_parameters;
+		cu::vector<cu::string*> m_sorted_params;
 	public:
 		__device__ expr_param_storage() = default;
 		template <class ParameterNameType>
@@ -328,23 +331,23 @@ namespace cu {
 		{
 			using cu::swap;
 			if (m_sorted_params.empty())
-				return return_wrapper_t<void>();
+				return cu::return_wrapper_t<void>();
 			auto heap_end = m_sorted_params.size() - 1;
 			while (heap_end > 0)
 			{
 				swap(m_sorted_params[0], m_sorted_params[--heap_end]);
-				for (cuda_vector<cuda_string*>::size_type iStart = 0, iSwap; iStart < heap_end / 2 - 1; iStart = iSwap)
+				for (cu::vector<cu::string*>::size_type iStart = 0, iSwap; iStart < heap_end / 2 - 1; iStart = iSwap)
 				{
 					iSwap = iStart * 2 + 1;
 					auto cmp = cu::strncmpnz(m_sorted_params[iSwap]->data(), m_sorted_params[iSwap]->size(), m_sorted_params[iSwap + 1]->data(), m_sorted_params[iSwap + 1]->size());
 					if (!cmp)
 						return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::ParameterIsNotUnique);
-					if (cmp < 0)
+					if (cmp.value() < 0)
 						++iSwap;
 					cmp = cu::strncmpnz(m_sorted_params[iStart]->data(), m_sorted_params[iStart]->size(), m_sorted_params[iSwap]->data(), m_sorted_params[iSwap]->size());
 					if (!cmp)
 						return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::ParameterIsNotUnique);
-					if (cmp > 0)
+					if (cmp.value() > 0)
 						break;
 					swap(m_sorted_params[iStart], m_sorted_params[iSwap]);
 				}
@@ -356,9 +359,9 @@ namespace cu {
 			return m_parameters.size();
 		}
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
-		__device__ return_wrapper_t<expr_param_init_block<T>> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
+		__device__ cu::return_wrapper_t<expr_param_init_block<T>> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 		{
-			cuda_vector<cu::pair<const cu::cuda_string*, T>> v_init;
+			cu::vector<cu::pair<const cu::string*, T>> v_init;
 			auto itParam = m_parameters.begin();
 			while (arg_begin != arg_end)
 			{
@@ -374,16 +377,16 @@ namespace cu {
 	class Header
 	{
 		expr_param_storage<T> m_strg;
-		cu::cuda_string function_name;
-		mutable return_wrapper_t<void> construction_success_code;
+		cu::string function_name;
+		mutable cu::return_wrapper_t<void> construction_success_code;
 	public:
 		__device__ Header() = default;
 		__device__ Header(const char* expression, std::size_t expression_len, char** ppEndPtr)
 		{
 			auto endPtr = expression + expression_len;
 			char* begPtr = (char*)(expression);
-			cuda_list<cu::cuda_string> params;
-			construction_success_code = return_wrapper_t<void>();
+			cu::list<cu::string> params;
+			construction_success_code = cu::return_wrapper_t<void>();
 
 			bool isOpeningBracket = false;
 			bool isClosingBracket = false;
@@ -396,15 +399,15 @@ namespace cu {
 					auto l_endptr = begPtr + 1;
 					while (l_endptr < endPtr && isalnum(*l_endptr)) ++l_endptr;
 					if (this->function_name.empty())
-						this->function_name = cu::cuda_string(begPtr, l_endptr);
+						this->function_name = cu::string(begPtr, l_endptr);
 					else
 					{
 						if (!isOpeningBracket)
 						{
-							construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
+							construction_success_code = cu::return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 							return;
 						}
-						construction_success_code = m_strg.add_parameter(cu::cuda_string(begPtr, l_endptr));
+						construction_success_code = m_strg.add_parameter(cu::string(begPtr, l_endptr));
 						if (!construction_success_code)
 							return;
 					}
@@ -420,7 +423,7 @@ namespace cu {
 				if (*begPtr == '(')
 				{
 					if (isOpeningBracket)
-						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::InvalidExpression);
+						construction_success_code = cu::return_wrapper_t<void>(CudaParserErrorCodes::InvalidExpression);
 					isOpeningBracket = true;
 					begPtr += 1;
 				}
@@ -434,7 +437,7 @@ namespace cu {
 				if (*begPtr == ')')
 				{
 					if (!isOpeningBracket || isClosingBracket)
-						construction_success_code = return_wrapper_t<void>(CudaParserErrorCodes::InvalidExpression);
+						construction_success_code = cu::return_wrapper_t<void>(CudaParserErrorCodes::InvalidExpression);
 					isClosingBracket = true;
 					begPtr += 1;
 				}
@@ -466,7 +469,7 @@ namespace cu {
 			return function_name.size();
 		}
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
-		__device__ inline return_wrapper_t<expr_param_init_block<T>> construct_argument_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
+		__device__ inline cu::return_wrapper_t<expr_param_init_block<T>> construct_argument_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 		{
 			return m_strg.construct_init_block(arg_begin, arg_end);
 		}
@@ -478,7 +481,7 @@ namespace cu {
 	public:
 		__device__ Mathexpr(const char* sMathExpr, std::size_t cbMathExpr);
 		__device__ Mathexpr(const char* szMathExpr) :Mathexpr(szMathExpr, std::strlen(szMathExpr)) {}
-		__device__ Mathexpr(const cuda_string& strMathExpr) : Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
+		__device__ Mathexpr(const cu::string& strMathExpr) : Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
 		__device__ auto operator()(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 			-> std::enable_if_t<
@@ -489,7 +492,7 @@ namespace cu {
 					>,
 					T
 				>::value,
-			return_wrapper_t<T>>
+			cu::return_wrapper_t<T>>
 		{
 			auto rw_init_blck = header.construct_argument_block(arg_begin, arg_end);
 			if (!rw_init_blck)
@@ -502,7 +505,7 @@ namespace cu {
 		{
 			return (*this)(cu::begin(container), cu::end(container));
 		}
-		__device__ inline return_wrapper_t<T> operator()(std::initializer_list<T> list) const
+		__device__ inline cu::return_wrapper_t<T> operator()(std::initializer_list<T> list) const
 		{
 			return (*this)(cu::begin(list), cu::end(list));
 		}
@@ -516,12 +519,12 @@ namespace cu {
 		cuda_device_unique_ptr<IToken<T>> body;
 
 		template <class T>
-		__device__ return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>> lexBody(const char* expr, std::size_t length)
+		__device__ cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>> lexBody(const char* expr, std::size_t length)
 		{
 			char* begPtr = (char*)expr;
 			std::size_t cbRest = length;
 			TokenStorage<T> tokens;
-			cuda_stack <cu::pair<cuda_device_unique_ptr<Function<T>>, std::size_t>> funcStack;
+			cu::stack <cu::pair<cuda_device_unique_ptr<Function<T>>, std::size_t>> funcStack;
 			int last_type_id = -1;
 
 			while (cbRest > 0)
@@ -561,7 +564,7 @@ namespace cu {
 					static_assert(std::is_same<T, double>::value, "The following line is only applicable to double");
 					auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
 					if (conversion_end != tkn.end())
-						return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
+						return cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
 					last_type_id = int(tokens.push_token(Number<T>(value))->type());
 				}
 				else if (isalpha(*tkn.begin()))
@@ -636,7 +639,7 @@ namespace cu {
 						last_type_id = int(tokens.push_token(MinFunction<T>())->type());
 						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
 					}
-					else //if (this->header.get_param_index(cuda_string(tkn.begin(), tkn.end())).value() >= 0)
+					else //if (this->header.get_param_index(cu::string(tkn.begin(), tkn.end())).value() >= 0)
 						last_type_id = int(tokens.push_token(Variable<T>(&*tkn.begin(), tkn.size()))->type());
 				}
 				else if (tkn == ")")
@@ -661,7 +664,7 @@ namespace cu {
 					last_type_id = int(tokens.push_token(Bracket<T>())->type());
 				}
 				else
-					return return_wrapper_t<cuda_list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
+					return cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
 				cbRest -= tkn.end() - begPtr;
 				begPtr = (char*) tkn.end();
 			}
@@ -672,7 +675,7 @@ namespace cu {
 	};
 
 	template <class K>
-	__device__ typename cuda_list<cuda_device_unique_ptr<IToken<K>>>::iterator simplify(cuda_list<cuda_device_unique_ptr<IToken<K>>>& body, typename cuda_list<cuda_device_unique_ptr<IToken<K>>>::iterator elem)
+	__device__ typename cu::list<cuda_device_unique_ptr<IToken<K>>>::iterator simplify(cu::list<cuda_device_unique_ptr<IToken<K>>>& body, typename cu::list<cuda_device_unique_ptr<IToken<K>>>::iterator elem)
 	{
 		auto paramsCount = elem->get()->get_required_parameter_count();
 		auto param_it = elem;
@@ -691,7 +694,7 @@ namespace cu {
 	}
 
 	template <class T>
-	__device__ cuda_device_unique_ptr<IToken<T>> simplify_body(cuda_list<cuda_device_unique_ptr<IToken<T>>>&& listBody)
+	__device__ cuda_device_unique_ptr<IToken<T>> simplify_body(cu::list<cuda_device_unique_ptr<IToken<T>>>&& listBody)
 	{
 		auto it = listBody.begin();
 		while (listBody.size() > 1)
@@ -700,7 +703,7 @@ namespace cu {
 		//When everything goes right, you are left with only one element within the list - the root of the tree.
 	}
 	template <class T>
-	__device__ T compute(const cuda_list<cuda_device_unique_ptr<IToken<T>>>& body)
+	__device__ T compute(const cu::list<cuda_device_unique_ptr<IToken<T>>>& body)
 	{
 		assert(body.size() == 1);
 		return body.front()();
@@ -712,8 +715,8 @@ namespace cu {
 		const char* endptr;
 		header = Header<T>(sMathExpr, cbMathExpr, (char**)&endptr);
 		++endptr;
-		this->body = simplify_body(cuda_list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value()));
+		this->body = simplify_body(cu::list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value()));
 	}
-}
+CU_END
 
 #endif // !PARSER_H

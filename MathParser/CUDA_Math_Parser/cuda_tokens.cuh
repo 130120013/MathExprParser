@@ -109,10 +109,10 @@ private:
 template <class T>
 class expr_param_init_block
 {
-	cuda_vector<cu::pair<const cu::cuda_string*, T>> m_sorted_arguments;
+	cu::vector<cu::pair<const cu::string*, T>> m_sorted_arguments;
 public:
 	__device__ expr_param_init_block() = default;
-	__device__ inline expr_param_init_block(cuda_vector<cu::pair<const cu::cuda_string*, T>>&& sorted_arg_frame):m_sorted_arguments(std::move(sorted_arg_frame)) {}
+	__device__ inline expr_param_init_block(cu::vector<cu::pair<const cu::string*, T>>&& sorted_arg_frame):m_sorted_arguments(std::move(sorted_arg_frame)) {}
 	__device__ cu::return_wrapper_t<T> get_parameter(const char* pName, std::size_t cbName) const
 	{
 		auto pFrameBegin = &m_sorted_arguments[0];
@@ -121,14 +121,20 @@ public:
 		{
 			auto mid = count / 2;
 			auto cmp = cu::strncmpnz(pFrameBegin[mid].first->c_str(), pFrameBegin[mid].first->size(), pName, cbName);
-			if (cmp == 0)
-				return cu::return_wrapper_t<T>(pFrameBegin[mid].second);
-			if (cmp < 0)
+			if (cmp)
 			{
-				pFrameBegin = &pFrameBegin[mid];
-				count -= mid;
-			}else
-				count = mid;
+				if (cmp.value() == 0)
+					return cu::return_wrapper_t<T>(pFrameBegin[mid].second);
+				if (cmp.value() < 0)
+				{
+					pFrameBegin = &pFrameBegin[mid];
+					count -= mid;
+				}
+				else
+					count = mid;
+			}
+			else
+				break;
 		}
 		return cu::make_return_wrapper_error<T>(CudaParserErrorCodes::ParameterIsNotFound);
 	}
@@ -220,7 +226,7 @@ private:
 template <class T>
 class Variable : public IToken<T> //arguments of Header, e.g. F(x) x - Variable
 {
-	cuda_string m_name;
+	cu::string m_name;
 public:
 	__device__ Variable(const char* varname, std::size_t len):m_name(varname, varname + len) {}
 	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
@@ -1686,11 +1692,11 @@ public:
 template <class T, class Implementation, class TokenBinPredicate>
 class ExtremumFunction : public Function<T>
 {
-	cuda_vector<cuda_device_unique_ptr<IToken<T>>> ops;
+	cu::vector<cuda_device_unique_ptr<IToken<T>>> ops;
 	std::size_t nRequiredParamsCount = 0;
 	TokenBinPredicate m_pred;
 
-	//ExtremumFunction(cuda_vector<cuda_device_unique_ptr<IToken<T>>>&& operands, const TokenBinPredicate& pred)
+	//ExtremumFunction(cu::vector<cuda_device_unique_ptr<IToken<T>>>&& operands, const TokenBinPredicate& pred)
 public:
 	__device__ ExtremumFunction() = default;
 	__device__ ExtremumFunction(std::size_t paramsNumber) : nRequiredParamsCount(paramsNumber) {}
@@ -1711,7 +1717,7 @@ public:
 		if (!rwExtr)
 			return rwExtr;
 		auto extrVal = rwExtr.value();
-		for (typename cuda_vector<cuda_device_unique_ptr<IToken<T>>>::size_type iElement = 1; iElement < ops.size(); ++iElement)
+		for (typename cu::vector<cuda_device_unique_ptr<IToken<T>>>::size_type iElement = 1; iElement < ops.size(); ++iElement)
 		{
 			auto rw_i = ops[iElement]->compute(args);
 			if (!rw_i)
@@ -1744,7 +1750,7 @@ public:
 	{
 		if (!is_ready())
 			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
-		cuda_vector<cuda_device_unique_ptr<IToken<T>>> new_ops;
+		cu::vector<cuda_device_unique_ptr<IToken<T>>> new_ops;
 		T extrem;
 		bool fExtrem = false;
 		new_ops.reserve(ops.size());

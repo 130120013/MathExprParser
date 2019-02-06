@@ -5,8 +5,10 @@
 #ifndef CUDA_VECTOR_H
 #define CUDA_VECTOR_H
 
+CU_BEGIN
+
 template <class T>
-class cuda_vector
+class vector
 {
 	static constexpr const std::size_t cReserveFrame = 128 / sizeof(T);
 public:
@@ -135,13 +137,13 @@ public:
 		}
 		return cu::return_wrapper_t<void>();
 	}
-	__device__ cuda_vector() = default;
-	__device__ cuda_vector(const cuda_vector& right)
+	__device__ vector() = default;
+	__device__ vector(const vector& right)
 	{
 		*this = right;
 	}
-	__device__ cuda_vector(cuda_vector&&) = default;
-	__device__ cuda_vector& operator=(const cuda_vector& right)
+	__device__ vector(vector&&) = default;
+	__device__ vector& operator=(const vector& right)
 	{
 		if (this != &right)
 		{
@@ -156,7 +158,7 @@ public:
 		}
 		return *this;
 	}
-	__device__ cuda_vector& operator=(cuda_vector&&) = default;
+	__device__ vector& operator=(vector&&) = default;
 
 private:
 	cuda_device_unique_ptr_malloc<value_type> m_buf;
@@ -164,5 +166,6 @@ private:
 	size_type m_capacity = 0;
 };
 
+CU_END
 
 #endif // !CUDA_VECTOR

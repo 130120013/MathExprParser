@@ -378,4 +378,5 @@ template <class T = void>
 __device__ auto make_return_wrapper_error(CudaParserErrorCodes error) { return return_wrapper_t<T>(error); }
 
 CU_END
+
 #endif // !CUDA_RETURN_WRAPPER_H

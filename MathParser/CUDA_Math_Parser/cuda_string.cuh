@@ -5,6 +5,7 @@
 #include "cuda_iterator.cuh"
 #include "cuda_memory.cuh"
 #include "cuda_config.cuh"
+#include "cuda_return_wrapper.cuh"
 
 #ifndef CUDA_STRING_H_
 #define CUDA_STRING_H_
@@ -99,13 +100,18 @@ __device__ int memcmp(const void* str1, const void* str2, std::size_t size)
 	return 0;
 }
 
-__device__ int strncmpnz(const char* pStr1, std::size_t cbStr1, const char* pStr2, std::size_t cbStr2)
+__device__ cu::return_wrapper_t<int> strncmpnz(const char* pStr1, std::size_t cbStr1, const char* pStr2, std::size_t cbStr2)
 {
-	auto cbMin = cbStr1 < cbStr2?cbStr1:cbStr2;
-	auto cmp = memcmp(pStr1, pStr2, cbMin);
-	if (cmp != 0)
-		return cmp;
-	return cbStr1 == cbStr2?0:(cbStr1 < cbStr2?-1:1);
+	if (!pStr1 && !pStr2)
+	{
+		auto cbMin = cbStr1 < cbStr2 ? cbStr1 : cbStr2;
+		auto cmp = memcmp(pStr1, pStr2, cbMin);
+		if (cmp != 0)
+			return cmp;
+		return cbStr1 == cbStr2 ? 0 : (cbStr1 < cbStr2 ? -1 : 1);
+	}
+	else
+		return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidArgument);
 }
 
 __host__ __device__ constexpr bool isdigit(const char ch) noexcept
@@ -246,22 +252,22 @@ __device__ double strtod(const char* str, char** str_end)
 
 //#endif
 
-class cuda_string
+class string
 {
 	cuda_device_unique_ptr<char[]> pStr;
 	std::size_t strSize = 0;
 public:
 	typedef char* iterator;
 	typedef const char* const_iterator;
-	typedef cuda_reverse_iterator<iterator> reverse_iterator;
-	typedef cuda_reverse_iterator<const_iterator> const_reverse_iterator;
-	__device__ cuda_string() = default;
-	__device__ inline cuda_string(const cuda_string& str)
+	typedef cu::reverse_iterator<iterator> reverse_iterator;
+	typedef cu::reverse_iterator<const_iterator> const_reverse_iterator;
+	__device__ string() = default;
+	__device__ inline string(const string& str)
 	{
 		*this = str;
 	}
-	__device__ inline cuda_string(cuda_string&&) = default;
-	__device__ cuda_string& operator=(const cuda_string& str)
+	__device__ inline string(string&&) = default;
+	__device__ string& operator=(const string& str)
 	{
 		if (&str != this)
 		{
@@ -276,16 +282,16 @@ public:
 		}
 		return *this;
 	}
-	__device__ cuda_string& operator=(cuda_string&& str) = default;
-	__device__ inline cuda_string(const char* str) : strSize(strlen(str))
+	__device__ string& operator=(string&& str) = default;
+	__device__ inline string(const char* str) : strSize(strlen(str))
 	{
 		pStr = make_cuda_device_unique_ptr<char[]>(strSize + 1);
 		if (pStr.get() != nullptr && str != nullptr)
 		memcpy(pStr.get(), str, strSize + 1);
 	}
-	//__device__ cuda_string(std::size_t size, char ch);
+	//__device__ string(std::size_t size, char ch);
 	template <class Iterator>
-	__device__ cuda_string(Iterator b, Iterator e)
+	__device__ string(Iterator b, Iterator e)
 	{
 		auto size = e - b;
 		std::size_t i = 0;
@@ -308,7 +314,7 @@ public:
 		return c_str();
 	}
 
-	__device__ cuda_string& operator+=(const cuda_string& str)
+	__device__ string& operator+=(const string& str)
 	{
 		auto tmp = make_cuda_device_unique_ptr<char[]>(this->size() + str.size() + 1);
 		if (bool(tmp))
@@ -323,9 +329,9 @@ public:
 		}
 		return *this;
 	}
-	__device__ inline cuda_string operator+(const cuda_string& str) const
+	__device__ inline string operator+(const string& str) const
 	{
-		cuda_string temp(*this);
+		string temp(*this);
 		temp += str;
 		return temp;
 	}
@@ -385,7 +391,7 @@ public:
 	__device__ Iterator erase(Iterator begin, Iterator end)
 	{
 		Iterator it;
-		cuda_string temp(this->end() - this->begin() - (end - begin), 0);
+		string temp(this->end() - this->begin() - (end - begin), 0);
 		int k = 0;
 		for (auto i = this->begin(); i != this->end(); ++i)
 		{
@@ -402,7 +408,7 @@ public:
 		return it;
 	}*/
 };
-__device__ double stod(const cuda_string& str, std::size_t* pos = 0)
+__device__ double stod(const string& str, std::size_t* pos = 0)
 {
 	char *p;
 	double result = strtod(str.c_str(), const_cast<char**>(&p));
@@ -413,37 +419,37 @@ __device__ double stod(const cuda_string& str, std::size_t* pos = 0)
 }
 
 
-__device__ inline bool operator==(const cuda_string& str1, const cuda_string& str2)
+__device__ inline bool operator==(const string& str1, const string& str2)
 {
 	return (strcmp(str1.c_str(), str2.c_str()) == 0);
 }
 
-__device__ inline bool operator!=(const cuda_string& str1, const cuda_string& str2)
+__device__ inline bool operator!=(const string& str1, const string& str2)
 {
 	return (strcmp(str1.c_str(), str2.c_str()) != 0);
 }
 
-__device__ inline bool operator>=(const cuda_string& str1, const cuda_string& str2)
+__device__ inline bool operator>=(const string& str1, const string& str2)
 {
 	return (strcmp(str1.c_str(), str2.c_str()) >= 0);
 }
-__device__ inline bool operator<=(const cuda_string& str1, const cuda_string& str2)
+__device__ inline bool operator<=(const string& str1, const string& str2)
 {
 	return (strcmp(str1.c_str(), str2.c_str()) <= 0);
 }
 
-__device__ inline bool operator>(const cuda_string& str1, const cuda_string& str2)
+__device__ inline bool operator>(const string& str1, const string& str2)
 {
 	return (strcmp(str1.c_str(), str2.c_str()) > 0);
 }
 
-__device__ inline bool operator<(const cuda_string& str1, const cuda_string& str2)
+__device__ inline bool operator<(const string& str1, const string& str2)
 {
 	return (strcmp(str1.c_str(), str2.c_str()) < 0);
 }
 
 template <class T>
-__device__ cuda_string to_cuda_string(T val)
+__device__ string to_string(T val)
 {
 	static_assert(std::is_integral<T>::value, "T must be integral");
 	static_assert(std::is_unsigned<T>::value, "T must be unsigned");
@@ -467,7 +473,7 @@ __device__ cuda_string to_cuda_string(T val)
 		buf[bufSize - i] = temp;
 	}
 
-	return cuda_string(&buf[0], &buf[bufSize]);
+	return string(&buf[0], &buf[bufSize]);
 }
 
 CU_END
