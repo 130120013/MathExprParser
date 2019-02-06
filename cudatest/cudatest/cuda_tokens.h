@@ -633,7 +633,7 @@ public:
 	}
 	__device__ virtual short getPriority()
 	{
-		return 2;
+		return 4;
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{

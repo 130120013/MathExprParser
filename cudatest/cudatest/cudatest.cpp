@@ -673,7 +673,8 @@ namespace cu {
 		const char* endptr;
 		header = Header<T>(sMathExpr, cbMathExpr, (char**)&endptr);
 		++endptr;
-		this->body = simplify_body(cuda_list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value()));
+		auto form = cuda_list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value());
+		this->body = simplify_body(std::move(form));
 	}
 }
 
@@ -683,7 +684,7 @@ namespace cu {
 #include <cmath>
 int main()
 {
-	char expr[] = "f(x, y) = x^(x+x)";
+	char expr[] = "f(x, y) = sin(x)^2 + cos(x)^2";
 	cu::Mathexpr<double> m(expr, sizeof(expr) - 1);
 	cuda_vector<double> v;
 	v.push_back(2);
