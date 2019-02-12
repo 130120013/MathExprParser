@@ -32,7 +32,7 @@ private:
 };
 
 template<typename T>
-stack<T>::~stack()
+__device__ stack<T>::~stack()
 {
 	node* next;
 	for (node* loop = root; loop != nullptr; loop = next)
@@ -42,39 +42,39 @@ stack<T>::~stack()
 	}
 }
 template<typename T>
-void stack<T>::push(const T& data)
+__device__ void stack<T>::push(const T& data)
 {
 	root = new node(data, root);
 	++elements;
 }
 template<typename T>
-void stack<T>::push(T&& data)
+__device__ void stack<T>::push(T&& data)
 {
 	root = new node(std::move(data), root);
 	++elements;
 }
 template<typename T>
-bool stack<T>::empty() const
+__device__ bool stack<T>::empty() const
 {
 	return root == nullptr;
 }
 template<typename T>
-int stack<T>::size() const
+__device__ int stack<T>::size() const
 {
 	return elements;
 }
 template<typename T>
-const T& stack<T>::top() const
+__device__ const T& stack<T>::top() const
 {
 	return root->data;
 }
 template<typename T>
-T& stack<T>::top()
+__device__ T& stack<T>::top()
 {
 	return root->data;
 }
 template<typename T>
-void stack<T>::pop()
+__device__ void stack<T>::pop()
 {
 	if (root == nullptr)
 	{

@@ -30,8 +30,8 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 int main()
 {
 	cudaError_t cudaStatus;
-	//const char pStr[] = "f(x) = sin(x)^2 + cos(x)^2";
-	const char pStr[] = "f(x) = x";
+	const char pStr[] = "f(x) = x + 1";
+	//const char pStr[] = "f(x) = 2*yn(1,0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
 	double V[1000];
 	std::size_t cbStack;
 
