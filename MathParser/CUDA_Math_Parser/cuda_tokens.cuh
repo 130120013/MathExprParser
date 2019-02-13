@@ -260,7 +260,7 @@ public:
 		return 0;
 	}
 private:
-	T m_val = std::acos(-1);
+	T m_val = acosf(-1);
 };
 
 template <class T>

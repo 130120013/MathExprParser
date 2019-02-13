@@ -20,7 +20,7 @@ __global__ void memset_expr(double* vec, std::size_t n, const char* pStr, std::s
 	if (i < n)
 	{
 		auto& m = *g_pExpr;
-		vec[i] = m(4).value();
+		vec[i] = m(10).value();
 	}
 	__syncthreads();
 	if (!i)
@@ -31,7 +31,7 @@ int main()
 {
 	cudaError_t cudaStatus;
 	//const char pStr[] = "f(x) = 2*j1(0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
-	const char pStr[] = "f(x) = PI*x";
+	const char pStr[] = "f(x) = gamma(x)";
 	double V[100];
 	std::size_t cbStack;
 
