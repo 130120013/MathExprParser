@@ -569,7 +569,15 @@ CU_BEGIN
 				}
 				else if (isalpha(*tkn.begin()))
 				{
-					if (tkn == "sin")
+					if (tkn == "PI")
+					{
+						last_type_id = int(tokens.push_token(PI<T>())->type());
+					}
+					else if (tkn == "EULER")
+					{
+						last_type_id = int(tokens.push_token(Euler<T>())->type());
+					}
+					else if (tkn == "sin")
 					{
 						last_type_id = int(tokens.push_token(SinFunction<T>())->type());
 						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<SinFunction<T>>()), 1));
@@ -628,6 +636,16 @@ CU_BEGIN
 					{
 						last_type_id = int(tokens.push_token(YnFunction<T>())->type());
 						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<YnFunction<T>>(), 2));
+					}
+					else if (tkn == "gamma")
+					{
+						last_type_id = int(tokens.push_token(GammaFunction<T>())->type());
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<GammaFunction<T>>(), 1));
+					}
+					else if (tkn == "abs")
+					{
+						last_type_id = int(tokens.push_token(AbsFunction<T>())->type());
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<AbsFunction<T>>(), 1));
 					}
 					else if (tkn == "max")
 					{
