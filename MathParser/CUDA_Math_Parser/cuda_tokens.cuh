@@ -2134,20 +2134,20 @@ public:
 	}
 };
 /////////////TODO
-
-template <class T, class = void>
-class PolarFunction;
-
 template <class T>
-class PolarFunction < T, std::enable_if<!std::is_floating_point<T>::value && !std::is_integral<T>::value>::value > : public Function<T>
+class PolarFunction {};
+
+//PolarFunction<thrust::complex<double>>
+template <class T>
+class PolarFunction<thrust::complex<T>>: public Function<thrust::complex<T>>
 {
-	static_parameter_storage<cuda_device_unique_ptr<IToken<T>>, 2> ops;
+	static_parameter_storage<cuda_device_unique_ptr<IToken<thrust::complex<T>>>, 2> ops;
 public:
-	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
+	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<thrust::complex<T>>>&& value)
 	{
 		return ops.push_argument(std::move(value));
 	}
-	__device__ virtual return_wrapper_t<T> compute(const expr_param_init_block<T>& args) const
+	__device__ virtual return_wrapper_t<thrust::complex<T>> compute(const expr_param_init_block<thrust::complex<T>>& args) const
 	{
 		if (!this->is_ready())
 			return cu::make_return_wrapper_error(CudaParserErrorCodes::NotReady);
@@ -2165,7 +2165,7 @@ public:
 		if (!rw1c)
 			return rw1c;
 
-		return thrust::polar(rw0c.value().real(), rw1c.value().real());
+		return thrust::polar(rw1c.value().real(), rw0c.value().real());
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -2187,10 +2187,10 @@ public:
 	{
 		return TokenType::polarFunction;
 	}
-	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
+	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<thrust::complex<T>>>> simplify() const
 	{
 		if (!this->is_ready())
-			return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(CudaParserErrorCodes::NotReady);
+			return return_wrapper_t<cuda_device_unique_ptr<IToken<thrust::complex<T>>>>(CudaParserErrorCodes::NotReady);
 		auto rw0 = ops[0];
 		if (!rw0)
 			return rw0;
@@ -2208,34 +2208,35 @@ public:
 
 		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(thrust::polar(static_cast<Number<T>&>(*op0).value().real(), static_cast<Number<T>&>(*op1).value().real())));
+			auto ptr = make_cuda_device_unique_ptr<Number<thrust::complex<T>>>(Number<thrust::complex<T>>(thrust::polar(static_cast<Number<thrust::complex<T>>&>(*op1).value().real(),
+				static_cast<Number<thrust::complex<T>>&>(*op0).value().real())));
 			if (!ptr)
-				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
+				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<thrust::complex<T>>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
+			return cuda_device_unique_ptr<IToken<thrust::complex<T>>>(std::move(ptr));
 		}
-		auto op_new = make_cuda_device_unique_ptr<PolarFunction<T>>();
+		auto op_new = make_cuda_device_unique_ptr<PolarFunction<thrust::complex<T>>>();
 		if (!op_new)
-			return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-		auto rw = op_new->push_argument(std::move(op0));
+			return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<thrust::complex<T>>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
+		auto rw = op_new->push_argument(std::move(op1));
 		if (!rw)
 			return rw;
-		rw = op_new->push_argument(std::move(op1));
+		rw = op_new->push_argument(std::move(op0));
 		if (!rw)
 			return rw;
-		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(op_new));
+		return return_wrapper_t<cuda_device_unique_ptr<IToken<thrust::complex<T>>>>(std::move(op_new));
 	}
 };
 
-template <class T>
-class PolarFunction < T, std::enable_if<std::is_floating_point<T>::value && std::is_integral<T>::value>::value > : public Function<T>
+template <>
+class PolarFunction <double> : public Function<double>
 {
-	static_parameter_storage<cuda_device_unique_ptr<IToken<T>>, 2> ops;
+	static_parameter_storage<cuda_device_unique_ptr<IToken<double>>, 2> ops;
 public:
-	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
+	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<double>>&& value)
 	{
 		return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidArgument);
 	}
-	__device__ virtual return_wrapper_t<T> compute(const expr_param_init_block<T>& args) const
+	__device__ virtual return_wrapper_t<double> compute(const expr_param_init_block<double>& args) const
 	{
 		return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidArgument);
 	}
@@ -2259,7 +2260,7 @@ public:
 	{
 		return TokenType::polarFunction;
 	}
-	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
+	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<double>>> simplify() const
 	{
 		return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidArgument);
 	}

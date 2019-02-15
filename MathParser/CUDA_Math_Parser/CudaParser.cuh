@@ -7,6 +7,7 @@
 #include "cuda_memory.cuh"
 #include "cuda_stack.cuh"
 #include "cuda_vector.cuh"
+#include "thrust/complex.h"
 
 #ifndef PARSER_H
 #define PARSER_H
@@ -194,7 +195,8 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 	//Or: something that only consists of digits and one comma
 	//Or: something that starts with a letter and proceeds with letters or digits
 
-	__device__ token_string_entity parse_string_token(const char* pExpression, std::size_t cbExpression)
+	template <class T>
+	__device__ std::enable_if_t<std::is_same<T, double>::value, token_string_entity> parse_string_token(const char* pExpression, std::size_t cbExpression)
 	{
 		auto pStart = skipSpaces(pExpression, cbExpression);
 		if (pStart == pExpression + cbExpression)
@@ -215,6 +217,27 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 		return token_string_entity(pStart, pStart + 1);
 	}
 
+	template <class T>
+	__device__ std::enable_if_t<cu::is_complex<T>::value, token_string_entity> parse_string_token(const char* pExpression, std::size_t cbExpression)
+	{
+		auto pStart = skipSpaces(pExpression, cbExpression);
+		if (pStart == pExpression + cbExpression)
+			return token_string_entity();
+		if (isdigit(*pStart) || *pStart == '.')
+		{
+			bool fFlPointFound = *pStart == '.';
+			const char* pEnd = pStart;
+			while (isdigit(*++pEnd) || (!fFlPointFound && *pEnd == '.') || (*pEnd == 'i')) continue;
+			return token_string_entity(pStart, pEnd);
+		}
+		if (isalpha(*pStart))
+		{
+			const char* pEnd = pStart;
+			while (isalnum(*++pEnd)) continue;
+			return token_string_entity(pStart, pEnd);
+		}
+		return token_string_entity(pStart, pStart + 1);
+	}
 	template <class T>
 	class TokenStorage
 	{
@@ -585,7 +608,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 
 			while (cbRest > 0)
 			{
-				auto tkn = parse_string_token(begPtr, cbRest);
+				auto tkn = parse_string_token<T>(begPtr, cbRest);
 				if (tkn == "+")
 				{
 					if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
@@ -702,6 +725,11 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 					{
 						last_type_id = int(tokens.push_token(AbsFunction<T>())->type());
 						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<AbsFunction<T>>(), 1));
+					}
+					else if (tkn == "polar")
+					{
+						last_type_id = int(tokens.push_token(PolarFunction<T>())->type());
+						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<PolarFunction<T>>(), 2));
 					}
 					else if (tkn == "max")
 					{
