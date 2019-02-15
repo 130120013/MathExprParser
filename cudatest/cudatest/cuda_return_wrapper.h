@@ -9,13 +9,15 @@ enum class CudaParserErrorCodes
 {
 	Success,
 	NotReady,
+	NotEnoughMemory,
 	UnexpectedCall,
-	InsufficientNumberParams,
+	InvalidNumberOfArguments,
 	UnexpectedToken,
 	ParameterIsNotUnique,
 	InvalidArgument,
 	ParameterIsNotFound,
-	InvalidExpression
+	InvalidExpression,
+	InvalidCast
 };
 template <class LeftReturnWrapper, class RightReturnWrapper>
 __device__ auto impl_assign_return_wrapper(LeftReturnWrapper& left, RightReturnWrapper&& right)
@@ -39,7 +41,7 @@ __device__ auto impl_assign_return_wrapper(LeftReturnWrapper& left, RightReturnW
 			left.value_ptr() = left.get_buf_ptr();
 		new (left.value_ptr()) value_type(std::forward<RightReturnWrapper>(right).value());
 	}
-	return *this;
+	return left;
 }
 
 template <class LeftReturnWrapper, class RightReturnWrapper>
@@ -55,7 +57,7 @@ __device__ auto impl_construct_return_wrapper(LeftReturnWrapper& left, RightRetu
 	else
 	{
 		left.value_ptr() = left.get_buf_ptr();
-		new (left.value_ptr()) value_type(right.value());
+		new (left.value_ptr()) value_type(std::forward<RightReturnWrapper>(right).value());
 	}
 	return left;
 }
@@ -169,6 +171,14 @@ struct impl_storage_wrapper :impl_copy_assignable_return_wrapper<Derived, T>, im
 	{
 		return m_code;
 	}
+	__device__ explicit operator bool() const
+	{
+		return m_code == CudaParserErrorCodes::Success;
+	}
+	__device__ bool operator!() const
+	{
+		return m_code != CudaParserErrorCodes::Success;
+	}
 protected:
 	__device__ Derived& get_this() { return static_cast<Derived&>(*this); }
 	__device__ const Derived& get_this() const { return static_cast<const Derived&>(*this); }
@@ -247,7 +257,14 @@ using impl_return_wrapper_proxy = std::conditional_t<
 template <class T>
 struct return_wrapper_t :impl_return_wrapper_proxy<T>
 {
-	using impl_return_wrapper_proxy<T>::impl_return_wrapper_proxy;
+	__device__ return_wrapper_t() = default;
+	template <class U, class = std::enable_if_t<std::is_constructible<T, U&&>::value>>
+	__device__ return_wrapper_t(U&& value, CudaParserErrorCodes exit_code = CudaParserErrorCodes::Success)
+		:impl_return_wrapper_proxy<T>(std::forward<U>(value), exit_code) {}
+	__device__ return_wrapper_t(CudaParserErrorCodes exit_code)
+		: impl_return_wrapper_proxy<T>(exit_code) {}
+	template <class U>
+	__device__ inline return_wrapper_t(const return_wrapper_t<U>& right) : return_wrapper_t(bool(right) ? cu::CudaParserErrorCodes::InvalidCast : right.return_code()) {}
 	friend impl_copy_assignable_return_wrapper<return_wrapper_t<T>, T>;
 	friend impl_move_assignable_return_wrapper<return_wrapper_t<T>, T>;
 	template <class LeftReturnWrapper, class RightReturnWrapper>
@@ -273,6 +290,8 @@ struct return_wrapper_t<T&>
 		m_pVal = &value;
 	}
 	__device__ explicit return_wrapper_t(CudaParserErrorCodes exit_code) :m_pVal(nullptr), m_code(exit_code) {}
+	template <class U>
+	__device__ inline return_wrapper_t(const return_wrapper_t<U>& right) : return_wrapper_t(bool(right) ? cu::CudaParserErrorCodes::InvalidCast : right.return_code()) {}
 	__device__ T* get()
 	{
 		return m_pVal;
@@ -297,6 +316,14 @@ struct return_wrapper_t<T&>
 	{
 		return *this->get();
 	}
+	__device__ explicit operator bool() const
+	{
+		return m_code == CudaParserErrorCodes::Success;
+	}
+	__device__ bool operator!() const
+	{
+		return m_code != CudaParserErrorCodes::Success;
+	}
 private:
 	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
 	T* m_pVal = nullptr;
@@ -308,6 +335,8 @@ struct return_wrapper_t<void>
 	__device__ return_wrapper_t() = default;
 	//__device__ return_wrapper_t():m_code(CudaParserErrorCodes::Success) {}
 	__device__ explicit return_wrapper_t(CudaParserErrorCodes exit_code) :m_code(exit_code) {}
+	template <class U>
+	__device__ inline return_wrapper_t(const return_wrapper_t<U>& right) : return_wrapper_t(bool(right) ? cu::CudaParserErrorCodes::InvalidCast : right.return_code()) {}
 	///*__device__*/ return_wrapper_t(const return_wrapper_t& ) = default;
 	///*__device__*/ return_wrapper_t(return_wrapper_t&& ) = default;
 	///*__device__*/  return_wrapper_t& operator= (const return_wrapper_t&) = default;
@@ -333,12 +362,21 @@ struct return_wrapper_t<void>
 	{
 		return m_code;
 	}
+	__device__ explicit operator bool() const
+	{
+		return m_code == CudaParserErrorCodes::Success;
+	}
+	__device__ bool operator!() const
+	{
+		return m_code != CudaParserErrorCodes::Success;
+	}
 private:
 	CudaParserErrorCodes m_code = CudaParserErrorCodes::Success;
 };
 
 template <class T = void>
-auto make_return_wrapper_error(CudaParserErrorCodes error) { return return_wrapper_t<T>(error); }
+__device__ auto make_return_wrapper_error(CudaParserErrorCodes error) { return return_wrapper_t<T>(error); }
 
 CU_END
+
 #endif // !CUDA_RETURN_WRAPPER_H

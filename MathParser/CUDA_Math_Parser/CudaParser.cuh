@@ -724,6 +724,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						switch (funcStack.top().first.get()->type())
 						{
 						case TokenType::maxFunction:
+							
 							static_cast<MaxFunction<T>&>(*tokens.get_top_operation()) = MaxFunction<T>(funcStack.top().second + 1);
 							break;
 						case TokenType::minFunction:

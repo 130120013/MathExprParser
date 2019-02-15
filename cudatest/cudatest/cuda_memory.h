@@ -5,18 +5,35 @@
 //#include <cuda/config.h>
 //#include <cuda/except.cuh>
 #include "cuda_config.h"
+#include <cstdlib>
 
 #ifndef CUDA_MEMORY_H
 #define CUDA_MEMORY_H
 
 CU_BEGIN
 
+__device__ inline void* aligned_malloc(std::size_t required_bytes, std::size_t alignment)
+{
+	int offset = alignment - 1 + sizeof(void*);
+	void* p1 = (void*)malloc(required_bytes + offset);
+	if (!p1)
+		return nullptr;
+	auto p2 = (void**)(((size_t)(p1)+offset) & ~(alignment - 1));
+	p2[-1] = p1;
+	return p2;
+}
+
+__device__ inline void aligned_free(void *p)
+{
+	free(((void**)p)[-1]);
+}
+
 template <class IteratorBegin, class IteratorEnd, class Predicate>
 __device__ auto min_element(IteratorBegin begin, IteratorEnd end, Predicate&& pred)
-	-> std::common_type_t<
-		IteratorBegin,
-		IteratorEnd
-	>
+-> std::common_type_t<
+	IteratorBegin,
+	IteratorEnd
+>
 {
 	auto itMin = begin;
 	if (begin != end)
@@ -35,6 +52,55 @@ __device__ auto min_element(IteratorBegin begin, IteratorEnd end, Predicate&& pr
 	}
 	return itMin;
 }
+
+template <class InputIteratorBegin, class InputIteratorEnd, class OutputIterator>
+__device__ inline OutputIterator copy(InputIteratorBegin begin, InputIteratorEnd end, OutputIterator out)
+{
+	while (begin != end)
+		*(out++) = *(begin++);
+	return begin;
+}
+
+template <class InputIteratorBegin, class InputIteratorEnd, class OutputIterator>
+__device__ inline OutputIterator move(InputIteratorBegin begin, InputIteratorEnd end, OutputIterator out)
+{
+	while (begin != end)
+		*(out++) = std::move(*(begin++));
+	return begin;
+}
+
+template <class T>
+__device__ inline void swap(T& l, T& r)
+{
+	T buf(std::move(l));
+	l = std::move(r);
+	r = std::move(buf);
+}
+
+template <class SequenceContainer>
+__device__ constexpr auto begin(SequenceContainer& sequence_container) -> decltype(std::declval<SequenceContainer>().begin())
+{
+	return sequence_container.begin();
+}
+
+template <class SequenceContainer>
+__device__ constexpr auto end(SequenceContainer& sequence_container) -> decltype(std::declval<SequenceContainer>().end())
+{
+	return sequence_container.end();
+}
+
+template <class T, std::size_t N>
+__device__ constexpr T* begin(T(&array)[N])
+{
+	return &array[0];
+}
+
+template <class T, std::size_t N>
+__device__ constexpr T* end(T(&array)[N])
+{
+	return &array[N];
+}
+
 
 CU_END
 
@@ -230,8 +296,11 @@ protected:
 	}
 	__device__ impl_cuda_device_unique_ptr_base& operator=(impl_cuda_device_unique_ptr_base&& right)
 	{
-		m_ptr = right.m_ptr;
-		right.m_ptr = nullptr;
+		if (this != &right)
+		{
+			m_ptr = right.m_ptr;
+			right.m_ptr = nullptr;
+		}
 		return *this;
 	}
 	__device__ constexpr const pointer& ptr() const
@@ -418,8 +487,6 @@ public:
 	{
 		return this->ptr() != nullptr;
 	}
-
-
 private:
 	struct deleter
 	{
@@ -446,6 +513,94 @@ template <class T, class ... Args>
 __device__ cuda_device_unique_ptr<T> make_cuda_device_unique_ptr(Args&& ... args)
 {
 	return cuda_device_unique_ptr<T>(cuda_device_unique_ptr<T>::resource_mgr::acquire(std::forward<Args>(args)...));
+}
+
+template <class T>
+struct cuda_device_unique_ptr_malloc
+{
+	typedef T* pointer;
+	typedef T element_type;
+
+	__device__ cuda_device_unique_ptr_malloc() = default;
+	cuda_device_unique_ptr_malloc(const cuda_device_unique_ptr_malloc&) = delete;
+	cuda_device_unique_ptr_malloc& operator=(const cuda_device_unique_ptr_malloc&) = delete;
+	__device__ cuda_device_unique_ptr_malloc(cuda_device_unique_ptr_malloc&& right) :m_ptr(reinterpret_cast<char*>(right.release())) {}
+	template <class U, class = typename std::enable_if<std::is_convertible<U*, pointer>::value>::type>
+	__device__ cuda_device_unique_ptr_malloc(cuda_device_unique_ptr_malloc<U>&& right) : m_ptr(reinterpret_cast<char*>(right.release())) {}
+	__device__ inline cuda_device_unique_ptr_malloc& operator=(cuda_device_unique_ptr_malloc&& right)
+	{
+		this->reset(right.release());
+		return *this;
+	}
+	__device__ inline explicit cuda_device_unique_ptr_malloc(pointer p) :m_ptr(reinterpret_cast<char*>(p)) {}
+	__device__ inline ~cuda_device_unique_ptr_malloc()
+	{
+		if (m_ptr)
+			cu::aligned_free(m_ptr);
+	}
+	__device__ inline pointer release()
+	{
+		pointer p = this->get();
+		m_ptr = nullptr;
+		return p;
+	}
+
+	__device__ void reset(pointer p = pointer())
+	{
+		if (this->get() != p)
+		{
+			if (m_ptr != nullptr)
+				cu::aligned_free(m_ptr);
+			m_ptr = reinterpret_cast<char*>(p);
+		}
+	}
+	__device__ inline pointer get() const
+	{
+		return reinterpret_cast<pointer>(m_ptr);
+	}
+	__device__ inline explicit operator bool()
+	{
+		return m_ptr != nullptr;
+	}
+	__device__ inline pointer operator->() const
+	{
+		return this->get();
+	}
+	__device__ inline element_type& operator*() const
+	{
+		return *this->get();
+	}
+	__device__ inline element_type& operator[](std::size_t i) const
+	{
+		return this->get()[i];
+	}
+private:
+	struct deleter
+	{
+		__device__ inline void operator()(pointer ptr) const
+		{
+			cu::aligned_free(ptr);
+		}
+	};
+	deleter m_del;
+	char* m_ptr = nullptr;
+public:
+	typedef deleter deleter_type;
+
+	__device__ inline deleter_type& get_deleter()
+	{
+		return m_del;
+	}
+	__device__ inline const deleter_type& get_deleter() const
+	{
+		return m_del;
+	}
+};
+
+template <class T>
+__device__ cuda_device_unique_ptr_malloc<T> make_cuda_device_unique_ptr_malloc(std::size_t cHowMany)
+{
+	return cuda_device_unique_ptr_malloc<T>((T*)cu::aligned_malloc(cHowMany * sizeof(T), alignof(T)));
 }
 
 class cuda_stream
@@ -579,17 +734,17 @@ public:
 	}
 };
 
-template <class T>
-class cuda_shared_ptr
-{
-public:
-	__device__ T* get() const;
-	T& operator*() const;
-	T* operator->() const;
-
-};
-
-template< class T, class... Args >
-cuda_shared_ptr<T> make_cuda_shared(Args&&... args);
+//template <class T>
+//class cuda_shared_ptr
+//{
+//public:
+//	__device__ T* get() const;
+//	T& operator*() const;
+//	T* operator->() const;
+//
+//};
+//
+//template< class T, class... Args >
+//cuda_shared_ptr<T> make_cuda_shared(Args&&... args);
 
 #endif //CUDA_MEMORY_H

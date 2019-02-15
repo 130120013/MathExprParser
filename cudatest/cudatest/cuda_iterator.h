@@ -9,10 +9,12 @@
 #ifndef CUDA_ITERATORS_H_
 #define CUDA_ITERATORS_H_
 
+CU_BEGIN
+
 template<class Iterator>
-class cuda_reverse_iterator :public std::reverse_iterator<Iterator>
+class reverse_iterator :public std::reverse_iterator<Iterator>
 {	// wrap iterator to run it backwards
-	typedef cuda_reverse_iterator<Iterator> _MyType;
+	typedef reverse_iterator<Iterator> _MyType;
 	typedef std::reverse_iterator<Iterator> _MyBase;
 
 public:
@@ -26,7 +28,7 @@ public:
 	using _MyBase::reverse_iterator;
 
 	//template<class RightIterator>
-	//__device__ _MyType& operator=(const cuda_reverse_iterator<RightIterator>& right)
+	//__device__ _MyType& operator=(const reverse_iterator<RightIterator>& right)
 	//{	// assign from compatible base
 	//	current = right.base();
 	//	return *this;
@@ -86,14 +88,14 @@ public:
 
 //template<class Iterator>
 //__device__ cuda_reverse_iterator<Iterator> operator+(typename cuda_reverse_iterator<Iterator>::difference_type _Off,
-//	const cuda_reverse_iterator<Iterator>& right)
+//	const reverse_iterator<Iterator>& right)
 //{	// return this + integer
 //	return right + _Off;
 //}
 //
 //template<class Iterator>
-//__device__ typename cuda_reverse_iterator<Iterator>::difference_type operator-(const cuda_reverse_iterator<Iterator>& left,
-//	const cuda_reverse_iterator<Iterator>& right)
+//__device__ typename reverse_iterator<Iterator>::difference_type operator-(const reverse_iterator<Iterator>& left,
+//	const reverse_iterator<Iterator>& right)
 //{	// return this + integer
 //	return static_cast<const std::reverse_iterator<Iterator>&>(left) - static_cast<const std::reverse_iterator<Iterator>&>(right);
 //}
@@ -141,6 +143,8 @@ __host__ __device__ auto end_it(T(&array)[N])
 {
 	return &array[N];
 }
+
+CU_END
 
 #endif //CUDA_ITERATORS_H_
 

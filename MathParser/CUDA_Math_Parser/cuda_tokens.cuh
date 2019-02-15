@@ -100,7 +100,7 @@ __device__ thrust::complex<T> gamma(thrust::complex<T> arg)
 	const int a = 12;
 	static double c_space[12];
 	static double *c = NULL;
-	double accm;
+	thrust::complex<T> accm;
 	double pi = acosf(-1);
 
 	if (c == NULL) 
@@ -110,21 +110,21 @@ __device__ thrust::complex<T> gamma(thrust::complex<T> arg)
 		c[0] = sqrt(2.0 * pi);
 		for (auto k = 1; k < a; k++) 
 		{
-			c[k] = exp(a - k) * pow(a - k, k - 0.5) / k1_factrl;
+			c[k] = expf(a - k) * pow(T(a - k), T(k - 0.5)) / k1_factrl;
 			k1_factrl *= -k;
 		}
 	}
 	accm = c[0];
 	for (auto k = 1; k < a; k++) 
 	{
-		accm += c[k] / (arg + k);
+		accm = accm + c[k] / (arg + T(k));
 	}
-	accm *= exp(-(arg + a)) * pow(arg + a, arg + 0.5); 
+	accm *= exp(-(arg + T(a))) * thrust::pow(arg + T(a), arg + T(0.5)); 
 	return accm / arg;
 }
 
 template <class T>
-T factorial(T n)
+__device__ T factorial(T n)
 {
 	auto fact = 1, i = 1;
 	while(i <= n)
@@ -145,7 +145,7 @@ template <class T>
 __device__ thrust::complex<T> j0(thrust::complex<T> arg)
 {
 	//alpha = 0
-	return jn(0, arg);
+	return jn(T(0), arg);
 }
 
 template <class T>
@@ -157,22 +157,22 @@ template <class T>
 __device__ thrust::complex<T> j1(thrust::complex<T> arg)
 {
 	//alpha = 1
-	return jn(1, arg);
+	return jn(T(1), arg);
 }
 
 template <class T>
-__device__ T jn(int n, T arg)
+__device__ T jn(T n, T arg)
 {
 	return jn(n, arg);
 }
 template <class T>
-__device__ thrust::complex<T> jn(int n, thrust::complex<T> arg)
+__device__ thrust::complex<T> jn(T n, thrust::complex<T> arg)
 {
 	//alpha = n
 	thrust::complex<T> result;
 	for (auto m = 0; m < 6; ++m)
 	{
-		result = result + thrust::pow(-1, T(m)) / (factorial(m) * gamma(T(m + n + 1))) * thrust::pow(arg / 2, T(2 * m + n));
+		result = result + (T(pow(-1, m)) / (factorial(m) * gamma(T(m + n + 1))) * thrust::pow(arg / T(2), T(2 * m + n)));
 	}
 	return result;
 }
@@ -186,7 +186,7 @@ template <class T>
 __device__ thrust::complex<T> y0(thrust::complex<T> arg)
 {
 	//alpha = 0
-	return yn(0, arg);
+	return yn(T(0), arg);
 }
 
 template <class T>
@@ -198,19 +198,19 @@ template <class T>
 __device__ thrust::complex<T> y1(thrust::complex<T> arg)
 {
 	//alpha = 1
-	return yn(1, arg);
+	return yn(T(1), arg);
 }
 
 template <class T>
-__device__ T yn(int n, T arg)
+__device__ T yn(T n, T arg)
 {
 	return yn(n, arg);
 }
 template <class T>
-__device__ thrust::complex<T> yn(int n, thrust::complex<T> arg)
+__device__ thrust::complex<T> yn(T n, thrust::complex<T> arg)
 {
-	auto pi = acos(-1);
-	return (jn(n, arg) * cos(n) * pi - jn(-n, arg)) / (sin(n) * pi);
+	auto pi = acosf(-1);
+	return (jn(n, arg) * T(cos(n)) * T(pi) - jn(-n, arg)) / T((sin(n) * pi));
 }
 
 template <class T>
@@ -228,7 +228,7 @@ __device__ thrust::complex<T> abs(thrust::complex<T> arg)
 template <class T>
 __device__ T pow(T base, T arg)
 {
-	return std::pow(base, arg);
+	return pow(base, arg);
 }
 template <class T>
 __device__ thrust::complex<T> pow(thrust::complex<T> base, thrust::complex<T> arg)
@@ -1251,7 +1251,7 @@ public:
 
 		if (rws.value()->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(abs(static_cast<const Number<T>&>((*rws.value())).value())));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(cu::abs(static_cast<const Number<T>&>((*rws.value())).value())));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
 			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
@@ -1718,7 +1718,7 @@ public:
 		if(!rw1c)
 			return rw1c;
 
-		return jn(int(rw0c.value()), rw1c.value());
+		return jn(T(rw0c.value()), rw1c.value());
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1761,7 +1761,7 @@ public:
 
 		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(jn(int(static_cast<Number<T>&>(*op0).value()), static_cast<Number<T>&>(*op1).value()))); //maybe need std::sph_bessel(unsigned n, double x) or std::cyl_bessel(double v, double x)
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(jn(static_cast<Number<T>&>(*op0).value(), static_cast<Number<T>&>(*op1).value()))); //maybe need std::sph_bessel(unsigned n, double x) or std::cyl_bessel(double v, double x)
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
 			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
@@ -1939,7 +1939,7 @@ public:
 		if(!rw1c)
 			return rw1c;
 
-		return yn(int(rw0c.value()), rw1c.value()); 
+		return yn(rw0c.value(), rw1c.value()); 
 	}
 	__device__ virtual bool is_ready() const
 	{
@@ -1982,7 +1982,7 @@ public:
 
 		if (op0->type() == TokenType::number && op1->type() == TokenType::number)
 		{
-			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(yn(int(static_cast<Number<T>&>(*op0).value()), static_cast<Number<T>&>(*op1).value())));
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(yn(static_cast<Number<T>&>(*op0).value(), static_cast<Number<T>&>(*op1).value())));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
 			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
@@ -2257,7 +2257,7 @@ public:
 	}
 	__device__ virtual TokenType type()
 	{
-		return TokenType::logFunction;
+		return TokenType::polarFunction;
 	}
 	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
 	{
@@ -2372,6 +2372,52 @@ public:
 	}
 };
 
+template <class T, class Implementation, class TokenBinPredicate>
+class ExtremumFunction<thrust::complex<T>, Implementation, TokenBinPredicate> : public Function<thrust::complex<T>>
+{
+	cu::vector<cuda_device_unique_ptr<IToken<thrust::complex<T>>>> ops;
+	std::size_t nRequiredParamsCount = 0;
+	TokenBinPredicate m_pred;
+
+	//ExtremumFunction(cu::vector<cuda_device_unique_ptr<IToken<T>>>&& operands, const TokenBinPredicate& pred)
+public:
+	__device__ ExtremumFunction() = default;
+	__device__ ExtremumFunction(std::size_t paramsNumber) : nRequiredParamsCount(paramsNumber) {}
+
+	//not used, but in case a state is needed by the definition of the predicate:
+	template <class Predicate, class = std::enable_if_t<std::is_constructible<TokenBinPredicate, Predicate&&>::value>>
+	__device__ ExtremumFunction(std::size_t paramsNumber, Predicate&& pred) : nRequiredParamsCount(paramsNumber), m_pred(std::forward<Predicate>(pred)) {}
+
+	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<thrust::complex<T>>>&& value)
+	{
+		return cu::make_return_wrapper_error(CudaParserErrorCodes::InvalidArgument);
+	}
+	__device__ virtual return_wrapper_t<thrust::complex<T>> compute(const expr_param_init_block<thrust::complex<T>>& args) const
+	{
+		return cu::make_return_wrapper_error(CudaParserErrorCodes::InvalidArgument);
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return false;
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return nRequiredParamsCount;
+	}
+	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<thrust::complex<T>>>> simplify() const///////////////////////////////TODO:continue
+	{
+		return make_return_wrapper_error(CudaParserErrorCodes::InvalidArgument);
+	}
+	__device__ return_wrapper_t<void> set_required_parameter_count(std::size_t value)
+	{
+		return return_wrapper_t<void>();
+	}
+};
+
 template <class T>
 struct TokenLess
 {
@@ -2405,6 +2451,7 @@ public:
 		return TokenType::maxFunction;
 	}
 };
+
 template <class T>
 class MinFunction : public ExtremumFunction<T, MinFunction<T>, TokenLess<T>>
 {
