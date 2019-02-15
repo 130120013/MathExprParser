@@ -241,7 +241,50 @@ __device__ double strtod(const char* str, char** str_end)
 	return strtod_n(str, (std::size_t) - 1, str_end);
 }
 
+/*
+__device__ double strtoc_n(const char* str, std::size_t cbMax, char** str_end)
+{
+#ifndef __CUDA_ARCH__
+	using std::pow;
+#endif
+	double result = 0;
 
+	if (cbMax == 0)
+		*str_end = (char*)str;
+	else
+	{
+		const char* p = &str[0];
+		const char *p1 = nullptr, *p2 = nullptr, *p3 = nullptr;
+
+		std::size_t cbRest = cbMax;
+		auto intPart = strtoll_n(p, cbRest, (char**)&p1, 10);
+		result = (double)intPart;
+		cbRest -= p1 - p;
+
+		if (cbRest > 0 && (*p1 == '.'))
+		{
+			std::size_t cbFractialPart;
+			auto realPart = strtoll_n(p1 + 1, cbRest, (char**)&p2, 10);
+			cbFractialPart = (std::size_t) (p2 - p1 - 1);
+			result += double(realPart) * pow((double)10, -(double)cbFractialPart);
+			cbRest -= cbFractialPart;
+			p1 = p2;
+		}
+		if (*p1 == 'E')
+		{
+			auto expPart = strtoll_n(p2 + 1, cbRest, const_cast<char**>(&p3), 10);
+			result *= pow((double)10, (double)expPart);
+			p1 = p3;
+		}
+		*str_end = const_cast<char*>(p1);
+	}
+	return result;
+}
+
+__device__ double strtoc(const char* str, char** str_end)
+{
+	return strtoc_n(str, (std::size_t) - 1, str_end);
+}*/
 //#ifdef CUDA_UTILS_CPP
 
 //__device__ __constant__ char chNull = 0;

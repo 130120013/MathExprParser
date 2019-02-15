@@ -13,6 +13,9 @@
 
 CU_BEGIN
 
+template<class T> struct is_complex : std::false_type {};
+template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
+
 	__device__ constexpr bool iswhitespace(char ch) noexcept
 	{
 		return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\0'; //see also std::isspace
@@ -90,6 +93,10 @@ CU_BEGIN
 		{
 			return this->compare(pszString, cu::strlen(pszString));
 		}
+		__device__ inline int compare(char ch) const noexcept
+		{
+			return this->compare(&ch, 1);
+		}
 		template <std::size_t N>
 		__device__ inline auto compare(const char(&strArray)[N]) const noexcept -> std::enable_if_t<N == 0, int>
 		{
@@ -134,6 +141,11 @@ CU_BEGIN
 		return left.compare(strArray) == 0;
 	}
 
+	__device__ bool operator==(const token_string_entity& left, char chTkn) noexcept
+	{
+		return left.compare(chTkn) == 0;
+	}
+
 	__device__ bool operator!=(const token_string_entity& left, const token_string_entity& right) noexcept
 	{
 		return left.compare(right) != 0;
@@ -170,6 +182,11 @@ CU_BEGIN
 	__device__ bool operator!=(const char(&strArray)[N], const token_string_entity& right) noexcept
 	{
 		return right != strArray;
+	}
+
+	__device__ bool operator!=(const token_string_entity& left, char chTkn) noexcept
+	{
+		return left.compare(chTkn) != 0;
 	}
 
 	//let's define token as a word.
@@ -407,6 +424,11 @@ CU_BEGIN
 							construction_success_code = cu::return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 							return;
 						}
+						if (cu::strcmp(cu::string(begPtr, l_endptr).c_str(), "i") == 0 && cu::is_complex<T>::value)
+						{
+							construction_success_code = cu::return_wrapper_t<void>(cu::CudaParserErrorCodes::InvalidArgument);
+							return;
+						}
 						construction_success_code = m_strg.add_parameter(cu::string(begPtr, l_endptr));
 						if (!construction_success_code)
 							return;
@@ -478,6 +500,41 @@ CU_BEGIN
 	template <class T>
 	class Mathexpr
 	{
+		static constexpr char IMAGINARY_UNIT = 'i';
+		template <class U = T>
+		auto parse_imaginary_unit() -> std::enable_if_t<cu::is_complex<U>::value, Number<U>>
+		{
+			return U(0, 1);
+		}
+		template <class U = T, class = void>
+		auto parse_imaginary_unit() -> std::enable_if_t<std::is_same<U, double>::value, Variable<U>>
+		{
+			auto ch = IMAGINARY_UNIT;
+			return Variable<U>(&ch, 1);
+		}
+		template <class U = T>
+		auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<std::is_same<U, double>::value, return_wrapper_t<U>>
+		{
+			char* conversion_end;
+			auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
+			if (conversion_end != tkn.end())
+				return cu::make_return_wrapper_error(CudaParserErrorCodes::InvalidExpression);
+			return return_wrapper_t<U>(value);
+		}
+		template <class U = T>
+		auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<cu::is_complex<U>::value, return_wrapper_t<U>>
+		{
+			char* conversion_end;
+			auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
+			if (conversion_end == tkn.end())
+				return return_wrapper_t<U>(U(value));
+			//auto i_marker = conversion_end;
+			//if (*conversion_end == ' ')
+			//	i_marker = cu::skipSpaces(i_marker);
+			if (*conversion_end == IMAGINARY_UNIT)
+				return return_wrapper_t<U>(U(0, value));
+			return cu::make_return_wrapper_error(CudaParserErrorCodes::InvalidExpression);
+		}
 	public:
 		__device__ Mathexpr(const char* sMathExpr, std::size_t cbMathExpr);
 		__device__ Mathexpr(const char* szMathExpr) :Mathexpr(szMathExpr, std::strlen(szMathExpr)) {}
@@ -518,7 +575,6 @@ CU_BEGIN
 		Header<T> header;
 		cuda_device_unique_ptr<IToken<T>> body;
 
-		template <class T>
 		__device__ cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>> lexBody(const char* expr, std::size_t length)
 		{
 			char* begPtr = (char*)expr;
@@ -560,22 +616,22 @@ CU_BEGIN
 				}
 				else if (isdigit(*tkn.begin()))
 				{
-					char* conversion_end;
-					static_assert(std::is_same<T, double>::value, "The following line is only applicable to double");
-					auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
-					if (conversion_end != tkn.end())
-						return cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
-					last_type_id = int(tokens.push_token(Number<T>(value))->type());
+					auto rw = parse_val(tkn);
+					if (!rw)
+						return rw;
+					last_type_id = int(tokens.push_token(Number<T>(rw.value()))->type());
 				}
 				else if (isalpha(*tkn.begin()))
 				{
-					if (tkn == "PI")
+					if (tkn == IMAGINARY_UNIT)
+						last_type_id = int(tokens.push_token(parse_imaginary_unit())->type());
+					else if (tkn == "PI")
 					{
-						last_type_id = int(tokens.push_token(PI<T>())->type());
+						last_type_id = int(tokens.push_token(PI<T>())->type()); ////////////////////////
 					}
 					else if (tkn == "EULER")
 					{
-						last_type_id = int(tokens.push_token(Euler<T>())->type());
+						last_type_id = int(tokens.push_token(Euler<T>())->type()); ///////////////////////////
 					}
 					else if (tkn == "sin")
 					{
@@ -733,7 +789,8 @@ CU_BEGIN
 		const char* endptr;
 		header = Header<T>(sMathExpr, cbMathExpr, (char**)&endptr);
 		++endptr;
-		this->body = simplify_body(cu::list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value()));
+		auto fr = cu::list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value());
+		this->body = simplify_body(fr);
 	}
 CU_END
 
