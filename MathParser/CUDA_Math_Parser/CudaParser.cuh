@@ -502,18 +502,18 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 	{
 		static constexpr char IMAGINARY_UNIT = 'i';
 		template <class U = T>
-		auto parse_imaginary_unit() -> std::enable_if_t<cu::is_complex<U>::value, Number<U>>
+		__device__ auto parse_imaginary_unit() -> std::enable_if_t<cu::is_complex<U>::value, Number<U>>
 		{
 			return U(0, 1);
 		}
 		template <class U = T, class = void>
-		auto parse_imaginary_unit() -> std::enable_if_t<std::is_same<U, double>::value, Variable<U>>
+		__device__ auto parse_imaginary_unit() -> std::enable_if_t<std::is_same<U, double>::value, Variable<U>>
 		{
 			auto ch = IMAGINARY_UNIT;
 			return Variable<U>(&ch, 1);
 		}
 		template <class U = T>
-		auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<std::is_same<U, double>::value, return_wrapper_t<U>>
+		__device__ auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<std::is_same<U, double>::value, return_wrapper_t<U>>
 		{
 			char* conversion_end;
 			auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
@@ -522,7 +522,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 			return return_wrapper_t<U>(value);
 		}
 		template <class U = T>
-		auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<cu::is_complex<U>::value, return_wrapper_t<U>>
+		__device__ auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<cu::is_complex<U>::value, return_wrapper_t<U>>
 		{
 			char* conversion_end;
 			auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
@@ -789,8 +789,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 		const char* endptr;
 		header = Header<T>(sMathExpr, cbMathExpr, (char**)&endptr);
 		++endptr;
-		auto fr = cu::list<cuda_device_unique_ptr<IToken<T>>>(lexBody<T>(endptr, cbMathExpr - (endptr - sMathExpr)).value());
-		this->body = simplify_body(fr);
+		this->body = simplify_body(lexBody(endptr, cbMathExpr - (endptr - sMathExpr)).value());
 	}
 CU_END
 

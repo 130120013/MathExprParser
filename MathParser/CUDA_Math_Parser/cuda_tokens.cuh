@@ -690,7 +690,7 @@ public:
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(static_cast<Number<T>&>(*op0).value() + static_cast<Number<T>&>(*op1).value()));
 			if (!ptr)
 				return cu::make_return_wrapper_error<cuda_device_unique_ptr<IToken<T>>>(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return cuda_device_unique_ptr<cu::IToken<double>>(std::move(ptr));
+			return cuda_device_unique_ptr<cu::IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<BinaryPlus<T>>();
 		if (!op_new)
@@ -756,7 +756,7 @@ public:
 			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(-static_cast<Number<T>&>(*rws.value())));
 			if (!ptr)
 				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
-			return cuda_device_unique_ptr<cu::IToken<double>>(std::move(ptr));
+			return cuda_device_unique_ptr<cu::IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<UnaryMinus<T>>();
 		if(!op_new)
