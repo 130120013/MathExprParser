@@ -227,7 +227,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 		{
 			bool fFlPointFound = *pStart == '.';
 			const char* pEnd = pStart;
-			while (isdigit(*++pEnd) || (!fFlPointFound && *pEnd == '.') || (*pEnd == 'i')) continue;
+			while (isdigit(*++pEnd) || (!fFlPointFound && *pEnd == '.') || (*pEnd == 'j')) continue;
 			return token_string_entity(pStart, pEnd);
 		}
 		if (isalpha(*pStart))
@@ -447,7 +447,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 							construction_success_code = cu::return_wrapper_t<void>(CudaParserErrorCodes::UnexpectedToken);
 							return;
 						}
-						if (cu::strcmp(cu::string(begPtr, l_endptr).c_str(), "i") == 0 && cu::is_complex<T>::value)
+						if (cu::strcmp(cu::string(begPtr, l_endptr).c_str(), "j") == 0 && cu::is_complex<T>::value)
 						{
 							construction_success_code = cu::return_wrapper_t<void>(cu::CudaParserErrorCodes::InvalidArgument);
 							return;
@@ -523,7 +523,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 	template <class T>
 	class Mathexpr
 	{
-		static constexpr char IMAGINARY_UNIT = 'i';
+		static constexpr char IMAGINARY_UNIT = 'j';
 		template <class U = T>
 		__device__ auto parse_imaginary_unit() -> std::enable_if_t<cu::is_complex<U>::value, Number<U>>
 		{
@@ -655,6 +655,11 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 					else if (tkn == "EULER")
 					{
 						last_type_id = int(tokens.push_token(Euler<T>())->type()); ///////////////////////////
+					}
+					else if (tkn == "arg")
+					{
+						last_type_id = int(tokens.push_token(ArgFunction<T>())->type());
+						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<ArgFunction<T>>()), 1));
 					}
 					else if (tkn == "sin")
 					{

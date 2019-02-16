@@ -49,6 +49,7 @@ __device__ constexpr bool IsOperatorTokenTypeId(TokenType id)
 		|| id == TokenType::operatorPow;
 }
 
+
 ////////////////////////
 template <class T>
 __device__ T sin(T arg)
@@ -223,6 +224,17 @@ __device__ thrust::complex<T> abs(thrust::complex<T> arg)
 {
 	//alpha = 0
 	return thrust::abs(arg);
+}
+
+template <class T>
+__device__ T arg(T z)
+{
+	return arg(z);
+}
+template <class T>
+__device__ thrust::complex<T> arg(thrust::complex<T> z)
+{
+	return thrust::arg(z);
 }
 
 template <class T>
@@ -1257,6 +1269,74 @@ public:
 			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
 		}
 		auto op_new = make_cuda_device_unique_ptr<AbsFunction<T>>();
+		if (!op_new)
+			return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
+		auto rwp = op_new->push_argument(std::move(rws.value()));
+		if (!rwp)
+			return rwp;
+		return return_wrapper_t<cuda_device_unique_ptr<IToken<T>>>(std::move(op_new));
+	}
+};
+
+template <class T>
+class ArgFunction : public Function<T>
+{
+	static_parameter_storage<cuda_device_unique_ptr<IToken<T>>, 1> ops;
+public:
+	__device__ virtual return_wrapper_t<void> push_argument(cuda_device_unique_ptr<IToken<T>>&& value)
+	{
+		return ops.push_argument(std::move(value));
+	}
+	__device__ virtual return_wrapper_t<T> compute(const expr_param_init_block<T>& args) const
+	{
+		if (!this->is_ready())
+			return cu::make_return_wrapper_error(CudaParserErrorCodes::NotReady);
+		auto rw = ops[0];
+		if (!rw)
+			return rw;
+		auto rwc = rw.value()->compute(args);
+
+		return cu::arg(rwc.value());
+	}
+	__device__ virtual bool is_ready() const
+	{
+		return ops.is_ready();
+	}
+	__device__ virtual std::size_t get_required_parameter_count() const
+	{
+		return 1;
+	}
+	__device__  const char* get_function_name() const
+	{
+		return "arg";
+	}
+	__device__ virtual TokenType type()
+	{
+		return TokenType::sinFunction;
+	}
+	__device__ virtual short getPriority()
+	{
+		return 4;
+	}
+	__device__ virtual return_wrapper_t<cuda_device_unique_ptr<IToken<T>>> simplify() const
+	{
+		if (!this->is_ready())
+			return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotReady);
+		auto rw = ops[0];
+		if (!rw)
+			return rw;
+		auto rws = rw.value()->simplify();
+		if (!rws)
+			return rws;
+
+		if (rws.value()->type() == TokenType::number)
+		{
+			auto ptr = make_cuda_device_unique_ptr<Number<T>>(Number<T>(cu::arg(static_cast<const Number<T>&>(*rws.value()).value())));
+			if (!ptr)
+				return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
+			return cuda_device_unique_ptr<IToken<T>>(std::move(ptr));
+		}
+		auto op_new = make_cuda_device_unique_ptr<ArgFunction<T>>();
 		if (!op_new)
 			return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
 		auto rwp = op_new->push_argument(std::move(rws.value()));

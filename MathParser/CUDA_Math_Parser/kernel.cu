@@ -33,7 +33,7 @@ int main()
 {
 	cudaError_t cudaStatus;
 	//const char pStr[] = "f(x) = 2*j1(0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
-	const char pStr[] = "f(x) = abs(polar(2, 5)) * x";
+	const char pStr[] = "f(x) = arg(i) * x";
 	number_type V[50];
 	std::size_t cbStack;
 
