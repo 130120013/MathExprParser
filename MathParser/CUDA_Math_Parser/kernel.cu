@@ -13,7 +13,7 @@ typedef thrust::complex<double> number_type;
 
 __device__ cu::Mathexpr<number_type>* g_pExpr;
 
-__global__ void memset_expr(number_type* vec, std::size_t n, const char* pStr, std::size_t cbStr)
+__global__ void memset_expr(cu::CudaParserErrorCodes* pCode, number_type* vec, std::size_t n, const char* pStr, std::size_t cbStr)
 {
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i == 0)
@@ -22,7 +22,10 @@ __global__ void memset_expr(number_type* vec, std::size_t n, const char* pStr, s
 	if (i < n)
 	{
 		auto& m = *g_pExpr;
-		vec[i] = m(10).value();
+		auto rv = m(thrust::complex<double>(1, i));
+		*pCode = rv.return_code();
+		if (bool(rv))
+			vec[i] = rv.value();
 	}
 	__syncthreads();
 	if (!i)
@@ -33,7 +36,7 @@ int main()
 {
 	cudaError_t cudaStatus;
 	//const char pStr[] = "f(x) = 2*j1(0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
-	const char pStr[] = "f(x) = arg(i) * x";
+	const char pStr[] = "f(x) = arg(xcx";
 	number_type V[50];
 	std::size_t cbStack;
 
@@ -46,12 +49,19 @@ int main()
 		return -5;
 
 	auto pStr_d = make_cuda_unique_ptr<char>(sizeof(pStr));
+	if (!pStr_d)
+		return -100;
 	auto V_d = make_cuda_unique_ptr<number_type>(sizeof(V) / sizeof(number_type));
+	if (!V_d)
+		return -100;
+	auto pCode = make_cuda_unique_ptr<cu::CudaParserErrorCodes>();
+	if (!pCode)
+		return -100;
 
 	cudaStatus = cudaMemcpy(pStr_d.get(), pStr, sizeof(pStr) - 1, cudaMemcpyHostToDevice);
 	if (cudaStatus != cudaSuccess)
 		return -1;
-	memset_expr<<<1, sizeof(V) / sizeof(number_type)>>>(V_d.get(), sizeof(V) / sizeof(number_type), pStr_d.get(), sizeof(pStr) - 1);
+	memset_expr<<<1, sizeof(V) / sizeof(number_type)>>>(pCode.get(), V_d.get(), sizeof(V) / sizeof(number_type), pStr_d.get(), sizeof(pStr) - 1);
 
 	/*cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
 	Mathexpr<double> mathexpr(expression);
@@ -70,9 +80,23 @@ int main()
 		return -2;
 	}
 
-	cudaStatus = cudaMemcpy(V, V_d.get(), sizeof(V), cudaMemcpyDeviceToHost);
+	cu::CudaParserErrorCodes errc;
+	cudaStatus = cudaMemcpy(&errc, pCode.get(), sizeof(cu::CudaParserErrorCodes), cudaMemcpyDeviceToHost);
 	if (cudaStatus != cudaSuccess)
 		return -3;
+	if (errc == cu::CudaParserErrorCodes::Success)
+	{
+		cudaStatus = cudaMemcpy(V, V_d.get(), sizeof(V), cudaMemcpyDeviceToHost);
+		if (cudaStatus != cudaSuccess)
+			return -3;
+		for (auto elem:V)
+			std::cout << elem << " ";
+		std::cout << "\n";
+	}else
+	{
+		printf("CUDA kernel returned code %d", int(errc));
+		return -50;
+	}
 
 	//printf("%d", l.front());
 
@@ -84,9 +108,7 @@ int main()
 		return -4;
 	}
 
-	for (auto elem:V)
-		std::cout << elem << " ";
-	std::cout << "\n";
+	
 
 	return 0;
 }

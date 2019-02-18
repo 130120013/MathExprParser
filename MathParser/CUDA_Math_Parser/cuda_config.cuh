@@ -7,8 +7,6 @@
 #ifndef CUDA_CONFIG_CUH
 #define CUDA_CONFIG_CUH
 
-#pragma warning(disable:4996)
-
 #define CU_BEGIN namespace cu { 
 #define CU_END }
 
