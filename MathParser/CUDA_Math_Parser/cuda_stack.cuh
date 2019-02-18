@@ -1,4 +1,5 @@
 #include "cuda_config.cuh"
+#include "cuda_return_wrapper.cuh"
 
 #ifndef CUDA_STACK_CUH
 #define CUDA_STACK_CUH
@@ -18,8 +19,8 @@ class stack
 
 public:
 	__device__ ~stack();
-	__device__ void push(T const& data);
-	__device__ void push(T&& data);
+	__device__ cu::return_wrapper_t<void> push(T const& data);
+	__device__ cu::return_wrapper_t<void> push(T&& data);
 	__device__ bool empty() const;
 	__device__ int size() const;
 	__device__ T& top();
@@ -42,16 +43,22 @@ __device__ stack<T>::~stack()
 	}
 }
 template<typename T>
-__device__ void stack<T>::push(const T& data)
+__device__ cu::return_wrapper_t<void> stack<T>::push(const T& data)
 {
 	root = new node(data, root);
+	if (root == nullptr)
+		return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
 	++elements;
+	return cu::return_wrapper_t<void>();
 }
 template<typename T>
-__device__ void stack<T>::push(T&& data)
+__device__ cu::return_wrapper_t<void> stack<T>::push(T&& data)
 {
 	root = new node(std::move(data), root);
+	if (root == nullptr)
+		return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory);
 	++elements;
+	return cu::return_wrapper_t<void>();
 }
 template<typename T>
 __device__ bool stack<T>::empty() const

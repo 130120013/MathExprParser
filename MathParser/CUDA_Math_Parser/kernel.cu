@@ -3,8 +3,10 @@
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include "cuda_config.cuh"
 #include "cuda_string.cuh"
 #include "cuda_list.cuh"
+#include "cuda_return_wrapper.cuh"
 //#include "cuda_stack.cuh"
 #include <stdio.h>
 #include "CudaParser.cuh"
@@ -17,12 +19,14 @@ __global__ void memset_expr(cu::CudaParserErrorCodes* pCode, number_type* vec, s
 {
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i == 0)
-		g_pExpr = new cu::Mathexpr<number_type>(pStr, cbStr);
+		g_pExpr = new cu::Mathexpr<number_type>(pCode, pStr, cbStr);
 	__syncthreads();
+	if (*pCode != cu::CudaParserErrorCodes::Success)
+		return;
 	if (i < n)
 	{
 		auto& m = *g_pExpr;
-		auto rv = m(thrust::complex<double>(1, i));
+		auto rv = m(number_type(i, i));
 		*pCode = rv.return_code();
 		if (bool(rv))
 			vec[i] = rv.value();
@@ -36,8 +40,8 @@ int main()
 {
 	cudaError_t cudaStatus;
 	//const char pStr[] = "f(x) = 2*j1(0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
-	const char pStr[] = "f(x) = arg(xcx";
-	number_type V[50];
+	const char pStr[] = "f(x) = abs(x) * (cos(arg(x)) + i * sin(arg(x)))";
+	number_type V[1];
 	std::size_t cbStack;
 
 	cudaStatus = cudaDeviceGetLimit(&cbStack, cudaLimitStackSize);
@@ -94,7 +98,7 @@ int main()
 		std::cout << "\n";
 	}else
 	{
-		printf("CUDA kernel returned code %d", int(errc));
+		printf("CUDA kernel returned code %d (%s)", int(errc), strerror(errc));
 		return -50;
 	}
 

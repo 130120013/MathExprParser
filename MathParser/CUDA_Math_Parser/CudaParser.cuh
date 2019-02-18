@@ -250,7 +250,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 		__device__ auto push_token(TokenParamType&& op) -> std::enable_if_t<
 			std::is_base_of<Operator<T>, std::decay_t<TokenParamType>>::value ||
 			std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value,
-			IToken<T>*
+			cu::return_wrapper_t<IToken<T>*>
 		>
 		{
 			auto my_priority = op.getPriority();
@@ -259,7 +259,9 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 				outputList.push_back(std::move(operationStack.top()));
 				operationStack.pop();
 			}
-			operationStack.push(make_cuda_device_unique_ptr<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
+			auto rw = operationStack.push(make_cuda_device_unique_ptr<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(op)));
+			if (!rw)
+				return rw;
 			return operationStack.top().get();
 		}
 
@@ -268,11 +270,11 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 			!(std::is_base_of<Operator<T>, std::decay_t<TokenParamType>>::value ||
 				std::is_base_of<Function<T>, std::decay_t<TokenParamType>>::value ||
 				std::is_base_of<Bracket<T>, std::decay_t<TokenParamType>>::value),
-			IToken<T>*
+			cu::return_wrapper_t<IToken<T>*>
 		>
 		{
 			outputList.push_back(make_cuda_device_unique_ptr<std::decay_t<TokenParamType>>(std::forward<TokenParamType>(value)));
-			return outputList.back().get();
+			return cu::return_wrapper_t<IToken<T>*>(outputList.back().get());
 		}
 
 		__device__ cu::return_wrapper_t<void> pop_bracket()
@@ -525,18 +527,28 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 	{
 		static constexpr char IMAGINARY_UNIT = 'j';
 		template <class U = T>
-		__device__ auto parse_imaginary_unit() -> std::enable_if_t<cu::is_complex<U>::value, Number<U>>
+		__device__ static constexpr auto is_imaginary_unit(char) -> std::enable_if_t<std::is_same<U, double>::value, bool>
+		{
+			return false;
+		}
+		template <class U = T>
+		__device__ static constexpr auto is_imaginary_unit(char ch) -> std::enable_if_t<cu::is_complex<U>::value, bool>
+		{
+			return ch == IMAGINARY_UNIT;
+		}
+		template <class U = T>
+		__device__ static auto parse_imaginary_unit() -> std::enable_if_t<cu::is_complex<U>::value, Number<U>>
 		{
 			return U(0, 1);
 		}
 		template <class U = T, class = void>
-		__device__ auto parse_imaginary_unit() -> std::enable_if_t<std::is_same<U, double>::value, Variable<U>>
+		__device__ static auto parse_imaginary_unit() -> std::enable_if_t<std::is_same<U, double>::value, Variable<U>>
 		{
 			auto ch = IMAGINARY_UNIT;
 			return Variable<U>(&ch, 1);
 		}
 		template <class U = T>
-		__device__ auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<std::is_same<U, double>::value, return_wrapper_t<U>>
+		__device__ static auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<std::is_same<U, double>::value, return_wrapper_t<U>>
 		{
 			char* conversion_end;
 			auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
@@ -545,7 +557,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 			return return_wrapper_t<U>(value);
 		}
 		template <class U = T>
-		__device__ auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<cu::is_complex<U>::value, return_wrapper_t<U>>
+		__device__ static auto parse_val(const token_string_entity& tkn) -> std::enable_if_t<cu::is_complex<U>::value, return_wrapper_t<U>>
 		{
 			char* conversion_end;
 			auto value = cu::strtod(tkn.begin(), (char**)&conversion_end);
@@ -559,9 +571,9 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 			return cu::make_return_wrapper_error(CudaParserErrorCodes::InvalidExpression);
 		}
 	public:
-		__device__ Mathexpr(const char* sMathExpr, std::size_t cbMathExpr);
-		__device__ Mathexpr(const char* szMathExpr) :Mathexpr(szMathExpr, std::strlen(szMathExpr)) {}
-		__device__ Mathexpr(const cu::string& strMathExpr) : Mathexpr(strMathExpr.c_str(), strMathExpr.size()) {}
+		__device__ Mathexpr(cu::CudaParserErrorCodes* pCode, const char* sMathExpr, std::size_t cbMathExpr);
+		__device__ Mathexpr(cu::CudaParserErrorCodes* pCode, const char* szMathExpr) :Mathexpr(pCode, szMathExpr, std::strlen(szMathExpr)) {}
+		__device__ Mathexpr(cu::CudaParserErrorCodes* pCode, const cu::string& strMathExpr) : Mathexpr(pCode, strMathExpr.c_str(), strMathExpr.size()) {}
 		template <class ArgIteratorBegin, class ArgIteratorEnd>
 		__device__ auto operator()(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 			-> std::enable_if_t<
@@ -598,6 +610,95 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 		Header<T> header;
 		cuda_device_unique_ptr<IToken<T>> body;
 
+		enum class LastParsedId
+		{
+			Unspecified,
+			Literal,
+			Function,
+			UnaryOperator,
+			BinaryOperator,
+			OpenBracket,
+			ClosingBracket,
+			Comma
+		};
+		__device__ static inline bool verify_unary_operator(LastParsedId last_parsed_entity)
+		{
+			switch (last_parsed_entity)
+			{
+			case LastParsedId::Unspecified:
+			case LastParsedId::BinaryOperator:
+			case LastParsedId::Comma:
+			case LastParsedId::OpenBracket:
+				return true;
+			default:
+				return false;
+			}
+		}
+		__device__ static inline bool verify_binary_operator(LastParsedId last_parsed_entity)
+		{
+			switch (last_parsed_entity)
+			{
+			case LastParsedId::ClosingBracket:
+			case LastParsedId::Literal:
+				return true;
+			default:
+				return false;
+			}
+		}
+		__device__ static inline bool verify_comma(LastParsedId last_parsed_entity)
+		{
+			return verify_binary_operator(last_parsed_entity);
+		}
+		__device__ static inline bool verify_literal(LastParsedId last_parsed_entity)
+		{
+			switch (last_parsed_entity)
+			{
+			case LastParsedId::Unspecified:
+			case LastParsedId::UnaryOperator:
+			case LastParsedId::BinaryOperator:
+			case LastParsedId::Comma:
+			case LastParsedId::OpenBracket:
+				return true;
+			default:
+				return false;
+			}
+		}
+		__device__ static inline bool verify_open_bracket(LastParsedId last_parsed_entity)
+		{
+			switch (last_parsed_entity)
+			{
+			case LastParsedId::Unspecified:
+			case LastParsedId::Function:
+			case LastParsedId::UnaryOperator:
+			case LastParsedId::BinaryOperator:
+			case LastParsedId::OpenBracket:
+				return true;
+			default:
+				return false;
+			}
+		}
+		__device__ static inline bool verify_closing_bracket(LastParsedId last_parsed_entity)
+		{
+			switch (last_parsed_entity)
+			{
+			case LastParsedId::Literal:
+			case LastParsedId::ClosingBracket:
+				return true;
+			default:
+				return false;
+			}
+		}
+		__device__ static inline bool verify_end(LastParsedId last_parsed_entity)
+		{
+			switch (last_parsed_entity)
+			{
+			case LastParsedId::Literal:
+			case LastParsedId::ClosingBracket:
+				return true;
+			default:
+				return false;
+			}
+		}
 		__device__ cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>> lexBody(const char* expr, std::size_t length)
 		{
 			char* begPtr = (char*)expr;
@@ -605,152 +706,340 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 			TokenStorage<T> tokens;
 			cu::stack <cu::pair<cuda_device_unique_ptr<Function<T>>, std::size_t>> funcStack;
 			int last_type_id = -1;
+			LastParsedId last_parse_entity = LastParsedId::Unspecified;
 
 			while (cbRest > 0)
 			{
 				auto tkn = parse_string_token<T>(begPtr, cbRest);
 				if (tkn == "+")
 				{
-					if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
-						last_type_id = int(tokens.push_token(UnaryPlus<T>())->type());
-					else //binary form
-						last_type_id = int(tokens.push_token(BinaryPlus<T>())->type());
+					if (verify_unary_operator(last_parse_entity))
+					{
+						auto rw = tokens.push_token(UnaryPlus<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::UnaryOperator;
+					}else if (verify_binary_operator(last_parse_entity))
+					{
+						auto rw = tokens.push_token(BinaryPlus<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::BinaryOperator;
+					}else
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
 				}
 				else if (tkn == "-")
 				{
-					if (last_type_id == -1 || IsOperatorTokenTypeId(TokenType(last_type_id))) //unary form
-						last_type_id = int(tokens.push_token(UnaryMinus<T>())->type());
-					else //binary form
-						last_type_id = int(tokens.push_token(BinaryMinus<T>())->type());
+					
+					if (verify_unary_operator(last_parse_entity))
+					{
+						auto rw = tokens.push_token(UnaryMinus<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::UnaryOperator;
+					}else if (verify_binary_operator(last_parse_entity))
+					{
+						auto rw = tokens.push_token(BinaryMinus<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::BinaryOperator;
+					}else
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
 				}
 				else if (tkn == "*")
-					last_type_id = int(tokens.push_token(OperatorMul<T>())->type());
-				else if (tkn == "/")
-					last_type_id = int(tokens.push_token(OperatorDiv<T>())->type());
-				else if (tkn == "^")
-					last_type_id = int(tokens.push_token(OperatorPow<T>())->type());
-				else if (tkn == ",")
 				{
+					if (!verify_binary_operator(last_parse_entity))
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
+					auto rw = tokens.push_token(OperatorMul<T>());
+					if (!rw)
+						return rw;
+					last_type_id = int(rw.value()->type());
+					last_parse_entity = LastParsedId::BinaryOperator;
+				}else if (tkn == "/")
+				{
+					if (!verify_binary_operator(last_parse_entity))
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
+					auto rw = tokens.push_token(OperatorDiv<T>());
+					if (!rw)
+						return rw;
+					last_type_id = int(rw.value()->type());
+					last_parse_entity = LastParsedId::BinaryOperator;
+				}else if (tkn == "^")
+				{
+					if (!verify_binary_operator(last_parse_entity))
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
+					auto rw = tokens.push_token(OperatorPow<T>());
+					if (!rw)
+						return rw;
+					last_type_id = int(rw.value()->type());
+					last_parse_entity = LastParsedId::BinaryOperator;
+				}else if (tkn == ",")
+				{
+					if (!verify_comma(last_parse_entity))
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
 					tokens.comma_parameter_replacement();
 
 					if (funcStack.top().first.get()->type() == TokenType::maxFunction ||
 						funcStack.top().first.get()->type() == TokenType::minFunction)
 						funcStack.top().second += 1;
+					last_parse_entity = LastParsedId::Comma;
 				}
 				else if (isdigit(*tkn.begin()))
 				{
-					auto rw = parse_val(tkn);
-					if (!rw)
-						return rw;
-					last_type_id = int(tokens.push_token(Number<T>(rw.value()))->type());
+					if (!verify_literal(last_parse_entity))
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
+					auto rw_val = parse_val(tkn);
+					if (!rw_val)
+						return rw_val;
+					auto rw_tkn = tokens.push_token(Number<T>(rw_val.value()));
+					if (!rw_tkn)
+						return rw_tkn;
+					last_type_id = int(rw_tkn.value()->type());
+					last_parse_entity = LastParsedId::Literal;
 				}
 				else if (isalpha(*tkn.begin()))
 				{
-					if (tkn == IMAGINARY_UNIT)
-						last_type_id = int(tokens.push_token(parse_imaginary_unit())->type());
+					if (!verify_literal(last_parse_entity))
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
+					if (is_imaginary_unit(*tkn.begin()))
+					{
+						auto rw = tokens.push_token(parse_imaginary_unit());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+					}
 					else if (tkn == "PI")
 					{
-						last_type_id = int(tokens.push_token(PI<T>())->type()); ////////////////////////
+						auto rw = tokens.push_token(PI<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type()); // TODO: Set last_parse_entity for every entity
+						last_parse_entity = LastParsedId::Literal;
 					}
 					else if (tkn == "EULER")
 					{
-						last_type_id = int(tokens.push_token(Euler<T>())->type()); ///////////////////////////
+						auto rw = tokens.push_token(Euler<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
 					}
 					else if (tkn == "arg")
 					{
-						last_type_id = int(tokens.push_token(ArgFunction<T>())->type());
-						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<ArgFunction<T>>()), 1));
+						auto rw = tokens.push_token(ArgFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<ArgFunction<T>>()), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "sin")
 					{
-						last_type_id = int(tokens.push_token(SinFunction<T>())->type());
-						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<SinFunction<T>>()), 1));
+						auto rw = tokens.push_token(SinFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<SinFunction<T>>()), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "cos")
 					{
-						last_type_id = int(tokens.push_token(CosFunction<T>())->type());
-						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<CosFunction<T>>()), 1));
+						auto rw = tokens.push_token(CosFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<CosFunction<T>>()), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "tg")
 					{
-						last_type_id = int(tokens.push_token(TgFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<TgFunction<T>>(), 1));
+						auto rw = tokens.push_token(TgFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<TgFunction<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "log10")
 					{
-						last_type_id = int(tokens.push_token(Log10Function<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Log10Function<T>>(), 1));
+						auto rw = tokens.push_token(Log10Function<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Log10Function<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "ln")
 					{
-						last_type_id = int(tokens.push_token(LnFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<LnFunction<T>>(), 1));
+						auto rw = tokens.push_token(LnFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<LnFunction<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "log")
 					{
-						last_type_id = int(tokens.push_token(LogFunction<T>())->type());
-						funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<LogFunction<T>>()), 2));
+						auto rw = tokens.push_token(LogFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<LogFunction<T>>()), 2));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "j0")
 					{
-						last_type_id = int(tokens.push_token(J0Function<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<J0Function<T>>(), 1));
+						auto rw = tokens.push_token(J0Function<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<J0Function<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "j1")
 					{
-						last_type_id = int(tokens.push_token(J1Function<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<J1Function<T>>(), 1));
+						auto rw = tokens.push_token(J1Function<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<J1Function<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "jn")
 					{
-						last_type_id = int(tokens.push_token(JnFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<JnFunction<T>>(), 2));
+						auto rw = tokens.push_token(JnFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<JnFunction<T>>(), 2));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "y0")
 					{
-						last_type_id = int(tokens.push_token(Y0Function<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Y0Function<T>>(), 1));
+						auto rw = tokens.push_token(Y0Function<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Y0Function<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "y1")
 					{
-						last_type_id = int(tokens.push_token(Y1Function<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Y1Function<T>>(), 1));
+						auto rw = tokens.push_token(Y1Function<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Y1Function<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "yn")
 					{
-						last_type_id = int(tokens.push_token(YnFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<YnFunction<T>>(), 2));
+						auto rw = tokens.push_token(YnFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<YnFunction<T>>(), 2));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "gamma")
 					{
-						last_type_id = int(tokens.push_token(GammaFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<GammaFunction<T>>(), 1));
+						auto rw = tokens.push_token(GammaFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<GammaFunction<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "abs")
 					{
-						last_type_id = int(tokens.push_token(AbsFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<AbsFunction<T>>(), 1));
+						auto rw = tokens.push_token(AbsFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<AbsFunction<T>>(), 1));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "polar")
 					{
-						last_type_id = int(tokens.push_token(PolarFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<PolarFunction<T>>(), 2));
+						auto rw = tokens.push_token(PolarFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<PolarFunction<T>>(), 2));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "max")
 					{
-						last_type_id = int(tokens.push_token(MaxFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MaxFunction<T>>(), 0));
+						auto rw = tokens.push_token(MaxFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MaxFunction<T>>(), 0));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "min")
 					{
-						last_type_id = int(tokens.push_token(MinFunction<T>())->type());
-						funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
+						auto rw = tokens.push_token(MinFunction<T>());
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
+						if(!rw)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else //if (this->header.get_param_index(cu::string(tkn.begin(), tkn.end())).value() >= 0)
-						last_type_id = int(tokens.push_token(Variable<T>(&*tkn.begin(), tkn.size()))->type());
+					{
+						auto rw = tokens.push_token(Variable<T>(&*tkn.begin(), tkn.size()));
+						if (!rw)
+							return rw;
+						last_type_id = int(rw.value()->type());
+						last_parse_entity = LastParsedId::Literal;
+					}
 				}
 				else if (tkn == ")")
 				{
+					if (!verify_open_bracket(last_parse_entity))
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
 					tokens.pop_bracket();
 					if(!funcStack.empty())
 					{
@@ -766,17 +1055,25 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						}
 						funcStack.pop();
 					}
+					last_parse_entity = LastParsedId::OpenBracket;
 				}
 				else if (tkn == "(")
 				{
-					last_type_id = int(tokens.push_token(Bracket<T>())->type());
+					if (!verify_closing_bracket(last_parse_entity))
+						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
+					auto rw = tokens.push_token(Bracket<T>());
+					if (!rw)
+						return rw;
+					last_type_id = int(rw.value()->type());
+					last_parse_entity = LastParsedId::ClosingBracket;
 				}
 				else
 					return cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
 				cbRest -= tkn.end() - begPtr;
 				begPtr = (char*) tkn.end();
 			}
-
+			if (!verify_end(last_parse_entity))
+				return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
 			//auto formula = std::move(tokens).finalize();
 			return std::move(tokens).finalize();
 		}
@@ -818,12 +1115,15 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 	}
 
 	template <class T>
-	__device__ Mathexpr<T>::Mathexpr(const char* sMathExpr, std::size_t cbMathExpr)
+	__device__ Mathexpr<T>::Mathexpr(cu::CudaParserErrorCodes* pCode, const char* sMathExpr, std::size_t cbMathExpr)
 	{
 		const char* endptr;
 		header = Header<T>(sMathExpr, cbMathExpr, (char**)&endptr);
 		++endptr;
-		this->body = simplify_body(lexBody(endptr, cbMathExpr - (endptr - sMathExpr)).value());
+		auto rwFormula = lexBody(endptr, cbMathExpr - (endptr - sMathExpr));
+		if(bool(rwFormula))
+			this->body = simplify_body(std::move(rwFormula.value()));
+		*pCode = rwFormula.return_code();
 	}
 CU_END
 

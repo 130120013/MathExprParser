@@ -19,6 +19,38 @@ enum class CudaParserErrorCodes
 	InvalidExpression,
 	InvalidCast
 };
+
+__host__ static inline const char* strerror(CudaParserErrorCodes cd)
+{
+	switch (cd)
+	{
+		case CudaParserErrorCodes::Success:
+			return "Success";
+		case CudaParserErrorCodes::NotReady:
+			return "Not Ready";
+		case CudaParserErrorCodes::NotEnoughMemory:
+			return "Not Enough Memory";
+		case CudaParserErrorCodes::UnexpectedCall:
+			return "Unexpected Call";
+		case CudaParserErrorCodes::InvalidNumberOfArguments:
+			return "Invalid Number Of Arguments";
+		case CudaParserErrorCodes::UnexpectedToken:
+			return "Unexpected Token";
+		case CudaParserErrorCodes::ParameterIsNotUnique:
+			return "Parameter Is Not Unique";
+		case CudaParserErrorCodes::InvalidArgument:
+			return "Invalid Argument";
+		case CudaParserErrorCodes::ParameterIsNotFound:
+			return "Parameter Is Not Found";
+		case CudaParserErrorCodes::InvalidExpression:
+			return "Invalid Expression";
+		case CudaParserErrorCodes::InvalidCast:
+			return "Invalid Cast";
+		default:
+			return "Unknown error";
+	}
+}
+
 template <class LeftReturnWrapper, class RightReturnWrapper>
 __device__ auto impl_assign_return_wrapper(LeftReturnWrapper& left, RightReturnWrapper&& right)
 -> std::enable_if_t <
@@ -65,20 +97,20 @@ __device__ auto impl_construct_return_wrapper(LeftReturnWrapper& left, RightRetu
 template <class Derived, class T, class = void>
 struct impl_move_assignable_return_wrapper
 {
-	impl_move_assignable_return_wrapper() = default;
-	impl_move_assignable_return_wrapper(const impl_move_assignable_return_wrapper&) = default;
-	impl_move_assignable_return_wrapper(impl_move_assignable_return_wrapper&&) = default;
-	impl_move_assignable_return_wrapper& operator=(const impl_move_assignable_return_wrapper&) = default;
-	impl_move_assignable_return_wrapper& operator=(impl_move_assignable_return_wrapper&&) = delete;
+	__device__ impl_move_assignable_return_wrapper() = default;
+	__device__ impl_move_assignable_return_wrapper(const impl_move_assignable_return_wrapper&) = default;
+	__device__ impl_move_assignable_return_wrapper(impl_move_assignable_return_wrapper&&) = default;
+	__device__ impl_move_assignable_return_wrapper& operator=(const impl_move_assignable_return_wrapper&) = default;
+	__device__ impl_move_assignable_return_wrapper& operator=(impl_move_assignable_return_wrapper&&) = delete;
 };
 
 template <class Derived, class T>
 struct impl_move_assignable_return_wrapper<Derived, T, std::enable_if_t<std::is_move_assignable<T>::value>>
 {
-	impl_move_assignable_return_wrapper() = default;
-	impl_move_assignable_return_wrapper(const impl_move_assignable_return_wrapper&) = default;
-	impl_move_assignable_return_wrapper(impl_move_assignable_return_wrapper&&) = default;
-	impl_move_assignable_return_wrapper& operator=(const impl_move_assignable_return_wrapper&) = default;
+	__device__ impl_move_assignable_return_wrapper() = default;
+	__device__ impl_move_assignable_return_wrapper(const impl_move_assignable_return_wrapper&) = default;
+	__device__ impl_move_assignable_return_wrapper(impl_move_assignable_return_wrapper&&) = default;
+	__device__ impl_move_assignable_return_wrapper& operator=(const impl_move_assignable_return_wrapper&) = default;
 	__device__ impl_move_assignable_return_wrapper& operator=(impl_move_assignable_return_wrapper&& right)
 	{
 		impl_assign_return_wrapper(get_this(), std::move(right.get_this()));
@@ -92,18 +124,18 @@ private:
 template <class Derived, class T, class = void>
 struct impl_copy_assignable_return_wrapper
 {
-	impl_copy_assignable_return_wrapper() = default;
-	impl_copy_assignable_return_wrapper(const impl_copy_assignable_return_wrapper&) = default;
-	impl_copy_assignable_return_wrapper(impl_copy_assignable_return_wrapper&&) = default;
-	impl_copy_assignable_return_wrapper& operator=(const impl_copy_assignable_return_wrapper&) = delete;
+	__device__ impl_copy_assignable_return_wrapper() = default;
+	__device__ impl_copy_assignable_return_wrapper(const impl_copy_assignable_return_wrapper&) = default;
+	__device__ impl_copy_assignable_return_wrapper(impl_copy_assignable_return_wrapper&&) = default;
+	__device__ impl_copy_assignable_return_wrapper& operator=(const impl_copy_assignable_return_wrapper&) = delete;
 	__device__ impl_copy_assignable_return_wrapper& operator=(impl_copy_assignable_return_wrapper&&) = default;
 };
 template <class Derived, class T>
 struct impl_copy_assignable_return_wrapper<Derived, T, std::enable_if_t<std::is_copy_assignable<T>::value>>
 {
-	impl_copy_assignable_return_wrapper() = default;
-	impl_copy_assignable_return_wrapper(const impl_copy_assignable_return_wrapper&) = default;
-	impl_copy_assignable_return_wrapper(impl_copy_assignable_return_wrapper&&) = default;
+	__device__ impl_copy_assignable_return_wrapper() = default;
+	__device__ impl_copy_assignable_return_wrapper(const impl_copy_assignable_return_wrapper&) = default;
+	__device__ impl_copy_assignable_return_wrapper(impl_copy_assignable_return_wrapper&&) = default;
 	__device__ impl_copy_assignable_return_wrapper& operator=(const impl_copy_assignable_return_wrapper& right)
 	{
 		impl_assign_return_wrapper(get_this(), right.get_this());
