@@ -787,6 +787,12 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 					if (funcStack.top().first.get()->type() == TokenType::maxFunction ||
 						funcStack.top().first.get()->type() == TokenType::minFunction)
 						funcStack.top().second += 1;
+					else
+					{
+						funcStack.top().second -= 1;
+						if (funcStack.top().second == 0)
+							return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
+					}
 					last_parse_entity = LastParsedId::Comma;
 				}
 				else if (isdigit(*tkn.begin()))
