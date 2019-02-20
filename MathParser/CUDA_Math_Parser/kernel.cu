@@ -40,8 +40,9 @@ int main()
 {
 	cudaError_t cudaStatus;
 	//const char pStr[] = "f(x) = 2*j1(0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
-	const char pStr[] = "f(x) = abs(x) * (cos(arg(x)) + i * sin(arg(x)))";
-	number_type V[1];
+	//const char pStr[] = "f(x) = abs(x) * (cos(arg(x)) + j * sin(arg(x)))";
+	const char pStr[] = "f(x, y) = sin(x, y)";
+	number_type V[10];
 	std::size_t cbStack;
 
 	cudaStatus = cudaDeviceGetLimit(&cbStack, cudaLimitStackSize);

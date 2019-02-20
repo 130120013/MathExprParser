@@ -33,6 +33,7 @@ enum class TokenType
 	y1Function,
 	ynFunction,
 	gammaFunction,
+	argFunction,
 	absFunction,
 	polarFunction,
 	minFunction,
@@ -915,7 +916,7 @@ public:
 	}
 	__device__ virtual short getPriority()
 	{
-		return 1;
+		return 4;
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{
@@ -999,7 +1000,7 @@ public:
 	}
 	__device__ virtual short getPriority()
 	{
-		return 1;
+		return 4;
 	}
 	__device__ virtual std::size_t get_required_parameter_count() const
 	{
@@ -1312,7 +1313,7 @@ public:
 	}
 	__device__ virtual TokenType type()
 	{
-		return TokenType::sinFunction;
+		return TokenType::argFunction;
 	}
 	__device__ virtual short getPriority()
 	{

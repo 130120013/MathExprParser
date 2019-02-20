@@ -296,7 +296,7 @@ struct return_wrapper_t :impl_return_wrapper_proxy<T>
 	__device__ return_wrapper_t(CudaParserErrorCodes exit_code)
 		:impl_return_wrapper_proxy<T>(exit_code) {}
 	template <class U>
-	__device__ inline return_wrapper_t(const return_wrapper_t<U>& right):return_wrapper_t(bool(right)?cu::CudaParserErrorCodes::InvalidCast:right.return_code()) {}
+	__device__ inline return_wrapper_t(const return_wrapper_t<U>& right):return_wrapper_t(bool(right)?right.return_code():cu::CudaParserErrorCodes::InvalidCast) {}
 	friend impl_copy_assignable_return_wrapper<return_wrapper_t<T>, T>;
 	friend impl_move_assignable_return_wrapper<return_wrapper_t<T>, T>;
 	template <class LeftReturnWrapper, class RightReturnWrapper>

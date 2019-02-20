@@ -672,6 +672,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 			case LastParsedId::UnaryOperator:
 			case LastParsedId::BinaryOperator:
 			case LastParsedId::OpenBracket:
+			case LastParsedId::Literal:
 				return true;
 			default:
 				return false;
@@ -990,8 +991,8 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 							return rw;
 						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
-						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<AbsFunction<T>>(), 1));
-						if(!rw)
+						auto rw1 = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<AbsFunction<T>>(), 1));
+						if(!rw1)
 							return make_return_wrapper_error(cu::CudaParserErrorCodes::NotEnoughMemory); 
 					}
 					else if (tkn == "polar")
@@ -1038,7 +1039,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 				}
 				else if (tkn == ")")
 				{
-					if (!verify_open_bracket(last_parse_entity))
+					if (!verify_closing_bracket(last_parse_entity))
 						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
 					tokens.pop_bracket();
 					if(!funcStack.empty())
@@ -1055,17 +1056,17 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						}
 						funcStack.pop();
 					}
-					last_parse_entity = LastParsedId::OpenBracket;
+					last_parse_entity = LastParsedId::ClosingBracket;
 				}
 				else if (tkn == "(")
 				{
-					if (!verify_closing_bracket(last_parse_entity))
+					if (!verify_open_bracket(last_parse_entity))
 						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
 					auto rw = tokens.push_token(Bracket<T>());
 					if (!rw)
 						return rw;
 					last_type_id = int(rw.value()->type());
-					last_parse_entity = LastParsedId::ClosingBracket;
+					last_parse_entity = LastParsedId::OpenBracket;
 				}
 				else
 					return cu::return_wrapper_t<cu::list<cuda_device_unique_ptr<IToken<T>>>>(CudaParserErrorCodes::InvalidExpression);
