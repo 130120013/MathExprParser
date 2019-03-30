@@ -26,7 +26,7 @@ __global__ void memset_expr(cu::CudaParserErrorCodes* pCode, number_type* vec, s
 	if (i < n)
 	{
 		auto& m = *g_pExpr;
-		auto rv = m(number_type(i, i));
+		auto rv = m(number_type(i));
 		*pCode = rv.return_code();
 		if (bool(rv))
 			vec[i] = rv.value();
@@ -41,7 +41,7 @@ int main()
 	cudaError_t cudaStatus;
 	//const char pStr[] = "f(x) = 2*j1(0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
 	//const char pStr[] = "f(x) = abs(x) * (cos(arg(x)) + j * sin(arg(x)))";
-	const char pStr[] = "f(x, y) = sin(x, y)";
+	const char pStr[] = "f(x) = x";
 	number_type V[10];
 	std::size_t cbStack;
 
