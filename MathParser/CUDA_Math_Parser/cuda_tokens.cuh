@@ -364,20 +364,15 @@ public:
 		{
 			auto mid = count / 2;
 			auto cmp = cu::strncmpnz(pFrameBegin[mid].first->c_str(), pFrameBegin[mid].first->size(), pName, cbName);
-			//if (cmp)
-			//{
-				if (cmp == 0)
-					return cu::return_wrapper_t<T>(pFrameBegin[mid].second);
-				if (cmp < 0)
-				{
-					pFrameBegin = &pFrameBegin[mid];
-					count -= mid;
-				}
-				else
-					count = mid;
-			//}
-			//else
-			//	break;
+			if (cmp == 0)
+				return cu::return_wrapper_t<T>(pFrameBegin[mid].second);
+			if (cmp < 0)
+			{
+				pFrameBegin = &pFrameBegin[mid];
+				count -= mid;
+			}
+			else
+				count = mid;
 		}
 		return cu::make_return_wrapper_error<T>(CudaParserErrorCodes::ParameterIsNotFound);
 	}

@@ -361,7 +361,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 			auto i = m_sorted_params.size() - 1;
 			while (i > 0)
 			{
-				auto repl = i / 2 - 1;
+				auto repl = (i - 1) / 2;
 				if (*m_sorted_params[repl] > *m_sorted_params[i])
 					return cu::return_wrapper_t<void>();
 				swap(m_sorted_params[repl], m_sorted_params[i]);
@@ -372,26 +372,29 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 		__device__ cu::return_wrapper_t<void> finalize()
 		{
 			using cu::swap;
-			if (m_sorted_params.empty())
-				return cu::return_wrapper_t<void>();
-			auto heap_end = m_sorted_params.size() - 1;
-			while (heap_end > 0)
+			using size_type = cu::vector<cu::string*>::size_type;
+			auto heap_end = m_sorted_params.size();
+			while (heap_end > 1)
 			{
 				swap(m_sorted_params[0], m_sorted_params[--heap_end]);
-				for (cu::vector<cu::string*>::size_type iStart = 0, iSwap; iStart < heap_end / 2 - 1; iStart = iSwap)
+				size_type heap_end_parent = (heap_end - 1) / 2, iStart, iSwap;
+				for (iStart = 0, iSwap; iStart < heap_end_parent; iStart = iSwap)
 				{
 					iSwap = iStart * 2 + 1;
 					auto cmp = cu::strncmpnz(m_sorted_params[iSwap]->data(), m_sorted_params[iSwap]->size(), m_sorted_params[iSwap + 1]->data(), m_sorted_params[iSwap + 1]->size());
-					if (!cmp)
-						return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::ParameterIsNotUnique);
-					if (cmp.value() < 0)
+					if (cmp < 0)
 						++iSwap;
 					cmp = cu::strncmpnz(m_sorted_params[iStart]->data(), m_sorted_params[iStart]->size(), m_sorted_params[iSwap]->data(), m_sorted_params[iSwap]->size());
-					if (!cmp)
-						return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::ParameterIsNotUnique);
-					if (cmp.value() > 0)
+					if (cmp > 0)
 						break;
 					swap(m_sorted_params[iStart], m_sorted_params[iSwap]);
+				}
+				if (iStart == heap_end_parent && (heap_end & 1) == 0)
+				{
+					auto iSwap = heap_end - 1;
+					auto cmp = cu::strncmpnz(m_sorted_params[iStart]->data(), m_sorted_params[iStart]->size(), m_sorted_params[iSwap]->data(), m_sorted_params[iSwap]->size());
+					if (cmp < 0)
+						swap(m_sorted_params[iStart], m_sorted_params[iSwap]);
 				}
 			}
 			return cu::return_wrapper_t<void>();
@@ -404,12 +407,12 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 		__device__ cu::return_wrapper_t<expr_param_init_block<T>> construct_init_block(ArgIteratorBegin arg_begin, ArgIteratorEnd arg_end) const
 		{
 			cu::vector<cu::pair<const cu::string*, T>> v_init;
-			auto itParam = m_parameters.begin();
+			auto itParam = m_sorted_params.begin();
 			while (arg_begin != arg_end)
 			{
-				if (itParam == m_parameters.end())
+				if (itParam == m_sorted_params.end())
 					return cu::make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidNumberOfArguments);
-				v_init.emplace_back(cu::make_pair(&*(itParam++), *(arg_begin++)));
+				v_init.emplace_back(cu::make_pair(*(itParam++), *(arg_begin++)));
 			}
 			return expr_param_init_block<T>(std::move(v_init));
 		}
@@ -490,6 +493,7 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 				}
 			}
 			*ppEndPtr = begPtr;
+			m_strg.finalize();
 		}
 		Header(const Header<T>&) = delete;
 		Header& operator=(const Header<T>&) = delete;
@@ -706,7 +710,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 			std::size_t cbRest = length;
 			TokenStorage<T> tokens;
 			cu::stack <cu::pair<cuda_device_unique_ptr<Function<T>>, std::size_t>> funcStack;
-			int last_type_id = -1;
 			LastParsedId last_parse_entity = LastParsedId::Unspecified;
 
 			while (cbRest > 0)
@@ -719,14 +722,12 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(UnaryPlus<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::UnaryOperator;
 					}else if (verify_binary_operator(last_parse_entity))
 					{
 						auto rw = tokens.push_token(BinaryPlus<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::BinaryOperator;
 					}else
 						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
@@ -739,14 +740,12 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(UnaryMinus<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::UnaryOperator;
 					}else if (verify_binary_operator(last_parse_entity))
 					{
 						auto rw = tokens.push_token(BinaryMinus<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::BinaryOperator;
 					}else
 						return make_return_wrapper_error(cu::CudaParserErrorCodes::InvalidExpression);
@@ -758,7 +757,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 					auto rw = tokens.push_token(OperatorMul<T>());
 					if (!rw)
 						return rw;
-					last_type_id = int(rw.value()->type());
 					last_parse_entity = LastParsedId::BinaryOperator;
 				}else if (tkn == "/")
 				{
@@ -767,7 +765,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 					auto rw = tokens.push_token(OperatorDiv<T>());
 					if (!rw)
 						return rw;
-					last_type_id = int(rw.value()->type());
 					last_parse_entity = LastParsedId::BinaryOperator;
 				}else if (tkn == "^")
 				{
@@ -776,7 +773,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 					auto rw = tokens.push_token(OperatorPow<T>());
 					if (!rw)
 						return rw;
-					last_type_id = int(rw.value()->type());
 					last_parse_entity = LastParsedId::BinaryOperator;
 				}else if (tkn == ",")
 				{
@@ -805,7 +801,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 					auto rw_tkn = tokens.push_token(Number<T>(rw_val.value()));
 					if (!rw_tkn)
 						return rw_tkn;
-					last_type_id = int(rw_tkn.value()->type());
 					last_parse_entity = LastParsedId::Literal;
 				}
 				else if (isalpha(*tkn.begin()))
@@ -817,7 +812,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(parse_imaginary_unit());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 					}
 					else if (tkn == "PI")
@@ -825,7 +819,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(PI<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type()); // TODO: Set last_parse_entity for every entity
 						last_parse_entity = LastParsedId::Literal;
 					}
 					else if (tkn == "EULER")
@@ -833,7 +826,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(Euler<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 					}
 					else if (tkn == "arg")
@@ -841,7 +833,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(ArgFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<ArgFunction<T>>()), 1));
 						if(!rw)
@@ -852,7 +843,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(SinFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<SinFunction<T>>()), 1));
 						if(!rw)
@@ -863,7 +853,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(CosFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<CosFunction<T>>()), 1));
 						if(!rw)
@@ -874,7 +863,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(TgFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<TgFunction<T>>(), 1));
 						if(!rw)
@@ -885,7 +873,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(Log10Function<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Log10Function<T>>(), 1));
 						if(!rw)
@@ -896,7 +883,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(LnFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<LnFunction<T>>(), 1));
 						if(!rw)
@@ -907,7 +893,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(LogFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(std::move(make_cuda_device_unique_ptr<LogFunction<T>>()), 2));
 						if(!rw)
@@ -918,7 +903,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(J0Function<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<J0Function<T>>(), 1));
 						if(!rw)
@@ -929,7 +913,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(J1Function<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<J1Function<T>>(), 1));
 						if(!rw)
@@ -940,7 +923,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(JnFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<JnFunction<T>>(), 2));
 						if(!rw)
@@ -951,7 +933,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(Y0Function<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Y0Function<T>>(), 1));
 						if(!rw)
@@ -962,7 +943,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(Y1Function<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<Y1Function<T>>(), 1));
 						if(!rw)
@@ -973,7 +953,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(YnFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<YnFunction<T>>(), 2));
 						if(!rw)
@@ -984,7 +963,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(GammaFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<GammaFunction<T>>(), 1));
 						if(!rw)
@@ -995,7 +973,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(AbsFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						auto rw1 = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<AbsFunction<T>>(), 1));
 						if(!rw1)
@@ -1006,7 +983,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(PolarFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<PolarFunction<T>>(), 2));
 						if(!rw)
@@ -1017,7 +993,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(MaxFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MaxFunction<T>>(), 0));
 						if(!rw)
@@ -1028,7 +1003,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(MinFunction<T>());
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 						rw = funcStack.push(cu::make_pair(make_cuda_device_unique_ptr<MinFunction<T>>(), 0));
 						if(!rw)
@@ -1039,7 +1013,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 						auto rw = tokens.push_token(Variable<T>(&*tkn.begin(), tkn.size()));
 						if (!rw)
 							return rw;
-						last_type_id = int(rw.value()->type());
 						last_parse_entity = LastParsedId::Literal;
 					}
 				}
@@ -1071,7 +1044,6 @@ template<class T> struct is_complex<thrust::complex<T>> : std::true_type {};
 					auto rw = tokens.push_token(Bracket<T>());
 					if (!rw)
 						return rw;
-					last_type_id = int(rw.value()->type());
 					last_parse_entity = LastParsedId::OpenBracket;
 				}
 				else

@@ -1,4 +1,5 @@
 #include "cuda_config.cuh"
+#include <type_traits>
 
 #ifndef CUDA_PAIR
 #define CUDA_PAIR
@@ -21,9 +22,9 @@ struct pair
 };
 
 template <class T1, class T2>
-__device__ pair<T1, T2> make_pair(T1&& t, T2&& u)
+__device__ auto make_pair(T1&& t, T2&& u)
 {
-	return pair<T1, T2>{std::forward<T1>(t), std::forward<T2>(u)};
+	return pair<std::decay_t<T1>, std::decay_t<T2>>{std::forward<T1>(t), std::forward<T2>(u)};
 }
 CU_END
 
