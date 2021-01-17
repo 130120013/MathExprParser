@@ -7,9 +7,6 @@
     <ClInclude Include="cuda_list.h">
       <Filter>headers</Filter>
     </ClInclude>
-    <ClInclude Include="cuda_map.h">
-      <Filter>headers</Filter>
-    </ClInclude>
     <ClInclude Include="cuda_memory.h">
       <Filter>headers</Filter>
     </ClInclude>
@@ -23,9 +20,6 @@
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="cuda_vector.h">
-      <Filter>headers</Filter>
-    </ClInclude>
-    <ClInclude Include="impl_rb_tree.h">
       <Filter>headers</Filter>
     </ClInclude>
     <ClInclude Include="cuda_return_wrapper.h">

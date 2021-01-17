@@ -1,48 +1,31 @@
-//#define __device__
-//#define __global__
-
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#include "cuda_config.cuh"
-#include "cuda_string.cuh"
-#include "cuda_list.cuh"
-#include "cuda_return_wrapper.cuh"
-//#include "cuda_stack.cuh"
+#include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 #include <stdio.h>
 #include "CudaParser.cuh"
 
-typedef thrust::complex<double> number_type;
+__device__ cu::Mathexpr<thrust::complex<double>>* g_pExpr;
 
-__device__ cu::Mathexpr<number_type>* g_pExpr;
-
-__global__ void memset_expr(cu::CudaParserErrorCodes* pCode, number_type* vec, std::size_t n, const char* pStr, std::size_t cbStr)
+__global__ void memset_expr(cu::CudaParserErrorCodes* pCode, thrust::complex<double>* vec, std::size_t n, const char* pStr, std::size_t cbStr)
 {
 	auto i = threadIdx.x + blockIdx.x * blockDim.x;
 	if (i == 0)
-		g_pExpr = new cu::Mathexpr<number_type>(pCode, pStr, cbStr);
+		g_pExpr = new cu::Mathexpr<thrust::complex<double>>(pCode, pStr, cbStr);
 	__syncthreads();
-	if (*pCode != cu::CudaParserErrorCodes::Success)
-		return;
-	if (i < n)
+	if (*pCode == cu::CudaParserErrorCodes::Success && i < n)
 	{
 		auto& m = *g_pExpr;
-		auto rv = m(number_type(i), number_type(i), number_type(i), number_type(i), number_type(i), number_type(i));
+		auto rv = m(thrust::complex<double>(i, i));
 		*pCode = rv.return_code();
 		if (bool(rv))
 			vec[i] = rv.value();
 	}
-	__syncthreads();
-	if (!i)
-		delete g_pExpr;
 }
 
 int main()
 {
 	cudaError_t cudaStatus;
-	//const char pStr[] = "f(x) = 2*j1(0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
-	//const char pStr[] = "f(x) = abs(x) * (cos(arg(x)) + j * sin(arg(x)))";
-	const char pStr[] = "f(x, y, z, a, c, d) = x + y + z + a + c + d";
-	number_type V[10];
+	const char pStr[] = "f(x) = 2*j1(0.1*3.14*sin(x)) / (0.1*3.14*sin(x))";
+	thrust::complex<double> V[2048];
 	std::size_t cbStack;
 
 	cudaStatus = cudaDeviceGetLimit(&cbStack, cudaLimitStackSize);
@@ -56,7 +39,7 @@ int main()
 	auto pStr_d = make_cuda_unique_ptr<char>(sizeof(pStr));
 	if (!pStr_d)
 		return -100;
-	auto V_d = make_cuda_unique_ptr<number_type>(sizeof(V) / sizeof(number_type));
+	auto V_d = make_cuda_unique_ptr<thrust::complex<double>>(sizeof(V) / sizeof(thrust::complex<double>));
 	if (!V_d)
 		return -100;
 	auto pCode = make_cuda_unique_ptr<cu::CudaParserErrorCodes>();
@@ -66,7 +49,7 @@ int main()
 	cudaStatus = cudaMemcpy(pStr_d.get(), pStr, sizeof(pStr) - 1, cudaMemcpyHostToDevice);
 	if (cudaStatus != cudaSuccess)
 		return -1;
-	memset_expr<<<1, sizeof(V) / sizeof(number_type)>>>(pCode.get(), V_d.get(), sizeof(V) / sizeof(number_type), pStr_d.get(), sizeof(pStr) - 1);
+	memset_expr<<<1, sizeof(V) / sizeof(thrust::complex<double>)>>>(pCode.get(), V_d.get(), sizeof(V) / sizeof(thrust::complex<double>), pStr_d.get(), sizeof(pStr) - 1);
 
 	/*cuda_string expression = "f(x, y) = min(x, 5, y) + min(y, 5, x) + max(x, 5, y) + max(y, 5, x)";
 	Mathexpr<double> mathexpr(expression);

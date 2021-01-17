@@ -139,14 +139,12 @@
     <ClInclude Include="cuda_return_wrapper.h" />
     <ClInclude Include="cuda_iterator.h" />
     <ClInclude Include="cuda_list.h" />
-    <ClInclude Include="cuda_map.h" />
     <ClInclude Include="cuda_memory.h" />
     <ClInclude Include="cuda_pair.h" />
     <ClInclude Include="cuda_stack.h" />
     <ClInclude Include="cuda_string.h" />
     <ClInclude Include="cuda_tokens.h" />
     <ClInclude Include="cuda_vector.h" />
-    <ClInclude Include="impl_rb_tree.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

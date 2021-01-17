@@ -5,6 +5,7 @@
 #include "cuda_pair.cuh"
 #include <cmath>
 #include "thrust/complex.h"
+#include "cuda_string.cuh"
 
 #ifndef CUDA_TOKENS_H
 #define CUDA_TOKENS_H
