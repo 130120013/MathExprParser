@@ -293,7 +293,7 @@ public:
 		if (top - strg.params >= N)
 			throw std::range_error("static_parameter_storage: buffer overflow");
 		*(top++) = std::forward<U>(arg);
-	}
+	}	
 	bool is_ready() const
 	{
 		return top == &strg.params[N] && this->is_ready_from<0>();
@@ -325,10 +325,10 @@ public:
 	virtual bool is_ready() const = 0; //all parameters are specified
 	virtual ~IToken() {} //virtual d-tor is to allow correct destruction of polymorphic objects
 	virtual constexpr TokenType type() = 0;
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const= 0;
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const = 0;
 	virtual short getPriority() = 0;
 	virtual std::shared_ptr<IToken<T>> get_param(std::size_t idx) = 0;
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const = 0;
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const = 0;
 };
 
 template <class T>
@@ -386,7 +386,7 @@ public:
 	{
 		return TokenType::number;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for a number");
 	}
@@ -394,7 +394,7 @@ public:
 	{
 		return -2;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const 
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const 
 	{
 		return nullptr;
 	}
@@ -454,7 +454,7 @@ public:
 		throw std::exception("not implemented for variable");
 	}
 
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for a number");
 	}
@@ -480,7 +480,7 @@ public:
 	{
 		return TokenType::variable;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		if (!strcmp((this->name).get(), target_variable))
 			return std::make_shared<Variable<T>>(*this);
@@ -505,11 +505,38 @@ class Operator : public IToken<T>
 	{
 		throw std::exception("Cannot get operand with index" + index);
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}	
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
+	{
+		throw std::exception("There is no reverse operation for a number");
+	}
+
+	virtual std::shared_ptr<IToken<T>> get_param(std::size_t idx)
+	{
+		throw std::exception("not implemented for operator");
+	}
+};
+
+template <class T>
+class NoncommutativeOperator : public Operator<T>
+{
+	virtual void set_required_parameter_count(std::size_t value)
+	{
+		throw std::exception("Invalid operation");
+	}
+
+	virtual std::shared_ptr<IToken<T>> get_operand(std::size_t index) const
+	{
+		throw std::exception("Cannot get operand with index" + index);
+	}
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
+	{
+		return nullptr;
+	}	
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for a number");
 	}
@@ -564,14 +591,14 @@ public:
 	{
 		return TokenType::UnaryPlus;
 	}	
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		return std::make_shared<UnaryMinus<T>>();
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		static_parameter_storage<std::shared_ptr<IToken<T>>, 1> operands;
-		operands.push_argument((ops[0].get())->transform(root, target_variable));
+		operands.push_argument((ops[0].get())->transform(root, target_variable, target_operator_idx));
 
 		if (this == root.get())
 		{ 
@@ -625,7 +652,7 @@ public:
 	{
 		return ops.is_ready();
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw TokenType::UnaryPlus;
 	}
@@ -637,7 +664,7 @@ public:
 	{
 		return TokenType::UnaryMinus;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -693,16 +720,31 @@ public:
 	{
 		return 2;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
-		return std::make_shared<BinaryMinus<T>>();
+		return std::make_shared<BinaryMinus<T>>(operands);
 	}
 	virtual constexpr TokenType type()
 	{
 		return TokenType::BinaryPlus;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
+		static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands;
+		operands.push_argument((ops[0].get())->transform(root, target_variable, target_operator_idx));
+		operands.push_argument((ops[1].get())->transform(root, target_variable, target_operator_idx));
+
+		for (std::size_t i = 0; i < 2; ++i)
+		{
+			if (operands[i].get() != nullptr) {
+				*target_operator_idx = i;
+				if (this == root.get())
+					return operands[i];
+				else
+					return std::make_shared<BinaryPlus<T>>(*this);
+			}
+		}
+
 		return nullptr;
 	}
 	virtual short getPriority()
@@ -721,6 +763,7 @@ class BinaryMinus : public Operator<T>
 
 public:
 	BinaryMinus() {}
+	BinaryMinus(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) : ops(operands) {}
 	virtual void push_argument(const std::shared_ptr<IToken<T>>& value)
 	{
 		ops.push_argument(value);
@@ -744,11 +787,11 @@ public:
 	{
 		return TokenType::BinaryMinus;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		return std::make_shared<BinaryPlus<T>>(operands);
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -810,31 +853,33 @@ public:
 	{
 		return TokenType::operatorMul;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
+		//static_parameter_storage<std::shared_ptr<IToken<T>>, 2> reversed_operands;
+		//reversed_operands.push_argument(operands[1]);
+		//reversed_operands.push_argument(operands[0]);
 		return std::make_shared<OperatorDiv<T>>(operands);
 	}
 	virtual std::shared_ptr<IToken<T>> get_param(std::size_t idx) 
 	{
 		return ops[idx];
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands;
-		//static_parameter_storage<std::shared_ptr<IToken<T>>, 2> targets;
-		operands.push_argument((ops[0].get())->transform(root, target_variable));
-		operands.push_argument((ops[1].get())->transform(root, target_variable));
+		operands.push_argument((ops[0].get())->transform(root, target_variable, target_operator_idx));
+		operands.push_argument((ops[1].get())->transform(root, target_variable, target_operator_idx));
 
-		if (this == root.get())
-		{//TODO: detect expressions like f = x + y/x
-			for (std::size_t i = 0; i < 2; ++i)
-			{
-				if (operands[i].get() != nullptr)
+		for (std::size_t i = 0; i < 2; ++i)
+		{
+			if (operands[i].get() != nullptr) {
+				*target_operator_idx = i;
+				if (this == root.get())
 					return operands[i];
+				else
+					return std::make_shared<OperatorMul<T>>(*this);
 			}
 		}
-		else if (operands[0] != nullptr && operands[1] != nullptr)
-			return std::make_shared<OperatorMul<T>>(*this);
 
 		return nullptr;
 	}
@@ -888,11 +933,20 @@ public:
 	{
 		return TokenType::operatorDiv;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
-		return std::make_shared<OperatorMul<T>>();
+		if (target_idx == 0)
+		{
+			static_parameter_storage<std::shared_ptr<IToken<T>>, 2> reversed_operands;
+			reversed_operands.push_argument(operands[1]);
+			reversed_operands.push_argument(operands[0]);
+			return std::make_shared<OperatorDiv<T>>(reversed_operands);
+		}
+		else if (target_idx == 1)
+			return std::make_shared<OperatorMul<T>>(operands);
+		return nullptr;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -955,12 +1009,12 @@ public:
 	{
 		return TokenType::operatorPow;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("");
 		//return TokenType::sqrtFunction; //TODO: operator root or log
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -992,11 +1046,11 @@ public:
 	{
 		throw std::exception("Invalid operation");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		throw std::exception("Cannot transform abstract function");
 	}	
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for a number");
 	}
@@ -1038,7 +1092,7 @@ public:
 	{
 		return TokenType::sqrtFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		return TokenType::operatorPow;
 	}
@@ -1046,7 +1100,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1098,7 +1152,7 @@ public:
 	{
 		return TokenType::sinFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("");
 		//return TokenType::sinFunction; //TODO: arcsin
@@ -1107,7 +1161,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1159,7 +1213,7 @@ public:
 	{
 		return TokenType::cosFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("");
 		//return TokenType::cosFunction; //TODO: arccos
@@ -1168,7 +1222,7 @@ public:
 	{
 		return 4;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1224,12 +1278,12 @@ public:
 	{
 		return TokenType::tgFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("");
 		//return TokenType::tgFunction; //TODO: arctg
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1288,11 +1342,11 @@ public:
 	{
 		return TokenType::log10Function;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		return std::make_shared<OperatorPow<T>>(operands); //TODO: pow to 10
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1348,11 +1402,11 @@ public:
 	{
 		return TokenType::lnFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		return std::make_shared<OperatorPow<T>>(operands); //TODO: pow e
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1408,11 +1462,11 @@ public:
 	{
 		return TokenType::logFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		return std::make_shared<OperatorPow<T>>(operands); //TODO: pow arbitrary
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1471,11 +1525,11 @@ public:
 	{
 		return TokenType::jnFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for jn");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1534,11 +1588,11 @@ public:
 	{
 		return TokenType::j0Function;
 	}	
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for j0");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1594,11 +1648,11 @@ public:
 	{
 		return TokenType::j1Function;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for j1");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1654,11 +1708,11 @@ public:
 	{
 		return TokenType::ynFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for yn");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1717,11 +1771,11 @@ public:
 	{
 		return TokenType::y0Function;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for y0");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1777,11 +1831,11 @@ public:
 	{
 		return TokenType::y1Function;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for y1");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1827,11 +1881,11 @@ public:
 
 		return (*std::min_element(ops.begin(), ops.end(), m_pred)).get()->operator()();
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for extremum");
 	}
@@ -1928,11 +1982,11 @@ public:
 	{
 		return TokenType::maxFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1951,11 +2005,11 @@ public:
 	{
 		return TokenType::minFunction;
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("Error");
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1985,7 +2039,7 @@ public:
 	{
 		return -1;
 	}
-	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable) const
+	virtual std::shared_ptr<IToken<T>> transform(std::shared_ptr<IToken<T>> root, const char* target_variable, std::size_t* target_operator_idx) const
 	{
 		return nullptr;
 	}
@@ -1993,7 +2047,7 @@ public:
 	{
 		return TokenType::bracket; 
 	}
-	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands) const
+	virtual std::shared_ptr<IToken<T>> get_reverse_operator(const static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands, std::size_t target_idx = -1) const
 	{
 		throw std::exception("There is no reverse operation for a bracket");
 	}
@@ -2254,6 +2308,11 @@ public:
 		}
 		throw std::invalid_argument("Parameter not found");
 	}
+	std::shared_ptr<IToken<T>> get_header_expression() const
+	{
+		return std::make_shared<Variable<T>>(function_name.c_str(), function_name.size());
+	}
+
 	Header(Header&&) = default;
 	Header& operator=(Header&&) = default;
 };
@@ -2284,10 +2343,26 @@ public:
 
 	std::shared_ptr<IToken<T>> transformation(const char* target_parameter, std::size_t parameter_size) 
 	{
-		auto param = header.get_argument(target_parameter, parameter_size);
-		auto res = (body.get())->transform(body, target_parameter);
-		reverse_operation<T>(body, 0, body);
-		return res;
+		auto pBody = body;
+		auto header_expression = header.get_header_expression();
+		std::size_t* target_param_idx = new std::size_t();
+		try {
+			auto param = header.get_argument(target_parameter, parameter_size);
+
+			while ((pBody.get())->type() != TokenType::variable || (pBody.get())->type() != TokenType::variable)
+			{
+				auto target_variable_operator = (pBody.get())->transform(pBody, target_parameter, target_param_idx);
+				auto another_operator_idx = (pBody.get())->get_required_parameter_count() - 1 - *target_param_idx;
+				auto res = reverse_operation(pBody, another_operator_idx, header_expression);
+				header_expression = res;
+				pBody = target_variable_operator;
+			}
+		}
+		catch (std::exception e)
+		{
+			return nullptr;
+		}
+		return header_expression;
 		//for (auto i = body.get(); i != (body.get())->end(); ++i)
 		//{
 		//	*i;
@@ -2299,6 +2374,22 @@ public:
 private:
 	Header<T> header;
 	std::shared_ptr<IToken<T>> body;
+
+	std::shared_ptr<IToken<T>> reverse_operation(std::shared_ptr<IToken<T>> operation,
+		std::size_t reverse_param_index, std::shared_ptr<IToken<T>> header)
+	{
+		//TODO: use header
+		//auto head = std::make_shared<Variable<T>>("F", 1);
+		std::shared_ptr<IToken<T>> reverse_param = (operation.get())->get_param(reverse_param_index);
+		TokenType type = (operation.get())->type();
+		static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands;
+		
+		operands.push_argument(reverse_param);
+		operands.push_argument(header);
+		
+		auto new_operator = (operation.get())->get_reverse_operator(operands, reverse_param_index);
+		return new_operator;
+	}
 
 	template <class T>
 	std::list<std::shared_ptr<IToken<T>>> lexBody(const char* expr, std::size_t length)
@@ -2453,21 +2544,6 @@ private:
 		//body = std::move(tokens).finalize();
 		formula = std::move(tokens).finalize();
 		return formula;
-	}
-
-	template <class T>
-	auto reverse_operation(std::shared_ptr<IToken<T>> operation,
-		std::size_t reverse_param_index, std::shared_ptr<IToken<T>> header)
-	{
-		//TODO: use header
-		auto head = std::make_shared<Variable<T>>("F", 1);
-		auto reverse_param = (operation.get())->get_param(reverse_param_index);
-		TokenType type = (operation.get())->type();
-		static_parameter_storage<std::shared_ptr<IToken<T>>, 2> operands;
-		operands.push_argument(head);
-		operands.push_argument(reverse_param);
-		auto new_operator = (operation.get())->get_reverse_operator(operands);
-		return nullptr;
 	}
 };
 

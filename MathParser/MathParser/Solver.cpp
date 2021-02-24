@@ -3,14 +3,19 @@
 
 /*
 std::string expression = "f(x, y) = x * y"; - PASSED
+std::string expression = "f(x <-, y, z) = x * y + z"; - PASSED
+std::string expression = "f(x, y <-, z) = x * y + z"; - PASSED
+std::string expression = "f(x, y, z <-) = x * y + z"; - PASSED 
+std::string expression = "f(x, y) = x / y"; - 
+
 */
 
 
 void transform_test()
 {
-	std::string expression = "f(x, y) = x * y";
+	std::string expression = "f(x, y, z) = x * y + z";
 	Mathexpr<double> mathexpr = { expression };
-	auto result = mathexpr.transformation("x", 1);
+	auto result = mathexpr.transformation("z", 1);
 
 	
 	/*auto type = (result.get())->type();
