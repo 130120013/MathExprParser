@@ -6,14 +6,15 @@ std::string expression = "f(x, y) = x * y"; - PASSED
 std::string expression = "f(x <-, y, z) = x * y + z"; - PASSED
 std::string expression = "f(x, y <-, z) = x * y + z"; - PASSED
 std::string expression = "f(x, y, z <-) = x * y + z"; - PASSED 
-std::string expression = "f(x, y) = x / y"; - 
+std::string expression = "f(x <-, y) = x / y"; - PASSED
+std::string expression = "f(x, y <-) = x / y"; - PASSED
 
 */
 
 
 void transform_test()
 {
-	std::string expression = "f(x, y, z) = x * y + z";
+	std::string expression = "f(x, y, z) = x / y - z";
 	Mathexpr<double> mathexpr = { expression };
 	auto result = mathexpr.transformation("z", 1);
 
